@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import argparse
+import io
 from pathlib import Path
 
 from capstone import (
@@ -14,6 +15,7 @@ from capstone import (
     Cs,
 )
 from elftools.elf.elffile import ELFFile
+from ps2_ee_disasm import disassemble_ee
 
 
 def parse_int(text: str) -> int:
@@ -23,6 +25,7 @@ def parse_int(text: str) -> int:
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("elf", type=Path)
+    parser.add_argument("--iso-member", help="Read this ISO9660 ELF member in memory; do not extract the disc")
     parser.add_argument("--start", type=parse_int, required=True)
     parser.add_argument("--end", type=parse_int, required=True)
     parser.add_argument("--output", type=Path)
@@ -35,10 +38,24 @@ def main() -> int:
 
     if args.end <= args.start:
         parser.error("--end must be greater than --start")
+    if args.start % 4 or args.end % 4:
+        parser.error("EE instruction ranges must be 4-byte aligned")
     if args.end - args.start > 16 * 1024 * 1024:
         parser.error("range exceeds 16 MiB safety bound")
 
-    with args.elf.open("rb") as stream:
+    if args.iso_member:
+        import pycdlib
+        disc = pycdlib.PyCdlib()
+        disc.open(str(args.elf))
+        stream = io.BytesIO()
+        try:
+            disc.get_file_from_iso_fp(stream, iso_path=args.iso_member)
+        finally:
+            disc.close()
+        stream.seek(0)
+    else:
+        stream = args.elf.open("rb")
+    with stream:
         elf = ELFFile(stream)
         containing = None
         for segment in elf.iter_segments():
@@ -63,17 +80,14 @@ def main() -> int:
         | CS_MODE_LITTLE_ENDIAN,
     )
     disassembler.detail = False
-    # Capstone does not decode every Emotion Engine MMI instruction.  Keep the
-    # surrounding scalar control flow visible instead of stopping at one.
-    disassembler.skipdata = True
+    # Decode EE-specific primary/COP2 encodings before scalar Capstone. Its
+    # generic MIPS tables otherwise mislabel LQC2 as bbit032 and LQ as MSA.
     lines = [
         f"# file={args.elf.resolve()}",
         f"# va=0x{args.start:08x}..0x{args.end:08x} bytes={len(code)}",
+        "# decoder=EE overrides + scalar Capstone; unsupported EE ops are explicit .word",
     ]
-    lines.extend(
-        f"0x{insn.address:08x}: {insn.mnemonic:<10} {insn.op_str}".rstrip()
-        for insn in disassembler.disasm(code, args.start)
-    )
+    lines.extend(disassemble_ee(code, args.start, disassembler))
     text = "\n".join(lines) + "\n"
     if args.output:
         args.output.parent.mkdir(parents=True, exist_ok=True)

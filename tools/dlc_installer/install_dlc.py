@@ -1032,6 +1032,92 @@ def validate_release_content_plan(release_manifest: Path | None) -> dict[str, An
     return {"status": "validated", "packages": report}
 
 
+def validate_release_ui_assets(release_manifest: Path | None) -> dict[str, Any]:
+    if release_manifest is None:
+        return {"status": "not_requested", "assets": []}
+    root = load_manifest(release_manifest)
+    assets = root.get("ui_assets", [])
+    if not isinstance(assets, list):
+        raise InstallError("release manifest ui_assets must be an array")
+    report: list[dict[str, Any]] = []
+    for row in assets:
+        if not isinstance(row, dict):
+            raise InstallError("invalid release UI asset row")
+        asset_id = row.get("id")
+        relative = row.get("path")
+        destination = row.get("destination")
+        files = row.get("files")
+        if (
+            not isinstance(asset_id, str) or not asset_id
+            or not isinstance(relative, str) or not relative
+            or not isinstance(destination, str) or not destination
+            or not isinstance(files, list) or not files
+        ):
+            raise InstallError("incomplete release UI asset row")
+        normalized_package_path(destination)
+        source = resolve_below(
+            release_manifest.parent, relative,
+            f"release UI asset {asset_id} path",
+        )
+        expected: dict[str, str] = {}
+        for item in files:
+            if (
+                not isinstance(item, dict)
+                or not isinstance(item.get("path"), str)
+                or not isinstance(item.get("sha256"), str)
+                or not re.fullmatch(r"[0-9a-fA-F]{64}", item["sha256"])
+            ):
+                raise InstallError(f"{asset_id}: invalid UI asset file row")
+            file_path = normalized_package_path(item["path"])
+            key = file_path.casefold()
+            if key in expected:
+                raise InstallError(f"{asset_id}: duplicate UI asset: {file_path}")
+            expected[key] = item["sha256"].casefold()
+        actual = {
+            path.relative_to(source).as_posix().casefold(): path
+            for path in source.rglob("*") if path.is_file()
+        } if source.is_dir() else {}
+        if set(actual) != set(expected):
+            raise InstallError(f"{asset_id}: release UI asset file set differs")
+        total = 0
+        for key, digest in expected.items():
+            path = actual[key]
+            if sha256_file(path).casefold() != digest:
+                raise InstallError(f"{asset_id}: UI asset hash mismatch: {key}")
+            total += path.stat().st_size
+        report.append({
+            "id": asset_id, "status": "validated_for_copy",
+            "source": str(source), "destination": destination,
+            "files": len(actual), "bytes": total,
+        })
+    return {"status": "validated", "assets": report}
+
+
+def install_release_ui_assets(release_manifest: Path | None, base_gen: Path) -> dict[str, Any]:
+    validation = validate_release_ui_assets(release_manifest)
+    if release_manifest is None:
+        return validation
+    root = load_manifest(release_manifest)
+    for row, validated in zip(root.get("ui_assets", []), validation["assets"]):
+        source = resolve_below(
+            release_manifest.parent, row["path"],
+            f"release UI asset {row['id']} path",
+        )
+        destination = resolve_below(
+            base_gen, row["destination"],
+            f"release UI asset {row['id']} destination",
+        )
+        staged = destination.parent / f".{destination.name}-staging-{uuid.uuid4().hex}"
+        copy_tree(source, staged)
+        if destination.exists():
+            remove_tree(destination)
+        os.replace(staged, destination)
+        validated["status"] = "installed"
+        validated["destination"] = str(destination)
+    validation["status"] = "installed"
+    return validation
+
+
 def dolphin_image_identity(
     source: Path,
     dolphin_tool: Path,
@@ -1641,6 +1727,7 @@ def main() -> int:
         if release_manifest and not release_manifest.is_file():
             raise InstallError(f"release manifest not found: {release_manifest}")
         audit["release_content"] = validate_release_content_plan(release_manifest)
+        audit["release_ui_assets"] = validate_release_ui_assets(release_manifest)
         if args.plan:
             audit["base"] = {
                 "path": str(base_gen),
@@ -1704,6 +1791,9 @@ def main() -> int:
         check_package_conflicts(dlc_root, packages, base_paths)
         emit_progress(94, "Installing and verifying the base and DLC…")
         audit["base"] = install_gh2_base(sources["gh2"], base_gen)
+        audit["release_ui_assets"] = install_release_ui_assets(
+            release_manifest, base_gen
+        )
         dlc_root.mkdir(parents=True, exist_ok=True)
         for package in packages:
             audit["packages"].append(

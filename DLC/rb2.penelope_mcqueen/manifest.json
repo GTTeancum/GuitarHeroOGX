@@ -1,0 +1,43 @@
+{
+  "schema_version": 1,
+  "id": "rb2.penelope_mcqueen",
+  "name": "Penelope McQueen",
+  "version": "0.1.0",
+  "source_game": "rb2_wii",
+  "source_prefab": "vocals20",
+  "content_root": "content",
+  "content_index": "content-index.json",
+  "files": [
+    "char/rb2_penelope_mcqueen/og/gen/rb2_penelope_mcqueen.milo_ps2",
+    "char/rb2_penelope_mcqueen/anims/gen/rock1_viseme.milo_ps2",
+    "ui/image/dlc/rb2_penelope_mcqueen/portrait.bmp_ps2"
+  ],
+  "characters": [
+    {
+      "id": "rb2_penelope_mcqueen",
+      "label": "Penelope McQueen",
+      "description": "Rock Band 2 Wii preset vocals20, converted from its authored prefab data.",
+      "portrait": "ui/image/dlc/rb2_penelope_mcqueen/portrait.bmp_ps2",
+      "preferred_guitar": "stratocaster02",
+      "preferred_guitar_finish": "stratocaster02_paint",
+      "preferred_guitar_paint_primary": 0,
+      "preferred_guitar_paint_secondary": 4,
+      "outfits": [
+        {
+          "selection": "rb2_penelope_mcqueen_default",
+          "source": "rb2_wii",
+          "label": "Penelope McQueen",
+          "description": "",
+          "model": "char/rb2_penelope_mcqueen/og/gen/rb2_penelope_mcqueen.milo_ps2",
+          "ui_model": "char/rb2_penelope_mcqueen/og/gen/rb2_penelope_mcqueen.milo_ps2",
+          "ui_anim": "char/rock1/anims/gen/rock1_ui.milo_ps2",
+          "main_anim": "char/rock1/anims/gen/rock1_main.milo_ps2",
+          "strum_anim": "char/rock1/anims/gen/rock1_strum.milo_ps2",
+          "fret_anim": "char/rock1/anims/gen/rock1_fret.milo_ps2",
+          "animation_source_model": "char/rock1/og/gen/rock1.milo_ps2",
+          "retarget_animation": true
+        }
+      ]
+    }
+  ]
+}

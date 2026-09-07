@@ -47,12 +47,16 @@ void SongIntroOverlay::reset(std::string visual_hdr_path,
                              std::string visual_ark_path,
                              std::string content_hdr_path,
                              std::string content_ark_path,
-                             std::string song_shortname) {
+                             std::string song_shortname,
+                             std::string title_override,
+                             std::string artist_override) {
   hdr_path_ = std::move(visual_hdr_path);
   ark_path_ = std::move(visual_ark_path);
   content_hdr_path_ = std::move(content_hdr_path);
   content_ark_path_ = std::move(content_ark_path);
   song_shortname_ = std::move(song_shortname);
+  title_override_ = std::move(title_override);
+  artist_override_ = std::move(artist_override);
   attempted_ = false;
   ready_ = false;
   shown_logged_ = false;
@@ -62,35 +66,52 @@ void SongIntroOverlay::reset(std::string visual_hdr_path,
 
 bool SongIntroOverlay::load_text(std::string& title, std::string& caption,
                                  std::string& artist) const {
+  title = title_override_;
+  artist = artist_override_;
   try {
-    auto archive = gh::ark::ArkV3Reader::load(content_hdr_path_);
-    const auto songs_entry = archive.find("config/gen/songs.dtb");
-    auto locale_entry = archive.find("ui/eng/gen/locale.dtb");
+    // The song card is a GH2 UI surface, so its localized caption belongs to
+    // the visual/base archive even when the selected song comes from loose DLC
+    // or a separately mounted GH1/GH80s archive.
+    auto visual_archive = gh::ark::ArkV3Reader::load(hdr_path_);
+    auto locale_entry = visual_archive.find("ui/eng/gen/locale.dtb");
     if (!locale_entry)
-      locale_entry = archive.find("ghui/eng/gen/locale.dtb");
-    if (!songs_entry || !locale_entry) return false;
-    const auto songs = ghogx::catalog::extract_songs(
-        gh::dtb::parse(
-            archive.read_entry(*songs_entry, {content_ark_path_})));
-    for (const auto& song : songs) {
-      if (song.shortname != song_shortname_) continue;
-      title = song.display_name;
-      artist = song.artist;
-      break;
-    }
+      locale_entry = visual_archive.find("ghui/eng/gen/locale.dtb");
+    if (!locale_entry) return false;
     const auto locale =
         gh::dtb::parse(
-            archive.read_entry(*locale_entry, {content_ark_path_}));
+            visual_archive.read_entry(*locale_entry, {ark_path_}));
     if (const auto row = gh::dtb::find_keyed(locale, "mtv_made_famous")) {
       const auto& children = gh::dtb::children(*row);
       if (children.size() >= 2 && children[1])
         caption = gh::dtb::as_string(*children[1]).value_or("");
     }
+
+    if (title.empty() || artist.empty()) {
+      auto content_archive = gh::ark::ArkV3Reader::load(content_hdr_path_);
+      const auto songs_entry = content_archive.find("config/gen/songs.dtb");
+      if (songs_entry) {
+        const auto songs = ghogx::catalog::extract_songs(
+            gh::dtb::parse(content_archive.read_entry(
+                *songs_entry, {content_ark_path_})));
+        for (const auto& song : songs) {
+          if (song.shortname != song_shortname_) continue;
+          if (title.empty()) title = song.display_name;
+          if (artist.empty()) artist = song.artist;
+          break;
+        }
+      }
+    }
     return !title.empty() && !caption.empty() && !artist.empty();
   } catch (const std::exception& ex) {
-    std::fprintf(stderr, "[ghogx] GH1 song intro text: %s\n", ex.what());
+    std::fprintf(stderr, "[ghogx] song intro text load failed: %s\n",
+                 ex.what());
     return false;
   }
+}
+
+bool SongIntroOverlay::prepare() {
+  ensure_loaded();
+  return ready_;
 }
 
 void SongIntroOverlay::ensure_loaded() {

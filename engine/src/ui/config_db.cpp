@@ -486,6 +486,7 @@ void ConfigDb::load(const gh::ark::ArkV3Reader& ark, const std::vector<std::stri
   // are intentionally parsed before any loose content becomes visible.
   gh::ark::ArkV3Reader::clear_loose_file_mounts();
   addon_venues_.clear();
+  addon_venue_labels_.clear();
   addon_quickplay_songs_.clear();
   addon_setlists_.clear();
   dlc_packages_.clear();
@@ -639,6 +640,7 @@ void ConfigDb::load_addon_manifests(
   for (const fs::path& manifest : manifests) {
     const std::size_t variants_before = character_variants_.size();
     const std::size_t venues_before = addon_venues_.size();
+    const std::size_t venue_labels_before = addon_venue_labels_.size();
     const std::size_t quickplay_before = addon_quickplay_songs_.size();
     const std::size_t setlists_before = addon_setlists_.size();
     std::vector<std::pair<std::size_t, CharacterVariant>>
@@ -833,7 +835,11 @@ void ConfigDb::load_addon_manifests(
                                 const std::string& inherited_character,
                                 const std::string& inherited_label,
                                 const std::string& inherited_blurb,
-                                const std::string& inherited_portrait) {
+                                const std::string& inherited_portrait,
+                                const std::string& inherited_preferred_guitar,
+                                const std::string& inherited_preferred_finish,
+                                int inherited_preferred_primary,
+                                int inherited_preferred_secondary) {
         CharacterVariant variant;
         const std::string character =
             json_string(row, "character").empty()
@@ -889,6 +895,25 @@ void ConfigDb::load_addon_manifests(
         std::string portrait = json_string(row, "portrait");
         if (portrait.empty()) portrait = inherited_portrait;
         variant.portrait_path = normalized_manifest_path(addon_dir, portrait);
+        std::string preferred_guitar = json_string(row, "preferred_guitar");
+        if (preferred_guitar.empty())
+          preferred_guitar = inherited_preferred_guitar;
+        variant.preferred_guitar = preferred_guitar.empty()
+                                       ? Symbol()
+                                       : Symbol(preferred_guitar);
+        std::string preferred_finish =
+            json_string(row, "preferred_guitar_finish");
+        if (preferred_finish.empty())
+          preferred_finish = inherited_preferred_finish;
+        variant.preferred_guitar_skin = preferred_finish.empty()
+                                            ? Symbol()
+                                            : Symbol(preferred_finish);
+        variant.preferred_guitar_paint_primary = json_int(
+            row, "preferred_guitar_paint_primary",
+            inherited_preferred_primary);
+        variant.preferred_guitar_paint_secondary = json_int(
+            row, "preferred_guitar_paint_secondary",
+            inherited_preferred_secondary);
         variant.animation_source_model_path = normalized_manifest_path(
             addon_dir, json_string(row, "animation_source_model"));
         variant.retarget_animation =
@@ -967,17 +992,27 @@ void ConfigDb::load_addon_manifests(
           const std::string description =
               json_string(character, "description");
           const std::string portrait = json_string(character, "portrait");
+          const std::string preferred_guitar =
+              json_string(character, "preferred_guitar");
+          const std::string preferred_finish =
+              json_string(character, "preferred_guitar_finish");
+          const int preferred_primary = json_int(
+              character, "preferred_guitar_paint_primary", -1);
+          const int preferred_secondary = json_int(
+              character, "preferred_guitar_paint_secondary", -1);
           const auto* outfits = json_array(character, "outfits");
           if (!outfits || outfits->empty())
             throw std::runtime_error("character " + id +
                                      " has no outfits");
           for (const JsonValue& outfit : *outfits)
-            append_variant(outfit, id, label, description, portrait);
+            append_variant(outfit, id, label, description, portrait,
+                           preferred_guitar, preferred_finish,
+                           preferred_primary, preferred_secondary);
         }
       }
       if (const auto* outfits = json_array(root, "outfits")) {
         for (const JsonValue& outfit : *outfits)
-          append_variant(outfit, {}, {}, {}, {});
+          append_variant(outfit, {}, {}, {}, {}, {}, {}, -1, -1);
       }
 
       if (const auto* songs = json_array(root, "songs")) {
@@ -1059,6 +1094,8 @@ void ConfigDb::load_addon_manifests(
           if (is_venue(venue))
             throw std::runtime_error("duplicate venue " + id);
           addon_venues_.push_back(venue);
+          addon_venue_labels_.emplace_back(venue,
+                                           json_string(venue_row, "name"));
         }
       }
 
@@ -1112,6 +1149,7 @@ void ConfigDb::load_addon_manifests(
         character_variants_[it->first] = std::move(it->second);
       character_variants_.resize(variants_before);
       addon_venues_.resize(venues_before);
+      addon_venue_labels_.resize(venue_labels_before);
       addon_quickplay_songs_.resize(quickplay_before);
       addon_setlists_.resize(setlists_before);
       addon_song_sources_ = song_sources_before;
@@ -1376,6 +1414,30 @@ Symbol ConfigDb::default_venue() const {
   if (is_venue(stock_main_default)) return stock_main_default;
   const auto list = venues();
   return list.empty() ? Symbol() : list.front();
+}
+
+std::string ConfigDb::venue_label(Symbol venue) const {
+  const auto found = std::find_if(
+      addon_venue_labels_.begin(), addon_venue_labels_.end(),
+      [&](const auto& row) { return row.first == venue; });
+  if (found != addon_venue_labels_.end() && !found->second.empty())
+    return found->second;
+
+  // The bundled converted GH1 package predates the optional manifest `name`
+  // field. These are the source game's player-facing venue identities, not
+  // synthesized internal-id formatting.
+  static const std::pair<const char*, const char*> gh1_names[] = {
+      {"gh1_basement", "The Basement"},
+      {"gh1_small_club", "Freak Pit"},
+      {"gh1_small_club_multi", "Freak Pit (Multiplayer)"},
+      {"gh1_big_club", "Red Octane"},
+      {"gh1_theatre", "Republik Theater"},
+      {"gh1_fest", "Toxic Summer Tour"},
+      {"gh1_arena", "The Garden"},
+  };
+  for (const auto& [id, label] : gh1_names)
+    if (venue == Symbol(id)) return label;
+  return {};
 }
 
 std::vector<Symbol> ConfigDb::campaign_songs(Symbol venue) const {

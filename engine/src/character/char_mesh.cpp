@@ -62,6 +62,8 @@ void decode_character_root(Character& out) {
   out.root_self_shadow = false;
   out.root_sphere_base.clear();
   out.root_environment.clear();
+  out.root_transform = {};
+  out.root_transform.name = out.dir_name;
   if (out.dir_entry_bytes.empty()) {
     out.root_decode_error = "empty Character directory root";
     return;
@@ -88,6 +90,13 @@ void decode_character_root(Character& out) {
     out.root_self_shadow = root.self_shadow;
     out.root_sphere_base = root.sphere_base;
     out.root_environment = root.render_directory.environment;
+    const auto& transform = root.render_directory.transformable;
+    out.root_transform.local = xfm_from_serialized_4x3(transform.local);
+    out.root_transform.world_stored = xfm_from_serialized_4x3(transform.world);
+    out.root_transform.constraint = transform.constraint;
+    out.root_transform.target = transform.target;
+    out.root_transform.preserve_scale = transform.preserve_scale;
+    out.root_transform.parent = transform.parent;
     out.root_decoded = true;
   } catch (const std::exception& ex) {
     out.root_decode_error = ex.what();

@@ -418,6 +418,10 @@ int main(int argc, char** argv) {
         << "    \"id\": \"addon_test\",\n"
         << "    \"label\": \"Addon Test\",\n"
         << "    \"portrait\": \"portraits/addon.bmp_ps2\",\n"
+        << "    \"preferred_guitar\": \"addon_test_guitar\",\n"
+        << "    \"preferred_guitar_finish\": \"addon_test_finish\",\n"
+        << "    \"preferred_guitar_paint_primary\": 7,\n"
+        << "    \"preferred_guitar_paint_secondary\": 8,\n"
         << "    \"outfits\": [{\n"
         << "      \"selection\": \"addon_test_default\",\n"
         << "      \"label\": \"Standard\",\n"
@@ -547,7 +551,12 @@ int main(int argc, char** argv) {
       addon_rows.front().selection != Symbol("addon_test_default") ||
       addon_rows.front().source_game != Symbol("addon") ||
       addon_rows.front().character_label != "Addon Test" ||
-      addon_rows.front().portrait_path != "portraits/addon.bmp_ps2") {
+      addon_rows.front().portrait_path != "portraits/addon.bmp_ps2" ||
+      addon_rows.front().preferred_guitar != Symbol("addon_test_guitar") ||
+      addon_rows.front().preferred_guitar_skin !=
+          Symbol("addon_test_finish") ||
+      addon_rows.front().preferred_guitar_paint_primary != 7 ||
+      addon_rows.front().preferred_guitar_paint_secondary != 8) {
     std::fprintf(stderr, "FAIL per-addon manifest character merge\n");
     return 1;
   }

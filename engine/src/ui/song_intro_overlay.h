@@ -27,7 +27,10 @@ class SongIntroOverlay {
              std::string song_shortname);
   void reset(std::string visual_hdr_path, std::string visual_ark_path,
              std::string content_hdr_path, std::string content_ark_path,
-             std::string song_shortname);
+             std::string song_shortname,
+             std::string title_override = {},
+             std::string artist_override = {});
+  bool prepare();
   void draw(double song_time_seconds);
 
  private:
@@ -43,6 +46,8 @@ class SongIntroOverlay {
   std::string content_hdr_path_;
   std::string content_ark_path_;
   std::string song_shortname_;
+  std::string title_override_;
+  std::string artist_override_;
   bool attempted_ = false;
   bool ready_ = false;
   bool shown_logged_ = false;

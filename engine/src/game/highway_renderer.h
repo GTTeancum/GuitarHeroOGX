@@ -99,10 +99,16 @@ class HighwayRenderer {
   // `surface_ref` is the resolved guitarist highway bitmap entry; empty keeps
   // the track MILO default.
   bool load_textures(const std::string& hdr_path, const std::string& ark_path,
-                     const std::string& surface_ref = std::string());
+                     const std::string& surface_ref = std::string(),
+                     bool timing_preview = false);
   bool textures_loaded() const { return loaded_; }
   bool textures_loaded_for_surface(const std::string& surface_ref) const {
     return loaded_ && loaded_surface_ref_ == surface_ref;
+  }
+  // Menu timing previews need an opaque source-textured board beneath the
+  // native track mesh because they composite over a bright UI backdrop.
+  void set_surface_quad_underlay(bool enabled) {
+    surface_quad_underlay_ = enabled;
   }
 
   // Draw one frame of the 3-D note highway.
@@ -509,6 +515,7 @@ class HighwayRenderer {
   float whammy_envelope_ = 0.0f;
   double last_sustain_visual_time_ = -1.0;
   bool selected_surface_loaded_ = false;
+  bool surface_quad_underlay_ = false;
   bool loaded_ = false;
 };
 

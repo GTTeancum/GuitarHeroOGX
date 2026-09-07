@@ -8,6 +8,10 @@ add_library(ghogx_gameplay_rules STATIC
     gameplay_session.cpp gameplay_session.h
 )
 target_include_directories(ghogx_gameplay_rules PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/..)
+
+add_executable(ghogx_source_anim_task_test source_anim_task_test.cpp)
+target_include_directories(ghogx_source_anim_task_test PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/..)
+add_test(NAME ghogx_source_anim_task_test COMMAND ghogx_source_anim_task_test)
 target_link_libraries(ghogx_gameplay_rules PUBLIC ghogx_chart)
 
 if(MSVC)
@@ -89,6 +93,19 @@ add_test(NAME ghogx_gameplay_rules_test COMMAND ghogx_gameplay_rules_test)
 add_executable(ghogx_gameplay_session_test gameplay_session_test.cpp)
 target_link_libraries(ghogx_gameplay_session_test PRIVATE ghogx_gameplay_rules)
 add_test(NAME ghogx_gameplay_session_test COMMAND ghogx_gameplay_session_test)
+
+  add_executable(ghogx_camera_filter_test camera_filter_test.cpp)
+  add_test(NAME ghogx_camera_filter_test COMMAND ghogx_camera_filter_test)
+  ghogx_add_windows_import_guard(ghogx_camera_filter_test)
+
+  add_executable(ghogx_camera_projection_test camera_projection_test.cpp)
+  add_test(NAME ghogx_camera_projection_test COMMAND ghogx_camera_projection_test)
+  ghogx_add_windows_import_guard(ghogx_camera_projection_test)
+
+  add_executable(ghogx_camera_intro_timing_test camera_intro_timing_test.cpp)
+  add_test(NAME ghogx_camera_intro_timing_test
+           COMMAND ghogx_camera_intro_timing_test)
+  ghogx_add_windows_import_guard(ghogx_camera_intro_timing_test)
 ghogx_add_windows_import_guard(ghogx_gameplay_venue_band_contract_test)
 ghogx_add_windows_import_guard(ghogx_gameplay_rules_test)
 ghogx_add_windows_import_guard(ghogx_gameplay_session_test)

@@ -1,0 +1,144 @@
+{
+  "schema": 1,
+  "id": "rb2.penelope_mcqueen",
+  "display_name": "Penelope McQueen",
+  "package_name": "rock1",
+  "asset_prefix": "rb2_penelope_mcqueen",
+  "material_prefix": "penelope_",
+  "source_prefab": "vocals20",
+  "source_skeleton": "female_vocal",
+  "animation_donor": "rock1",
+  "preferred_guitar": {
+    "id": "stratocaster02",
+    "finish": "stratocaster02_paint",
+    "paint_primary": 0,
+    "paint_secondary": 4
+  },
+  "target_required_transforms": [
+    "bone_pos_guitar.mesh"
+  ],
+  "body_shape": {
+    "height": 0.25,
+    "weight": 0.5
+  },
+  "texture_atlas": {
+    "enabled": true,
+    "size": 512,
+    "padding": 4
+  },
+  "ambient_occlusion": {
+    "enabled": true,
+    "samples": 8,
+    "max_distance": 5.0,
+    "bias": 0.06,
+    "strength": 0.15
+  },
+  "components": [
+    {
+      "directory": "hippybangs_maohat",
+      "include": "^Mesh__(?:hippybangs_resource(?:\\.[0-9]+)?|maohat)\\.mesh$"
+    },
+    {
+      "directory": "puffedsleeves_resource",
+      "include": "^Mesh__(?:puffedsleeves_resource(?:\\.[0-9]+)?|puffedsleeves_necklace_resource(?:\\.1)?|puffedsleeves_skin(?:\\.[0-9]+)?)\\.mesh$",
+      "require_full_material_coverage": [
+        "torso_puffedsleeves.mat",
+        "torso_puffedsleeves_necklace.mat",
+        "torso_skin.mat"
+      ]
+    },
+    {
+      "directory": "puffyskirt_resource",
+      "include": "^Mesh__(?:puffyskirt_resource(?:\\.[0-9]+)?|puffyskirt_legs_resource(?:\\.[0-9]+)?)\\.mesh$"
+    },
+    {
+      "directory": "thighhighheel_resource",
+      "include": "^Mesh__thighhighheel_resource(?:\\.1)?\\.mesh$"
+    },
+    {
+      "directory": "femalehands_naked",
+      "include": "^Mesh__hands_naked(?:\\.[0-9]+)?\\.mesh$"
+    },
+    {
+      "directory": "head_1",
+      "include": "^Mesh__(?:head(?:\\.[0-9]+)?|eye-[LR]|eyebrows(?:\\.1)?|lowerteeth|upperteeth|tongue)\\.mesh$"
+    }
+  ],
+  "materials": {
+    "hair_hippybangs.mat": {
+      "texture": "hippybangs_maohat/hippybangs_diffuse",
+      "mask": "hippybangs_maohat/hippybangs_mask",
+      "primary_palette": "hair",
+      "primary": 19,
+      "secondary_palette": "hair_secondary",
+      "secondary": 2,
+      "preserve_alpha": true
+    },
+    "hair_maohat.mat": {
+      "texture": "hippybangs_maohat/maohat",
+      "palette": "cloth_dulled",
+      "primary": 19,
+      "secondary": 2,
+      "preserve_alpha": true
+    },
+    "torso_puffedsleeves.mat": {
+      "texture": "puffedsleeves_leather/puffedsleeves_leather_diff",
+      "palette": "leather",
+      "primary": 0,
+      "secondary": 4
+    },
+    "torso_puffedsleeves_necklace.mat": {
+      "texture": "puffedsleeves_resource/puffedsleeves_leather_necklace_diff",
+      "preserve_alpha": true
+    },
+    "torso_skin.mat": {
+      "texture": "female_vocal/torso_skin_base",
+      "palette": "skin",
+      "primary": 1
+    },
+    "legs_socks.mat": {
+      "texture": "female_guitar/legs_naked_diffuse",
+      "palette": "skin",
+      "primary": 1
+    },
+    "puffyskirt.mat": {
+      "texture": "puffyskirt_barelegs/puffyskirt_barelegs_skirt_diff",
+      "palette": "cloth_dulled",
+      "primary": 0,
+      "secondary": 1
+    },
+    "feet_thighhighheel.mat": {
+      "texture": "thighhighheel_pvc/thighhighheel_pvc_diff",
+      "mask": "thighhighheel_pvc/thighhighheel_pvc_mask",
+      "palette": "cloth_dulled",
+      "primary": 34,
+      "secondary": 0
+    },
+    "head_skin.mat": {
+      "texture": "head_1/head_head1_diffuse",
+      "palette": "skin",
+      "primary": 1,
+      "overlays": [
+        {
+          "texture": "head_1_eyes_7/makeup_eyes"
+        },
+        {
+          "texture": "head_1_lips_3/makeup_lips"
+        }
+      ]
+    },
+    "eyes.mat": {
+      "texture": "head_1/head_eye",
+      "palette": "eyes",
+      "primary": 8
+    },
+    "eyebrows.mat": {
+      "texture": "head_1/head_eyebrows_diffuse",
+      "palette": "hair",
+      "primary": 47
+    },
+    "mouth.mat": {
+      "texture": "head_1/mouth"
+    }
+  }
+}

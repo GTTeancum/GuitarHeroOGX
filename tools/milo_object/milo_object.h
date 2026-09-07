@@ -1142,6 +1142,7 @@ struct CamShot20 {
     Animatable4 animatable;
     std::vector<CamShotFrame20> keyframes;
     bool looping = false;
+    // Historical API name: GH2 path_ease (+54), Save2643E4 / property26873C.
     float legacy_loop_frame = 0.0f;
     float near_plane = 10.0f;
     float far_plane = 10000.0f;
@@ -1149,8 +1150,10 @@ struct CamShot20 {
     float filter = 0.0f;
     float clamp_height = -1.0f;
     std::string path;
+    // Historical API name: GH2 fade_time (+3C), property26850C; not path position.
     float legacy_path_frame = 0.0f;
     std::string category;
+    // Historical API name. GH2 uses this as CamShot selection weight (+44).
     float legacy_category_frame = 0.0f;
     std::vector<std::array<int32_t, 2>> legacy_crowd_pairs;
     int32_t legacy_crowd_modify_stamp = -1;

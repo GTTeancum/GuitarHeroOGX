@@ -15,6 +15,15 @@ add_library(ghogx_character STATIC
     char_renderer.h
     char_clip.cpp
     char_clip.h
+    char_clip_binding.cpp
+    char_clip_binding.h
+    char_bones_output.cpp
+    char_bones_output.h
+    char_bones_samples.h
+    char_servo.cpp
+    char_servo.h
+    char_servo_character.cpp
+    char_servo_character.h
     character_type_script.cpp
     character_type_script.h
 )
@@ -55,6 +64,22 @@ target_link_libraries(ghogx_character_clip_driver_flags_test PRIVATE
     ghogx_character)
 add_test(NAME ghogx_character_clip_driver_flags_test
          COMMAND ghogx_character_clip_driver_flags_test)
+
+add_executable(ghogx_character_servo_runtime_test character_servo_runtime_test.cpp)
+target_link_libraries(ghogx_character_servo_runtime_test PRIVATE ghogx_character)
+add_test(NAME ghogx_character_servo_runtime_test COMMAND ghogx_character_servo_runtime_test)
+
+add_executable(ghogx_character_servo_character_test character_servo_character_test.cpp)
+target_link_libraries(ghogx_character_servo_character_test PRIVATE ghogx_character)
+add_test(NAME ghogx_character_servo_character_test COMMAND ghogx_character_servo_character_test)
+
+add_executable(ghogx_character_clip_binding_test character_clip_binding_test.cpp)
+target_link_libraries(ghogx_character_clip_binding_test PRIVATE ghogx_character)
+add_test(NAME ghogx_character_clip_binding_test COMMAND ghogx_character_clip_binding_test)
+
+add_executable(ghogx_character_bones_output_test character_bones_output_test.cpp)
+target_link_libraries(ghogx_character_bones_output_test PRIVATE ghogx_character)
+add_test(NAME ghogx_character_bones_output_test COMMAND ghogx_character_bones_output_test)
 
 add_executable(ghogx_character_facefx_materialization_test
     character_facefx_materialization_test.cpp)
@@ -430,6 +455,9 @@ add_test(NAME ghogx_character_source_truth_contract_test
 add_custom_target(ghogx_character_source_tests
     DEPENDS
         ghogx_character_clip_driver_flags_test
+        ghogx_character_servo_runtime_test
+        ghogx_character_clip_binding_test
+        ghogx_character_bones_output_test
         ghogx_character_facefx_materialization_test
         ghogx_character_clip_set_source_test
         ghogx_character_clip_display_source_test
@@ -489,6 +517,9 @@ target_compile_options(ghogx_character_bind_audit PRIVATE /W4)
 target_compile_options(ghogx_character_clip_audit PRIVATE /W4)
 target_compile_options(ghogx_character_facefx_audit PRIVATE /W4)
 target_compile_options(ghogx_character_clip_driver_flags_test PRIVATE /W4)
+target_compile_options(ghogx_character_servo_runtime_test PRIVATE /W4)
+target_compile_options(ghogx_character_clip_binding_test PRIVATE /W4)
+target_compile_options(ghogx_character_bones_output_test PRIVATE /W4)
 target_compile_options(ghogx_character_facefx_materialization_test PRIVATE /W4)
 target_compile_options(ghogx_character_clip_set_source_test PRIVATE /W4)
 target_compile_options(ghogx_character_clip_display_source_test PRIVATE /W4)
@@ -548,6 +579,12 @@ else()
     target_compile_options(ghogx_character_clip_audit PRIVATE -Wall -Wextra)
     target_compile_options(ghogx_character_facefx_audit PRIVATE -Wall -Wextra)
     target_compile_options(ghogx_character_clip_driver_flags_test PRIVATE
+        -Wall -Wextra)
+    target_compile_options(ghogx_character_servo_runtime_test PRIVATE
+        -Wall -Wextra)
+    target_compile_options(ghogx_character_clip_binding_test PRIVATE
+        -Wall -Wextra)
+    target_compile_options(ghogx_character_bones_output_test PRIVATE
         -Wall -Wextra)
     target_compile_options(ghogx_character_facefx_materialization_test PRIVATE
         -Wall -Wextra)

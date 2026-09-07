@@ -134,7 +134,7 @@ convert_gh1_venue_spots_to_gh2_waypoints(
             if (found == helpers.end())
                 throw std::runtime_error(
                     "milo convert: missing required GH1 venue spot " +
-                    name);
+                    name + " in " + target_venue);
             return placement_transform(found->second, name);
         };
 

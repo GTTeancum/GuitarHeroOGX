@@ -121,14 +121,19 @@ native camera pool is empty. The final Small Club proof starts on native
 `Intro01` and transitions to regular native `flr_near_lft01` through the
 ordinary camera manager.
 
-The repeated native CamShot refs are source-derived rather than an accidental
-blanket mapping. Across the seven packed retail DTBs, all 201 records begin
-with the internal `arena` parent atom, all 201 carry both `singer_in/out` and
-`offset_in/out`, and zero serialize an explicit `target` property. The
-GH2-native bridge consequently uses `arena:venue.view` as the transform parent
-and ArenaSinger slot zero, `guitarist0:bone_head.mesh`, as the normal
-single-player projection subject. GH1 `VenueCam::Update` at
-`SLUS-21224:0x0016E080` reads the record target index at `VenueCam + 0x74`
+**Superseded blanket-reference conclusion (2026-09-03 audit):** the initial
+`arena` atom is the message receiver, not a transform-parent declaration.
+`camera.dtb` does not contain the complete reference policy. GH1's shared
+`arena/gen/cam_paths.dtb` specifies parent and target per path; the executable
+queries it at `0x16f078` / `0x16f160` and applies it at
+`0x16fbc8..0x16fcc4`. Missing overrides use the player-head helper; explicit
+overrides include the venue root, stage spots, singer neck, and conditional
+guitar-neck references. The converter now reads that shared policy. Conditional
+`exists/else` references remain runtime decisions, not baked roster assumptions.
+Already-staged assets still require migration and proof before deployment.
+
+`SLUS-21224:0x0016E080` is only the default target-position resolver, not
+`VenueCam::Update`. It reads the target index at `VenueCam + 0x74`
 and resolves that index through the ArenaSinger vector at `Arena + 0x3C`.
 A read-only retail Basement savestate has target index zero and its selected
 transform is the player guitarist, approximately `(26.8,111.5,66.7)`, not the
@@ -398,6 +403,39 @@ the arena's baked background imagery or hide unrelated venue geometry.
 Cross-venue proofs are in
 `.codex/current-evidence/gh1-regular-venuecam-fields-proof/`.
 
+The 2026-09-01 live-camera acceptance pass closed three systemic integration
+faults without altering any authored camera pose. First, the camera frustum
+uses the active render output's width/height ratio, which is the target-side
+equivalent of retail RndCam's renderer-derived Y ratio; the old fixed 16:9
+assumption distorted 4:3 source framing. Second, when a converted GH1 venue
+publishes its logical `Arena::walk_spots` vector, `CamShot::ShotOk` measures
+the guitarist against that vector exclusively. Arena's current spot is
+therefore `gh1_walk_spot_0`, not the generated GH2
+`start_guitarist0.way` that happened to share its position. The exact authored
+`bad_waypoints` entries on `flr_near_lft01x12w` and `x13w` now reject those
+shots, after which normal category scanning selects `flr_near_lft02`.
+
+Third, native GH2 CamShot parents are serialized ObjPtrs whose owners are
+guaranteed by the loaded retail world and character packages. Loose DLC can
+break that package invariant. Before a shot is accepted, every authored parent
+used by its source and runtime frames must resolve from the assembled world or
+performer graph. If not, the selector continues to the next authored candidate;
+if a parent disappears after selection, submission retains the previous valid
+camera. The original Fest failure was `flr_near_rt01`, whose local pose is
+parented to `guitarist0:bone_neck.mesh`, combined with a requested GH80s
+performer package that did not actually contain that model. Submitting that
+local pose as world space produced the geometry-interior frames. With a valid
+stock guitarist the same shot remains accepted and renders correctly; with the
+deliberately missing performer it is rejected and the manager advances to
+`flr_far_rt02`. This is a package-dependency check, not a geometry raycast,
+camera offset, venue-name rule, character-name rule, or shot blacklist.
+
+Final 4:3 native runs cover valid Fest, deliberately unresolved-parent Fest,
+GH1 Arena, and GH1 Basement. Every retained runtime frame was inspected in
+sequence; the accepted transitions remained unobstructed at 59.5-59.9 steady
+FPS. The compact proof manifest and representative before/after frames are in
+`proofs/venue-camera-item3/`.
+
 The final translation/category regression set exercises both INTRO and regular
 song time for every GH1 venue:
 `.codex/current-evidence/gh1-venuecam-translation-category-final/`.
@@ -437,9 +475,13 @@ region from the camera/projection state. At venue construction, each original
 point-in-triangle test plus the limit mesh's local-depth range. Switching
 regions clears the active lists and copies the accepted original instances;
 it never creates or modifies their transforms, materials, or animation.
-Retaining the complete serialized MultiMesh instance lists is therefore
-content-complete in the target renderer: target frustum/depth culling replaces
-the source's camera-dependent draw-list reduction. Exact static evidence is in
+The previous claim that target frustum/depth culling replaces this authored
+camera-dependent draw-list reduction is **not parity evidence**. The 2026-09-03
+camera audit found that `crowd_region` is retained in converted TypeProps but
+not consumed by runtime. Theatre and Small Club native proofs still show
+foreground crowd obstruction. Recover/reinstate the original region-selection
+contract before accepting those views; do not hide arbitrary cards or reposition
+individual venue cameras. The earlier static evidence was recorded in
 `.codex/analysis/gh1-venuecam-crowd-region-static.md`.
 
 All 41 packed GH1 `MultiMesh0` objects are crowd-card archetypes. Runtime now
@@ -586,6 +628,17 @@ For example, big_club `lighting.view` propagates to `verse.anim`,
 `chorus.anim`, `beatOK.anim`, and `spotlight01.tnm`. The decoder preserves
 these as `GroupObj::anim_children`, and runtime switch/range propagation now
 feeds the TransAnim, MeshAnim, LightAnim, and EnvAnim samplers.
+
+Both member lists belong to the View on which they are serialized.
+`children_owner` is retained as an independent legacy owner/editor link and
+must not redirect either list. Theatre proves the distinction: `verse.anim`
+points at `chorus.anim` as owner but carries its own
+`verselight01/02/03.envanim` members. The former owner-following conversion
+therefore drove verse lighting with chorus tracks. The converter, its audit,
+and a distinct-owner regression now consume the source View's own lists. A
+fresh complete rebuild passes 678/678 View mappings, 105/105 converted assets,
+and all seven venue camera/script/package audits; see
+`proofs/manage-band-20260906/gh1-view-member-regeneration-v4/`.
 
 Renderer traversal now expands nested View/Group children recursively from
 the selected revision-10 root and does not append ungrouped Meshes afterward.

@@ -19,6 +19,7 @@ def main() -> int:
     parser.add_argument("elf", type=Path)
     parser.add_argument("--start", type=parse_int, required=True)
     parser.add_argument("--count", type=int, default=32)
+    parser.add_argument("--ascii", action="store_true", help="Also show the four original bytes as ASCII")
     args = parser.parse_args()
     if args.start & 3:
         parser.error("--start must be four-byte aligned")
@@ -46,7 +47,11 @@ def main() -> int:
         data = stream.read(byte_count)
 
     for index, (word,) in enumerate(struct.iter_unpack("<I", data)):
-        print(f"0x{args.start + index * 4:08x}: 0x{word:08x}")
+        suffix = ""
+        if args.ascii:
+            raw = data[index * 4:index * 4 + 4]
+            suffix = "  " + "".join(chr(byte) if 32 <= byte < 127 else "." for byte in raw)
+        print(f"0x{args.start + index * 4:08x}: 0x{word:08x}{suffix}")
     return 0
 
 

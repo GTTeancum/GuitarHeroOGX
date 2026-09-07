@@ -3204,7 +3204,8 @@ void HighwayRenderer::load_track_graphics_config(const std::string& hdr_path,
 
 bool HighwayRenderer::load_textures(const std::string& hdr_path,
                                     const std::string& ark_path,
-                                    const std::string& surface_ref) {
+                                    const std::string& surface_ref,
+                                    bool timing_preview) {
   if (!dev_) return false;
   if (!textures_.empty()) release_textures();
   load_track_graphics_config(hdr_path, ark_path);
@@ -3964,6 +3965,30 @@ bool HighwayRenderer::load_textures(const std::string& hdr_path,
     bonus_spark2_mesh_ = convert_mesh("gem_bonus_spark2.mesh");
     track_surface_mesh_ = convert_mesh("track_surface5.mesh");
     track_mask_mesh_ = convert_mesh("track_mask.mesh");
+    if (track_surface_mesh_.ok) {
+      float min_alpha = 1.0f;
+      float max_alpha = 0.0f;
+      float min_rgb = 1.0f;
+      float max_rgb = 0.0f;
+      for (const auto& vertex : track_surface_mesh_.verts) {
+        min_alpha = std::min(min_alpha, vertex.a);
+        max_alpha = std::max(max_alpha, vertex.a);
+        min_rgb = std::min({min_rgb, vertex.r, vertex.g, vertex.b});
+        max_rgb = std::max({max_rgb, vertex.r, vertex.g, vertex.b});
+      }
+      std::fprintf(
+          stderr,
+          "[highway] track surface source: texture=%s blend=%d prelit=%d "
+          "environ=%d point_lights=%d intensify=%d rgba_rgb=%.3f..%.3f "
+          "alpha=%.3f..%.3f uv=(%.3f..%.3f,%.3f..%.3f)\n",
+          track_surface_mesh_.texture_name.c_str(), track_surface_mesh_.blend,
+          track_surface_mesh_.prelit ? 1 : 0,
+          track_surface_mesh_.use_environ ? 1 : 0,
+          track_surface_mesh_.point_lights ? 1 : 0,
+          track_surface_mesh_.intensify ? 1 : 0, min_rgb, max_rgb, min_alpha,
+          max_alpha, track_surface_mesh_.min_u, track_surface_mesh_.max_u,
+          track_surface_mesh_.min_v, track_surface_mesh_.max_v);
+    }
     track_side_rails_mesh_ = convert_mesh("track_side_rails5.mesh");
     track_lane_lines_mesh_ = convert_mesh("track_lane_lines5.mesh");
     track_extend_anim_ = load_track_intro_transanim_source_order(
@@ -4384,6 +4409,51 @@ bool HighwayRenderer::load_textures(const std::string& hdr_path,
                  gem_sparkle_mesh_.ok ? 1 : 0,
                  bonus_spark1_mesh_.ok ? 1 : 0,
                  bonus_spark2_mesh_.ok ? 1 : 0);
+  }
+
+  if (timing_preview) {
+    // Soundcheck renders the stock GH2 board, timing lines, green gems, and
+    // fret targets only. Decoding every gameplay effect texture made opening
+    // the timing pass feel like loading a song. Keep the source meshes and
+    // materials authoritative while requesting only what this view can draw.
+    std::set<std::string> preview_texture_names;
+    const auto add_mesh_texture = [&](const RuntimeMesh& mesh) {
+      if (!mesh.texture_name.empty())
+        preview_texture_names.insert(mesh.texture_name);
+    };
+    add_mesh_texture(track_surface_mesh_);
+    add_mesh_texture(track_mask_mesh_);
+    add_mesh_texture(track_side_rails_mesh_);
+    add_mesh_texture(track_lane_lines_mesh_);
+    add_mesh_texture(bar_line_mesh_);
+    add_mesh_texture(beat_line_mesh_);
+    add_mesh_texture(half_beat_line_mesh_);
+    add_mesh_texture(quarter_beat_line_mesh_);
+    add_mesh_texture(gem_mesh_[0]);
+    add_mesh_texture(gem_top_mesh_);
+    add_mesh_texture(pc_standard_top_mesh_);
+    add_mesh_texture(gem_glow_mesh_);
+    add_mesh_texture(gem_smasher_mesh_);
+    add_mesh_texture(smasher_rim_mesh_);
+    add_mesh_texture(smasher_shadow_mesh_);
+    for (int lane = 0; lane < 5; ++lane) {
+      add_mesh_texture(smasher_add_meshes_[lane]);
+      add_mesh_texture(smasher_rim_meshes_[lane]);
+      add_mesh_texture(smasher_ring_add_meshes_[lane]);
+      if (!smasher_texture_names_[lane].empty())
+        preview_texture_names.insert(smasher_texture_names_[lane]);
+      if (!smasher_add_texture_names_[lane].empty())
+        preview_texture_names.insert(smasher_add_texture_names_[lane]);
+      if (!smasher_ring_texture_names_[lane].empty())
+        preview_texture_names.insert(smasher_ring_texture_names_[lane]);
+    }
+    if (!smasher_normal_texture_name_.empty())
+      preview_texture_names.insert(smasher_normal_texture_name_);
+    preview_texture_names.insert("track_surface.tex");
+    texture_names = std::move(preview_texture_names);
+    std::fprintf(stderr,
+                 "[highway] timing-preview texture subset: %zu\n",
+                 texture_names.size());
   }
 
   const std::vector<std::string> names(texture_names.begin(),
@@ -5505,13 +5575,28 @@ void HighwayRenderer::draw_impl(double song_time,
   } else if (side_rail_star_active && side_rails_star_.ok) {
     side_rail_color = side_rails_star_;
   }
+  if (surface_quad_underlay_) draw_track_surface_quad();
   if (native_track_enabled && track_surface_mesh_.ok) {
+    const HighwayBlendState surface_blend_state =
+        highway_blend_state_for(track_surface_mesh_.blend);
+    DWORD previous_surface_src_blend = D3DBLEND_SRCALPHA;
+    DWORD previous_surface_dest_blend = D3DBLEND_INVSRCALPHA;
+    DWORD previous_surface_blend_op = D3DBLENDOP_ADD;
+    dev_->GetRenderState(D3DRS_SRCBLEND, &previous_surface_src_blend);
+    dev_->GetRenderState(D3DRS_DESTBLEND, &previous_surface_dest_blend);
+    dev_->GetRenderState(D3DRS_BLENDOP, &previous_surface_blend_op);
+    dev_->SetRenderState(D3DRS_BLENDOP, surface_blend_state.op);
+    dev_->SetRenderState(D3DRS_SRCBLEND, surface_blend_state.src);
+    dev_->SetRenderState(D3DRS_DESTBLEND, surface_blend_state.dest);
     draw_runtime_mesh_scaled_with_texture(
         track_surface_mesh_, track_surface_mesh_.texture_name, 0.0f,
         track_surface_horizon_fit.origin_y, track_surface_tint,
         highway_root.x_scale, track_surface_horizon_fit.scale_y, 1.0f,
         false, 0.0f, surface_scroll_v, true, 0.0f, false, 0.0f, true,
         source_fade_top_y, source_fade_alpha_dist);
+    dev_->SetRenderState(D3DRS_BLENDOP, previous_surface_blend_op);
+    dev_->SetRenderState(D3DRS_SRCBLEND, previous_surface_src_blend);
+    dev_->SetRenderState(D3DRS_DESTBLEND, previous_surface_dest_blend);
     if (track_mask_mesh_.ok &&
         !env_enabled("GHOGX_DISABLE_HIGHWAY_TRACK_MASK")) {
       draw_runtime_mesh_scaled_with_texture(
@@ -5538,7 +5623,7 @@ void HighwayRenderer::draw_impl(double song_time,
           0.0f, true, 0.0f, false, 0.0f, true, source_fade_top_y,
           source_fade_alpha_dist);
     }
-  } else {
+  } else if (!surface_quad_underlay_) {
     draw_track_surface_quad();
   }
 

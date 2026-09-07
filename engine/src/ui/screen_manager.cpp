@@ -449,6 +449,12 @@ void ScreenManager::finish_transition() {
 }
 
 void ScreenManager::goto_screen(Symbol name) {
+  // Both stock video-settings routes still target GH2's one-value LagPanel.
+  // Preserve those authored routes and transparently substitute the native
+  // two-value Practice Room Soundcheck when it is installed.
+  if ((name == Symbol("lag_screen") || name == Symbol("pause_lag_screen")) &&
+      find_object(Symbol("soundcheck_screen")))
+    name = Symbol("soundcheck_screen");
   const bool back = consume_backwards_anim();
   Object* target = find_object(name);
   if (!target) { on_unhandled(std::string("goto_screen?:") + name.c_str()); return; }
@@ -1172,11 +1178,55 @@ class StubObject : public Object {
         const int offset = std::clamp(arg_int(args, 0, 0), -500, 500);
         set_property(Symbol("sync_offset"),
                      DataNode::Int(offset));
+        set_property(Symbol("video_input_offset_ms"), DataNode::Int(offset));
         if (Object* campaign = mgr_->resolve_object(Symbol("campaign"));
             campaign && campaign != this) {
           DataArray persist_args;
           persist_args.push(DataNode::Int(offset));
           campaign->handle_property(Symbol("set_sync_offset"), persist_args);
+        }
+        return DataNode();
+      }
+      if (std::strcmp(m, "get_audio_offset") == 0) {
+        if (Object* campaign = mgr_->resolve_object(Symbol("campaign"));
+            campaign && campaign != this) {
+          DataNode persisted = campaign->handle_property(
+              Symbol("get_audio_offset"), DataArray());
+          if (persisted.as_int()) return persisted;
+        }
+        return get_int("audio_offset_ms", 0);
+      }
+      if (std::strcmp(m, "set_audio_offset") == 0) {
+        const int offset = std::clamp(arg_int(args, 0, 0), -500, 500);
+        set_property(Symbol("audio_offset_ms"), DataNode::Int(offset));
+        if (Object* campaign = mgr_->resolve_object(Symbol("campaign"));
+            campaign && campaign != this) {
+          DataArray persist_args;
+          persist_args.push(DataNode::Int(offset));
+          campaign->handle_property(Symbol("set_audio_offset"), persist_args);
+        }
+        return DataNode();
+      }
+      if (std::strcmp(m, "get_video_input_offset") == 0) {
+        if (Object* campaign = mgr_->resolve_object(Symbol("campaign"));
+            campaign && campaign != this) {
+          DataNode persisted = campaign->handle_property(
+              Symbol("get_video_input_offset"), DataArray());
+          if (persisted.as_int()) return persisted;
+        }
+        const int legacy = get_int("sync_offset", 0).as_int().value_or(0);
+        return get_int("video_input_offset_ms", legacy);
+      }
+      if (std::strcmp(m, "set_video_input_offset") == 0) {
+        const int offset = std::clamp(arg_int(args, 0, 0), -500, 500);
+        set_property(Symbol("video_input_offset_ms"), DataNode::Int(offset));
+        set_property(Symbol("sync_offset"), DataNode::Int(offset));
+        if (Object* campaign = mgr_->resolve_object(Symbol("campaign"));
+            campaign && campaign != this) {
+          DataArray persist_args;
+          persist_args.push(DataNode::Int(offset));
+          campaign->handle_property(Symbol("set_video_input_offset"),
+                                    persist_args);
         }
         return DataNode();
       }

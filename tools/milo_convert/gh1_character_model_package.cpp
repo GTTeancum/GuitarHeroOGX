@@ -733,6 +733,15 @@ void merge_face_model(
         if (renamed == renamed_meshes.end())
             continue;
         auto mesh = source_mesh;
+        // GH1 keeps facial pose meshes in a separate face RndDir.  They are
+        // geometry donors for RndMorph and are never members of the
+        // character's drawable LOD groups.  Merging that directory into the
+        // GH2 character package changes the ownership boundary, so retaining
+        // the source RndDrawable::showing bit would make every pose donor a
+        // live render mesh until a morph happened to touch it.  Keep the
+        // authored pose geometry intact, but make its donor-only role
+        // explicit in the combined package.
+        mesh.drawable.showing = false;
         const auto parent = renamed_meshes.find(
             mesh.transformable.parent);
         if (parent != renamed_meshes.end())

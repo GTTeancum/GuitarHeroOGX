@@ -2,6 +2,27 @@
 
 ## Venue Camera
 
+- 2026-09-01 live venue-camera acceptance closure:
+  the renderer now publishes its actual output aspect to the camera runtime,
+  replacing the fixed 16:9 projection assumption with the source-equivalent
+  renderer Y-ratio contract. Converted GH1 camera validation now resolves the
+  nearest current walk spot from the decoded `Arena::walk_spots` logical
+  vector whenever that vector exists; generated GH2 start waypoints are only
+  the no-GH1-data fallback. This makes Arena's authored
+  `bad_waypoints=gh1_walk_spot_0` predicate reject `flr_near_lft01x12w` and
+  `x13w` before selecting the next valid shot. Loose DLC also receives a
+  generic load-integrity gate before selection and again before pose
+  submission: every authored CamShot parent must resolve from the loaded world
+  or character package, matching the retail ObjPtr invariant. An unresolved
+  parent-relative pose is never submitted as world space; selection continues
+  to the next authored shot, while a dependency lost after selection retains
+  the last valid camera. This is not collision avoidance, a venue/shot
+  blacklist, or a pose offset. Final native runs prove stock GH2 Fest still
+  selects the historically failing `flr_near_rt01` when its guitarist parent
+  exists, an intentionally missing Fest guitarist rejects that same shot and
+  advances, and GH1 Arena/Basement complete their inspected transitions at
+  59.5-59.9 steady FPS. Evidence is in
+  `proofs/venue-camera-item3/`.
 - 2026-07-28 native CharWalk type/group promotion:
   the DTB type compiler now retains data-only members and loads the exact
   stock `BandCharacter/guitarist` walk delays, `walkspot` mask, and
@@ -15476,9 +15497,11 @@ the playable roster.
   panel value again on `options set_sync_offset` at exit. The persisted option
   is therefore the signed judgment-clock correction: a negative value moves
   judgment earlier to compensate physically late input.
-- Audio is the gameplay master/presentation clock. Calibration changes input
-  comparison time, not music playback, chart time, animation time, or camera
-  time; the decoded 100 ms hit window is independent.
+- Decoded audio remains the master clock. Soundcheck Audio shifts the complete
+  chart presentation clock (highway, animation, and camera) with
+  `presentation = audio - audio_offset`; Video/Input then shifts only the input
+  comparison clock with `judgement = presentation + video_input_offset`. The
+  decoded 100 ms hit window is independent of both values.
 - The accepted female-singer proof uses the converted
   `char/female_singer/og` model and Judy Nails' `char/alterna/anims/gen`
   guitarist animation owner. Campaign completion already has one durable
@@ -15486,10 +15509,11 @@ the playable roster.
 
 ### Systemic implementation
 
-- `Gameplay` consumes `audio_time + sync_offset_ms / 1000` for both the FoFiX
-  session and legacy comparison path. The value defaults to zero, clamps to
-  +/-500 ms, persists in `GHOGX_PROFILE_V2`, and is ignored by diagnostic
-  autoplay so proof automation remains aligned to the audio clock.
+- `Gameplay` consumes distinct Audio and Video/Input offsets. Both default to
+  zero and clamp to +/-500 ms. Audio moves presentation against the audio
+  master; Video/Input moves FoFiX and legacy judgment against that calibrated
+  presentation. Diagnostic autoplay remains aligned to presentation so proof
+  automation does not fabricate input latency.
 - `config/playable_character_variants.tsv` declares project-owned playable
   conversions by exact model owner, animation owner, label, chronology, and
   unlock requirement. Overlay generation validates those owners against the
@@ -15503,15 +15527,80 @@ the playable roster.
 - Full Release build: 183/183 steps.
 - Full CTest: 86/86 passed in 107.00 seconds.
 - Calibration rules prove zero preservation, both +/-75 ms directions, late
-  input compensation, and an unchanged 100 ms hit window.
-- The two-process audit reloads `sync_offset=-73` exactly.
+  input compensation, and an unchanged 100 ms hit window. The Soundcheck state
+  test covers guided Audio, Video/Input, results, combined feedback, Fine Tune,
+  save, and cancel. The migration test loads legacy `sync_offset=73` as
+  Audio `0` / Video/Input `73`, then persists Audio `21` / Video/Input `-37`
+  while mirroring legacy Sync to `-37`.
 - The deployed catalog reports 12 characters and 34 variants; the female
   singer is hidden before campaign completion, visible afterward, and resolves
   both declared owners exactly.
 
 ### Remaining review
 
-Real guitar/display/audio calibration certification and the planned separate
-audio/video calibration menu remain open. The corrected authored camera flyby
-also remains open for user visual acceptance; its automated hold/restart ledger
-does not substitute for that review.
+Real guitar/display/audio calibration certification remains open. The corrected
+authored camera flyby also remains open for user visual acceptance; its
+automated hold/restart ledger does not substitute for that review.
+
+## 2026-09-04 source six-downbeat camera handoff
+
+- Original `world_objects_worldbase.dta::intro_start_msg` assigns six camera
+  bars and immediately picks the INTRO CamShot. Its `downbeat` handler
+  decrements once and runs `check_camera_shot`; the latter calls
+  `pick_new_shot` only at zero and only outside guitarist star mode.
+- The retained retail 60 Hz CameraManager trace keeps `Intro_fast` current
+  after song-clock zero and starts the first regular shot at beat-domain task
+  time `20.021`. Its CamShot frame advances to `443.384` even though the
+  nominal intro duration is 60 frames. This proves that the current CamShot is
+  not replaced merely because its intro duration elapsed.
+- Native previously set `camera_bars_left_ = 0` on the first song-clock update.
+  It now publishes the selected intro as CameraManager current with
+  `active_regular_camera_start_ = -intro_camera_seconds_`, delivers beat zero
+  as the first downbeat, and consumes all crossed bars through
+  `camera_bars_after_downbeats`. The recorded sequence is beats
+  `0,4,8,12,16,20`, bars left `5,4,3,2,1,0`; the first regular PrePoll occurs
+  only on beat 20.
+- `camera_intro_timing_test` covers the countdown, crossed bars, zero clamp,
+  star-mode suppression, and explicit zero-bar diagnostic behavior. The
+  structural venue/band contract rejects the old first-update zeroing.
+- `audit_camera_intro_regular_handoff.py` passes 18/18 lifecycle checks against
+  the retail trace. `audit_native_camera_handoff_trace.py` passes 9/9 against
+  all 1,500 native submitted-transform rows and proves one intro-to-regular
+  boundary with no shot return or one-update third-shot intrusion.
+- The focused native `intro-six-bar-native/big/camera-motion.mp4` retains
+  video-source frames 1320–1420 at 60 Hz. All 101 frames were reviewed
+  sequentially: one cut occurs on one-based video image 47, followed by 55
+  frames with no snap back. This passes only the shared first-handoff defect;
+  seek/reset, looping, shot-over, multiplayer, remaining pose contracts, and
+  all-venue matched visual parity remain open.
+
+## 2026-09-03 GH2 pre-song camera/TrackPanel audit
+
+Timing conclusions in this historical checkpoint are superseded by the
+2026-09-04 authored-intro correction in `docs/CAMERA_DRIVER_AUDIT.md`:
+the intro lasts selected CamShot mDuration/30, not six song-tempo bars;
+TrackPanel starts at task-clock -2 seconds and overlaps it. The 2.5-second
+button refresh is a later task, not a blocking presentation phase. Source
+addresses/config evidence and the new undeployed proof build are documented
+there. The earlier deployed proof establishes native behavior, not retail
+timing parity.
+
+- Retail `world_objects_worldbase.dta::intro_start_msg` resets the camera,
+  assigns six intro bars, and picks an `INTRO` CamShot. `game.dta::extend_track`
+  starts the TrackPanel sequence only after that venue intro; TrackPanel's
+  authored `do_extend_sequence` finishes at 2.5 seconds. The retail
+  `SLUS_214.47` string references at virtual addresses `0x003F4E30`
+  (`intro_start_msg`) and `0x003F4E40` (`extend_track`) are constructed in the
+  same gameplay-control routine at `0x0010771C`/`0x00107730` and
+  `0x00107980`/`0x00107988`, preserving that order.
+- Fest's selected `Intro01` is a two-key CamShot with a 300-frame authored
+  blend. Native now advances that exact key pair, then holds its final authored
+  pose while the 2.5-second TrackPanel fly-in completes. The regular camera
+  director is released with the chart/audio clock afterward, preventing the
+  prior regular-shot cuts from appearing briefly beneath the fly-in.
+- Deployed native proof
+  `camera-intro-source-proof-20260903/gh2-source-correct-intro-camera-proof.mp4`
+  records the complete intro and handoff. Runtime camera samples move
+  continuously from `(219.555, -50.351, 37.950)` at 0 seconds through
+  `(173.856, -564.802, 2.067)` at 10 seconds, remain latched through TrackPanel,
+  and perform one regular-camera handoff after the pre-song completion record.

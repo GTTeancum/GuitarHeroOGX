@@ -12,6 +12,8 @@
 #include <cstdlib>
 #include <cstdio>
 #include <cstring>
+#include <fstream>
+#include <limits>
 #include <map>
 #include <optional>
 #include <stdexcept>
@@ -22,6 +24,18 @@
 namespace ghogx::asset {
 
 namespace {
+
+uint16_t read_le16(const uint8_t* data) {
+  return static_cast<uint16_t>(data[0]) |
+         (static_cast<uint16_t>(data[1]) << 8u);
+}
+
+uint32_t read_le32(const uint8_t* data) {
+  return static_cast<uint32_t>(data[0]) |
+         (static_cast<uint32_t>(data[1]) << 8u) |
+         (static_cast<uint32_t>(data[2]) << 16u) |
+         (static_cast<uint32_t>(data[3]) << 24u);
+}
 
 struct Rb2PaintColor {
   std::array<uint8_t, 3> rgb;
@@ -83,6 +97,82 @@ constexpr std::array<Rb2PaintColor, 51> kRb2GuitarPalette = {{
 }};
 
 }  // namespace
+
+Image load_bmp_file(const std::string& path) {
+  Image image;
+  std::ifstream stream(path, std::ios::binary);
+  if (!stream) {
+    std::fprintf(stderr, "[asset] BMP not found: %s\n", path.c_str());
+    return image;
+  }
+  stream.seekg(0, std::ios::end);
+  const std::streamoff size = stream.tellg();
+  stream.seekg(0, std::ios::beg);
+  if (size < 54) {
+    std::fprintf(stderr, "[asset] invalid BMP size: %s\n", path.c_str());
+    return image;
+  }
+  std::vector<uint8_t> bytes(static_cast<std::size_t>(size));
+  if (!stream.read(reinterpret_cast<char*>(bytes.data()), size)) {
+    std::fprintf(stderr, "[asset] BMP read failed: %s\n", path.c_str());
+    return image;
+  }
+  if (bytes[0] != 'B' || bytes[1] != 'M' || read_le32(bytes.data() + 14) < 40) {
+    std::fprintf(stderr, "[asset] unsupported BMP header: %s\n", path.c_str());
+    return image;
+  }
+  const uint32_t data_offset = read_le32(bytes.data() + 10);
+  const int32_t width = static_cast<int32_t>(read_le32(bytes.data() + 18));
+  const int32_t signed_height =
+      static_cast<int32_t>(read_le32(bytes.data() + 22));
+  const uint16_t planes = read_le16(bytes.data() + 26);
+  const uint16_t bits = read_le16(bytes.data() + 28);
+  const uint32_t compression = read_le32(bytes.data() + 30);
+  if (width <= 0 || signed_height == 0 || planes != 1 ||
+      (bits != 24 && bits != 32) || compression != 0) {
+    std::fprintf(stderr,
+                 "[asset] BMP must be uncompressed 24/32-bit RGB: %s\n",
+                 path.c_str());
+    return image;
+  }
+  const int64_t height64 = signed_height < 0
+                               ? -static_cast<int64_t>(signed_height)
+                               : static_cast<int64_t>(signed_height);
+  if (height64 > std::numeric_limits<int>::max()) return image;
+  const int height = static_cast<int>(height64);
+  const uint64_t row_stride =
+      ((static_cast<uint64_t>(width) * bits + 31u) / 32u) * 4u;
+  const uint64_t payload_end =
+      static_cast<uint64_t>(data_offset) + row_stride * height;
+  if (data_offset >= bytes.size() || payload_end > bytes.size()) {
+    std::fprintf(stderr, "[asset] truncated BMP payload: %s\n", path.c_str());
+    return image;
+  }
+  const uint64_t pixel_count = static_cast<uint64_t>(width) * height;
+  if (pixel_count > std::numeric_limits<std::size_t>::max() / 4u)
+    return image;
+  image.width = width;
+  image.height = height;
+  image.rgba.resize(static_cast<std::size_t>(pixel_count) * 4u);
+  const int bytes_per_pixel = bits / 8;
+  for (int y = 0; y < height; ++y) {
+    const int source_y = signed_height > 0 ? height - 1 - y : y;
+    const uint8_t* source =
+        bytes.data() + data_offset + row_stride * source_y;
+    uint8_t* destination =
+        image.rgba.data() + static_cast<std::size_t>(y) * width * 4u;
+    for (int x = 0; x < width; ++x) {
+      destination[x * 4 + 0] = source[x * bytes_per_pixel + 2];
+      destination[x * 4 + 1] = source[x * bytes_per_pixel + 1];
+      destination[x * 4 + 2] = source[x * bytes_per_pixel + 0];
+      destination[x * 4 + 3] =
+          bits == 32 ? source[x * bytes_per_pixel + 3] : 255u;
+    }
+  }
+  std::fprintf(stderr, "[asset] loaded BMP %dx%d: %s\n", image.width,
+               image.height, path.c_str());
+  return image;
+}
 
 int rb2_paint_color_count() {
   return static_cast<int>(kRb2GuitarPalette.size());

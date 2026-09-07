@@ -1,5 +1,28 @@
 # Crowd and Crowd-Floor Source Parity
 
+## Release crowd quality policy
+
+Camera-selected near and semi-close crowd regions must always use full 3-D
+characters. Their legacy flat cards are removed before replacement rendering
+and are never a missing-asset or low-fullness fallback. If a required 3-D
+actor cannot load, the selected card remains suppressed and runtime emits a
+release-invariant error instead of putting a 2-D person into a close view.
+
+Flat crowd cards are permitted only for non-selected, far-distance regions.
+The `GHOGX_DIAGNOSTIC_GH1_CROWD_3D_ONLY` capture switch may suppress even those
+distant cards, but it is proof tooling rather than the production policy.
+
+## Later camera-audit findings (2026-09-05)
+
+The acceptance below is historical, not a claim that every current crowd view
+is correct. The camera audit subsequently fixed duplicate GH1 world/lighting
+crowd draws, then used a saved retail Basement scene to correct archetype
+ordering, promotion-plane height, one numerically sensitive region member,
+and SetSizes retaining the wrong half of the crowd. All 12 saved regions,
+all 92 instance origins, and all 36 live flat cards now match that oracle.
+Big Club's remaining foreground obstruction still needs a matched source check.
+See `CAMERA_DRIVER_AUDIT.md` for current evidence and remaining limitations.
+
 ## Scope and result
 
 This work closes the crowd and crowd-floor rendering subcase for all seven

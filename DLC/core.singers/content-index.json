@@ -1,25 +1,85 @@
 {
+  "schema_version": 1,
   "files": [
     {
       "path": "char/gh2_female_singer/og/gen/female_singer.milo_ps2",
-      "sha256": "caab73e52b4dc3d6dd6b89f2ad81db45ee927a46ce0163cb61b911c54f942957",
-      "size": 340363
+      "size": 333654,
+      "sha256": "0bbfe8108aaa217483d0486882d5137040933cea5f68a9aa8257630f79769f86"
+    },
+    {
+      "path": "char/gh1_female_singer/og/gen/female_singer.milo_ps2",
+      "size": 324977,
+      "sha256": "8d2443639d3a4d815a4695e333e697a323f07aae1a8ff5ddaf9e169316c1fe74"
     },
     {
       "path": "char/gh2_male_singer/og/gen/metal_singer.milo_ps2",
-      "sha256": "948fcc57e940375325743c494df6a7426558b02d6aaba04875847f99854b3027",
-      "size": 322678
+      "size": 494193,
+      "sha256": "3061f1cb0f76bc819cdf3390bc0d39ea965d1f8188df29957f7aa55d02994ddf"
+    },
+    {
+      "path": "char/gh1_male_singer/og/gen/metal_singer.milo_ps2",
+      "size": 470094,
+      "sha256": "f00368d803532962b21f9b1cf2bc3f3e848abe77a9af8f551a559ad841ba3b11"
     },
     {
       "path": "ui/image/dlc/core_singers/female_singer.bmp_ps2",
-      "sha256": "348b85d9b12ee9a043f9d1a1da750efe064be75eb443b6fd046c58680e6117d4",
-      "size": 32800
+      "size": 32800,
+      "sha256": "348b85d9b12ee9a043f9d1a1da750efe064be75eb443b6fd046c58680e6117d4"
     },
     {
       "path": "ui/image/dlc/core_singers/male_singer.bmp_ps2",
-      "sha256": "2aaefbb791ebf2d9d543bc447b5363ff8d7488006bfc98f9a8b13fcc6c05912e",
-      "size": 32800
+      "size": 32800,
+      "sha256": "2aaefbb791ebf2d9d543bc447b5363ff8d7488006bfc98f9a8b13fcc6c05912e"
+    },
+    {
+      "path": "char/playable_singers/retarget/alterna/alterna.milo_ps2",
+      "size": 854897,
+      "sha256": "67289febec8db9b856ed4390ed225d71f8079cfe2d5d11652d5eb0463d07d535"
+    },
+    {
+      "path": "char/playable_singers/retarget/alterna/alterna_ui.milo_ps2",
+      "size": 30679,
+      "sha256": "cea2c09569bed9a0ae8ca822e5bd10de084afd062ab9218907bc35e1122dc5e1"
+    },
+    {
+      "path": "char/playable_singers/retarget/alterna/alterna_main.milo_ps2",
+      "size": 1862336,
+      "sha256": "2a5f70d0af0c4726ebe9084be83667f34b1bf99d86f2070cb6ec5ea4b986fbaf"
+    },
+    {
+      "path": "char/playable_singers/retarget/alterna/alterna_strum.milo_ps2",
+      "size": 9734,
+      "sha256": "8ca907b2c30c68aa20c0e9320caa8818894c1d02977c83e9083ab7739316465a"
+    },
+    {
+      "path": "char/playable_singers/retarget/alterna/alterna_fret.milo_ps2",
+      "size": 10641,
+      "sha256": "7f03c8eec24db791fa8f69363dbe4d44b3839bb7998b2672b0dafec2741ce26d"
+    },
+    {
+      "path": "char/playable_singers/retarget/classic/classic.milo_ps2",
+      "size": 847582,
+      "sha256": "54d26714644099c2f9079fb3e93d47d79b6a5a904cb283b572f89e2016eec0c0"
+    },
+    {
+      "path": "char/playable_singers/retarget/classic/classic_ui.milo_ps2",
+      "size": 40416,
+      "sha256": "104d00f0f485f8fdedebaab4ecfb29d25809291b94ac2e3fbe053d4e22203539"
+    },
+    {
+      "path": "char/playable_singers/retarget/classic/classic_main.milo_ps2",
+      "size": 1778267,
+      "sha256": "fe76853bf03f4af70bfc6bf5956e4de0b64f9b00d4b04d5f0a12c6fc7dda1024"
+    },
+    {
+      "path": "char/playable_singers/retarget/classic/classic_strum.milo_ps2",
+      "size": 9186,
+      "sha256": "52457fd1df5fccf11ec452aabd2240a7b3fd94762300c21dea696852e4467b1d"
+    },
+    {
+      "path": "char/playable_singers/retarget/classic/classic_fret.milo_ps2",
+      "size": 9861,
+      "sha256": "afd9a1247cda6eff92d46ea05d4083f83cd1c639f776eaad8ccfb89206fd44d8"
     }
-  ],
-  "schema_version": 1
+  ]
 }

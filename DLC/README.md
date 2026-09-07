@@ -32,6 +32,14 @@ Character outfits may opt into skeleton retargeting with
 `animation_source_model`, `retarget_animation`, and role-specific
 `guitarist_hidden_roots`.
 
+A character or individual outfit may declare a source-authored fallback guitar
+with `preferred_guitar`, `preferred_guitar_finish`,
+`preferred_guitar_paint_primary`, and `preferred_guitar_paint_secondary`.
+Outfit values override character values. The fallback is used only when the
+player has not selected a guitar and the named instrument exists; an explicit
+player preference always wins, and an unavailable add-on instrument falls back
+to the normal guitar selection path.
+
 Disc-imported song packs use `song_catalogs`, an array of indexed paths to
 source `songs.dtb` files within the package. The runtime appends every complete
 source record to the base GH2 table and exposes it in Quickplay. This preserves

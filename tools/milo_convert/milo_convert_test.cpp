@@ -339,10 +339,12 @@ int main() {
                     "(bad_walk_spots (0 2)) "
                     "(enable_dof 1) (hide_crowd 1) "
                     "(real_time 1) (ease 0)})}\n"));
+        const auto camera_path_policy = gh::dtb::serialize(gh::dtb::parse_dta(
+            "(Cam_test (parent \"arena::venue.view\"))"));
         const auto camera_target =
             gh::milo_convert::
                 convert_gh1_venue_cameras_to_gh2_camshots(
-                    camera_source, camera_main, camera_paths,
+                    camera_source, camera_path_policy, camera_main, camera_paths,
                     shared_camera_animations);
         if (camera_target.records != 1 ||
             camera_target.main_directory.entries.size() != 1 ||
@@ -363,11 +365,18 @@ int main() {
                 return property.type == 0x05 &&
                        property.symbol == "bad_waypoints";
             });
-        if (parsed_camera.keyframes.size() != 3 ||
+        float camera_duration = 0;
+        bool retained_shake_boundary = false;
+        for (const auto& frame : parsed_camera.keyframes) {
+            camera_duration += frame.duration + frame.blend;
+            if (std::fabs(camera_duration - 96.0f) < 0.0001f) retained_shake_boundary = true;
+        }
+        if (parsed_camera.keyframes.size() < 3 ||
             parsed_camera.category != "TEST" ||
+            parsed_camera.legacy_category_frame != 1.0f ||
             parsed_camera.path != "" ||
             parsed_camera.animatable.rate != 0 ||
-            parsed_camera.keyframes[0].blend != 96.0f ||
+            std::fabs(camera_duration - 300.0f) > 0.001f || !retained_shake_boundary ||
             parsed_camera.keyframes[0].world_offset[9] != 1.0f ||
             parsed_camera.keyframes.back().world_offset[9] != 104.0f ||
             parsed_camera.keyframes.back().screen_offset[0] != 0.5f ||
@@ -394,6 +403,156 @@ int main() {
                 "milo_convert_test: venue camera conversion mismatch\n");
             return 1;
         }
+        // GH1 16E804/24B608: Multiply(shake, path), row-vector convention.
+        // Different rotation axes make reversed multiplication observable.
+        for (bool rotating_path : {false, true}) {
+            auto composed_paths = camera_paths;
+            auto path_with_rotation = camera_path;
+            const float quarter = std::sqrt(0.5f);
+            if (rotating_path)
+                path_with_rotation.rotation_keys = {{{0, 0, quarter, quarter}, 0}};
+            composed_paths.entries[0].body_bytes =
+                gh::milo_object::serialize_trans_anim6(path_with_rotation);
+            composed_paths.entries[0].size = composed_paths.entries[0].body_bytes.size();
+            auto shake_with_rotation = shake_path;
+            shake_with_rotation.translation_keys = {{{2, 3, 4}, 0}};
+            shake_with_rotation.rotation_keys = {{{quarter, 0, 0, quarter}, 0}};
+            const auto composed = gh::milo_convert::convert_gh1_venue_cameras_to_gh2_camshots(
+                camera_source, camera_path_policy, camera_main, composed_paths,
+                {{"shaky_cam1.tnm", shake_with_rotation}});
+            const auto shot = gh::milo_object::parse_cam_shot20(
+                composed.main_directory.entries[0].body_bytes);
+            const std::array<float, 12> expected = rotating_path
+                ? std::array<float, 12>{0,-1,0, 0,0,-1, 1,0,0, 4,10,27}
+                : std::array<float, 12>{1,0,0, 0,0,-1, 0,1,0, 3,15,27};
+            for (size_t component = 0; component < expected.size(); ++component) {
+                if (std::fabs(shot.keyframes[0].world_offset[component] - expected[component]) > 0.0001f) {
+                    std::fprintf(stderr,
+                        "milo_convert_test: GH1 shake/path composition mismatch (%d, %zu)\n",
+                        rotating_path, component);
+                    return 1;
+                }
+            }
+        }
+        const float helper_filter = gh::milo_convert::gh1_camera_helper_filter_from_game_config(
+            gh::dtb::serialize(gh::dtb::parse_dta("(arena (cam_filter 0.3))")));
+        const auto helper_result = gh::milo_convert::convert_gh1_venue_cameras_to_gh2_camshots(
+            camera_source, camera_path_policy, camera_main, camera_paths, shared_camera_animations,
+            helper_filter);
+        const auto helper_shot = gh::milo_object::parse_cam_shot20(helper_result.main_directory.entries[0].body_bytes);
+        const auto& helper_properties = helper_shot.object_fields.type_properties;
+        const auto find_helper_property = [&](const char* name) -> const gh::milo_object::TypePropertyNode& {
+            for (size_t i = 0; i+1 < helper_properties.size(); i += 2)
+                if (helper_properties[i].symbol == name) return helper_properties[i+1];
+            throw std::runtime_error("missing helper property");
+        };
+        if (std::fabs(helper_filter-0.3f) > 0.00001f || helper_shot.filter != 0 ||
+            find_helper_property("gh1_helper_filter").floating != helper_filter ||
+            find_helper_property("gh1_helper_target").integer != 1 ||
+            find_helper_property("gh1_helper_parent").integer != 0 ||
+            find_helper_property("gh1_helper_shake_keys").children.size() != helper_shot.keyframes.size()) {
+            std::fprintf(stderr, "milo_convert_test: GH1 helper metadata/config mismatch\n");
+            return 1;
+        }
+        bool missing_config_rejected = false;
+        try { (void)gh::milo_convert::gh1_camera_helper_filter_from_game_config(
+            gh::dtb::serialize(gh::dtb::parse_dta("(arena (other 1))"))); }
+        catch (const std::exception&) { missing_config_rejected = true; }
+        if (!missing_config_rejected) return 1;
+        const auto policy_camera = [&](const std::string& policy) {
+            const auto result = gh::milo_convert::convert_gh1_venue_cameras_to_gh2_camshots(
+                camera_source, gh::dtb::serialize(gh::dtb::parse_dta(policy)),
+                camera_main, camera_paths, shared_camera_animations);
+            return gh::milo_object::parse_cam_shot20(result.main_directory.entries[0].body_bytes);
+        };
+        const auto default_policy_camera = policy_camera("(Cam_test)");
+        const auto stage_policy_camera = policy_camera(
+            "(Cam_test (target \"arena::stage_spot_01.mesh\") (parent \"arena::venue.view\"))");
+        const auto singer_policy_camera = policy_camera(
+            "(Cam_test (target \"singer::bone_neck.mesh\") (parent \"arena::venue.view\"))");
+        const auto conditional_policy_camera = policy_camera(
+            "(Cam_test (target {if_else {exists \"guitarist0::spot_neck_fret20.mesh\"} "
+            "\"guitarist0::spot_neck_fret20.mesh\" \"arena::stage_spot_01.mesh\"}) "
+            "(parent {if_else {exists \"guitarist0::spot_neck_fret01.mesh\"} "
+            "\"guitarist0::spot_neck_fret01.mesh\" \"arena::stage_spot_01.mesh\"}))");
+        const auto& default_frame = default_policy_camera.keyframes[0];
+        const auto& stage_frame = stage_policy_camera.keyframes[0];
+        const auto& conditional_frame = conditional_policy_camera.keyframes[0];
+        size_t fallback_properties = 0;
+        for (const auto& property : conditional_policy_camera.object_fields.type_properties)
+            if (property.symbol == "gh1_camera_target_fallback" ||
+                property.symbol == "gh1_camera_parent_fallback") ++fallback_properties;
+        if (default_frame.parent.object != "guitarist0" ||
+            default_frame.parent.part != "bone_head.mesh" || default_frame.use_parent_rotation ||
+            stage_frame.targets[0].object != "arena" ||
+            stage_frame.targets[0].part != "stage_spot_01.mesh" ||
+            stage_frame.parent.part != "venue.view" || !stage_frame.use_parent_rotation ||
+            singer_policy_camera.keyframes[0].targets[0].object != "singer" ||
+            singer_policy_camera.keyframes[0].targets[0].part != "bone_neck.mesh" ||
+            conditional_frame.targets[0].part != "spot_neck_fret20.mesh" ||
+            conditional_frame.parent.part != "spot_neck_fret01.mesh" ||
+            !conditional_frame.use_parent_rotation || fallback_properties != 2) {
+            std::fprintf(stderr, "milo_convert_test: shared camera path policy mismatch\n");
+            return 1;
+        }
+        for (const auto& invalid_policy : {
+                 "(Unknown_path)",
+                 "(Cam_test (parent {some_unknown_command}))"}) {
+            bool rejected = false;
+            try { (void)policy_camera(invalid_policy); }
+            catch (const std::runtime_error&) { rejected = true; }
+            if (!rejected) {
+                std::fprintf(stderr, "milo_convert_test: unsupported camera policy accepted\n");
+                return 1;
+            }
+        }
+        const auto migrated = gh::milo_convert::rebind_gh1_venue_camera_paths(
+            gh::dtb::serialize(gh::dtb::parse_dta(
+                "(Cam_test (target \"arena::stage_spot_01.mesh\") (parent \"arena::venue.view\"))")),
+            camera_target.main_directory);
+        const auto migrated_again = gh::milo_convert::rebind_gh1_venue_camera_paths(
+            gh::dtb::serialize(gh::dtb::parse_dta(
+                "(Cam_test (target \"arena::stage_spot_01.mesh\") (parent \"arena::venue.view\"))")),
+            migrated.main_directory);
+        const auto migrated_shot = gh::milo_object::parse_cam_shot20(
+            migrated.main_directory.entries[0].body_bytes);
+        // Retail GH1 45-degree source camera: mxx=2.4142137, mzx=-3.2189515.
+        // GH2 takes vertical FOV, so passing 45 degrees unchanged is wrong.
+        const float converted_45 = parsed_camera.keyframes.front().field_of_view;
+        if (std::fabs(0.75f / std::tan(converted_45 * 0.5f) - 2.4142137f) > 0.00001f ||
+            std::fabs(-1.0f / std::tan(converted_45 * 0.5f) + 3.2189515f) > 0.00001f) {
+            std::fprintf(stderr, "milo_convert_test: GH1/GH2 projection scale mismatch\n");
+            return 1;
+        }
+        auto old_directory = camera_target.main_directory;
+        auto old_shot = parsed_camera;
+        auto& old_props = old_shot.object_fields.type_properties;
+        for (size_t i = 0; i + 1 < old_props.size(); i += 2) {
+            if (old_props[i].symbol == "gh1_fov_space") {
+                old_props.erase(old_props.begin() + i, old_props.begin() + i + 2);
+                break;
+            }
+        }
+        for (auto& frame : old_shot.keyframes) frame.field_of_view = 0.785398163f;
+        old_directory.entries[0].body_bytes = gh::milo_object::serialize_cam_shot20(old_shot);
+        const auto upgraded = gh::milo_convert::rebind_gh1_venue_camera_paths(camera_path_policy, old_directory);
+        const auto upgraded_again = gh::milo_convert::rebind_gh1_venue_camera_paths(camera_path_policy, upgraded.main_directory);
+        const auto upgraded_shot = gh::milo_object::parse_cam_shot20(upgraded.main_directory.entries[0].body_bytes);
+        if (std::fabs(upgraded_shot.keyframes.front().field_of_view - converted_45) > 0.000001f ||
+            upgraded.main_directory.entries[0].body_bytes != upgraded_again.main_directory.entries[0].body_bytes ||
+            upgraded_shot.keyframes.front().world_offset != old_shot.keyframes.front().world_offset ||
+            upgraded_shot.keyframes.front().blend != old_shot.keyframes.front().blend) {
+            std::fprintf(stderr, "milo_convert_test: old camera FOV upgrade incorrect or applied twice\n");
+            return 1;
+        }
+        if (migrated.main_directory.entries[0].body_bytes !=
+                migrated_again.main_directory.entries[0].body_bytes ||
+            migrated_shot.keyframes.back().world_offset != parsed_camera.keyframes.back().world_offset ||
+            migrated_shot.keyframes.back().screen_offset != parsed_camera.keyframes.back().screen_offset ||
+            migrated_shot.keyframes.back().targets[0].part != "stage_spot_01.mesh") {
+            std::fprintf(stderr, "milo_convert_test: camera policy migration changed curve or was not idempotent\n");
+            return 1;
+        }
         const auto fixed_path_camera_source =
             gh::dtb::serialize(
                 gh::dtb::parse_dta(
@@ -407,7 +566,7 @@ int main() {
         const auto fixed_path_camera_target =
             gh::milo_convert::
                 convert_gh1_venue_cameras_to_gh2_camshots(
-                    fixed_path_camera_source, camera_main, camera_paths,
+                    fixed_path_camera_source, camera_path_policy, camera_main, camera_paths,
                     shared_camera_animations);
         const auto fixed_path_camera =
             gh::milo_object::parse_cam_shot20(
@@ -421,10 +580,8 @@ int main() {
             fixed_path_camera.keyframes.back().screen_offset[0] != -0.5f ||
             fixed_path_camera.keyframes.front().screen_offset[1] != 0.4f ||
             fixed_path_camera.keyframes.back().screen_offset[1] != 0.4f ||
-            fixed_path_camera.keyframes.front().field_of_view !=
-                60.0f * 0.01745329251994329577f ||
-            fixed_path_camera.keyframes.back().field_of_view !=
-                60.0f * 0.01745329251994329577f) {
+            std::fabs(fixed_path_camera.keyframes.front().field_of_view - 0.81727571f) > 0.000001f ||
+            std::fabs(fixed_path_camera.keyframes.back().field_of_view - 0.81727571f) > 0.000001f) {
             std::fprintf(
                 stderr,
                 "milo_convert_test: fixed-path VenueCam endpoint mismatch\n");
@@ -973,6 +1130,84 @@ int main() {
             std::fprintf(
                 stderr,
                 "milo_convert_test: legacy drawable root mismatch\n");
+            return 1;
+        }
+
+        // View7 children_owner is not the source of a View's serialized
+        // member lists. GH1 Theatre's verse.anim legitimately points at
+        // chorus.anim there while retaining its own verselight EnvAnims.
+        gh::milo::Directory distinct_owner_source;
+        distinct_owner_source.dir_version = 10;
+        distinct_owner_source.boundaries_exact = true;
+        gh::milo_object::View owner_view;
+        owner_view.animatable.objects = {"chorus.envanim"};
+        owner_view.drawable.objects = {"chorus.mesh"};
+        owner_view.children_owner = "chorus.anim";
+        owner_view.transformable.parent = "chorus.anim";
+        gh::milo::Entry owner_view_entry;
+        owner_view_entry.type = "View";
+        owner_view_entry.name = "chorus.anim";
+        owner_view_entry.body_bytes =
+            gh::milo_object::serialize_view(owner_view);
+        owner_view_entry.terminator_value = 0xDEADDEADu;
+        distinct_owner_source.entries.push_back(std::move(owner_view_entry));
+        gh::milo_object::View member_view;
+        member_view.animatable.objects = {"verse.envanim"};
+        member_view.drawable.objects = {"verse.mesh"};
+        member_view.children_owner = "chorus.anim";
+        member_view.transformable.parent = "verse.anim";
+        gh::milo::Entry member_view_entry;
+        member_view_entry.type = "View";
+        member_view_entry.name = "verse.anim";
+        member_view_entry.body_bytes =
+            gh::milo_object::serialize_view(member_view);
+        member_view_entry.terminator_value = 0xDEADDEADu;
+        distinct_owner_source.entries.push_back(std::move(member_view_entry));
+        for (const char* name : {"chorus.mesh", "verse.mesh"}) {
+            gh::milo_object::Mesh mesh;
+            mesh.drawable.revision = 1;
+            mesh.transformable.parent = name;
+            gh::milo::Entry mesh_entry;
+            mesh_entry.type = "Mesh";
+            mesh_entry.name = name;
+            mesh_entry.body_bytes = gh::milo_object::serialize_mesh(mesh);
+            mesh_entry.terminator_value = 0xDEADDEADu;
+            distinct_owner_source.entries.push_back(std::move(mesh_entry));
+        }
+        for (const char* name : {"chorus.envanim", "verse.envanim"}) {
+            gh::milo_object::EnvAnim anim;
+            anim.animatable.revision = 0;
+            gh::milo::Entry anim_entry;
+            anim_entry.type = "EnvAnim";
+            anim_entry.name = name;
+            anim_entry.body_bytes =
+                gh::milo_object::serialize_env_anim(anim);
+            anim_entry.terminator_value = 0xDEADDEADu;
+            distinct_owner_source.entries.push_back(std::move(anim_entry));
+        }
+        const auto distinct_owner_result =
+            gh::milo_convert::convert_gh1_directory_to_gh2_rnddir(
+                distinct_owner_source, "distinct_owner", "verse.anim");
+        const auto distinct_member_entry = std::find_if(
+            distinct_owner_result.directory.entries.begin(),
+            distinct_owner_result.directory.entries.end(),
+            [](const gh::milo::Entry& entry) {
+                return entry.name == "verse.anim";
+            });
+        if (distinct_member_entry ==
+            distinct_owner_result.directory.entries.end()) {
+            std::fprintf(stderr,
+                         "milo_convert_test: distinct-owner View missing\n");
+            return 1;
+        }
+        const auto distinct_member = gh::milo_object::parse_group12(
+            distinct_member_entry->body_bytes);
+        if (distinct_member.objects.size() != 2 ||
+            distinct_member.objects[0] != "verse.envanim" ||
+            distinct_member.objects[1] != "verse.mesh") {
+            std::fprintf(
+                stderr,
+                "milo_convert_test: View incorrectly inherited children_owner members\n");
             return 1;
         }
 
@@ -1580,6 +1815,8 @@ int main() {
         const gh::milo::Entry* merged_shadow_helper = nullptr;
         const gh::milo::Entry* merged_shadow_body = nullptr;
         const gh::milo::Entry* merged_face_morph = nullptr;
+        const gh::milo::Entry* merged_face_ref = nullptr;
+        const gh::milo::Entry* merged_face_smile = nullptr;
         const gh::milo::Entry* merged_transition = nullptr;
         const gh::milo::Entry* merged_transition_filter = nullptr;
         const gh::milo::Entry* merged_transition_trigger = nullptr;
@@ -1600,6 +1837,10 @@ int main() {
                 entry.name ==
                 "test_merge_face__face.morph")
                 merged_face_morph = &entry;
+            else if (entry.name == "test_merge_face__ref.mesh")
+                merged_face_ref = &entry;
+            else if (entry.name == "test_merge_face__smile.mesh")
+                merged_face_smile = &entry;
             else if (
                 entry.name == "gh1_face_0_1_0.mrf")
                 merged_transition = &entry;
@@ -1626,7 +1867,8 @@ int main() {
             merged_package.directory.entries.size() != 29 ||
             pelvis_count != 1 || !merged_shadow_root ||
             !merged_shadow_helper || !merged_shadow_body ||
-            !merged_face_morph || !merged_transition ||
+            !merged_face_morph || !merged_face_ref ||
+            !merged_face_smile || !merged_transition ||
             !merged_transition_filter ||
             !merged_transition_trigger ||
             !merged_face_controller) {
@@ -1647,6 +1889,12 @@ int main() {
         const auto merged_morph =
             gh::milo_object::parse_morph4(
                 merged_face_morph->body_bytes);
+        const auto merged_ref =
+            gh::milo_object::parse_mesh28(
+                merged_face_ref->body_bytes);
+        const auto merged_smile =
+            gh::milo_object::parse_mesh28(
+                merged_face_smile->body_bytes);
         const auto transition_morph =
             gh::milo_object::parse_morph4(
                 merged_transition->body_bytes);
@@ -1673,6 +1921,8 @@ int main() {
                 "test_merge_face__ref.mesh" ||
             merged_morph.poses[1].mesh !=
                 "test_merge_face__smile.mesh" ||
+            merged_ref.drawable.showing ||
+            merged_smile.drawable.showing ||
             transition_morph.target != "head.mesh" ||
             transition_morph.poses.size() != 2 ||
             transition_morph.poses[0].keys.size() != 4 ||

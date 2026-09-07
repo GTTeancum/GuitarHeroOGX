@@ -3,6 +3,7 @@
 #include "gh2_face_config_patch.h"
 #include "gh1_character_package.h"
 #include "gh1_venue_placement_conversion.h"
+#include "gh1_venue_camera_conversion.h"
 #include "acp.h"
 #include "milo.h"
 #include "milo_object.h"
@@ -1545,6 +1546,10 @@ size_t add_generated_guitar_clip_groups(
 void usage() {
     std::cerr
         << "Usage:\n"
+        << "  milo_convert_tool recompile-gh1-cameras <GH2.milo_ps2> <camera.dtb> "
+           "<cam_paths.dtb> <campaths.milo_ps2> <shared.milo_ps2> <gh.dtb> --out <separate-output.milo_ps2>\n"
+        << "  milo_convert_tool rebind-gh1-camera-paths <GH2.milo_ps2> "
+           "<cam_paths.dtb> --out <separate-output.milo_ps2>\n"
         << "  milo_convert_tool convert <GH1.rnd_ps2> --name <dir-name> "
            "--out <GH2.milo_ps2> --manifest <manifest.tsv>\n"
         << "  milo_convert_tool build-clipset-from-acp <acp-dir> "
@@ -1592,6 +1597,7 @@ void usage() {
            "[--mesh-limit <count>] [--rebind-template-rig] "
            "[--preserve-donor-bind-offsets] "
            "[--preserve-donor-hand-mesh-bind-offsets] "
+           "[--retarget-rb2-face-rig] "
            "--out <merged.milo_ps2>\n"
         << "  milo_convert_tool repack-milo <GH2.milo_ps2> "
            "--out <repacked.milo_ps2>\n"
@@ -1621,6 +1627,73 @@ int main(int argc, char** argv) {
     if (argc < 3) usage();
     const std::string command = argv[1];
     fs::path input = argv[2];
+    if (command == "recompile-gh1-cameras") {
+        try {
+            if (argc != 10 || std::string(argv[8]) != "--out")
+                throw std::runtime_error("Usage: recompile-gh1-cameras input camera.dtb cam_paths.dtb campaths.milo_ps2 shared.milo_ps2 gh.dtb --out output");
+            const fs::path output = argv[9];
+            for (int i = 2; i <= 7; ++i)
+                if (fs::absolute(argv[i]).lexically_normal() == fs::absolute(output).lexically_normal())
+                    throw std::runtime_error("Use a separate output file; source assets must remain unchanged");
+            const auto read_directory = [](const fs::path& path) {
+                return gh::milo::parse_directory(gh::milo::container_payload(
+                    gh::milo::parse_container(gh::milo::read_file(path.string()))));
+            };
+            auto main = read_directory(input);
+            const auto paths = read_directory(argv[5]);
+            const auto shared = read_directory(argv[6]);
+            std::map<std::string, gh::milo_object::TransAnim6> animations;
+            for (const auto& entry : shared.entries)
+                if (entry.type == "TransAnim")
+                    animations.emplace(entry.name, gh::milo_object::parse_trans_anim6(entry.body_bytes));
+            // Replace only compiler-owned GH1 shots; keep geometry and every
+            // unrelated/native-GH2 object byte-for-byte. Name collisions fail.
+            main.entries.erase(std::remove_if(main.entries.begin(), main.entries.end(),
+                [](const gh::milo::Entry& entry) {
+                    return entry.type == "CamShot" &&
+                        gh::milo_object::parse_cam_shot20(entry.body_bytes).object_fields.type == "gh1_venue_camera";
+                }), main.entries.end());
+            const auto result = gh::milo_convert::convert_gh1_venue_cameras_to_gh2_camshots(
+                gh::milo::read_file(argv[3]), gh::milo::read_file(argv[4]), main, paths, animations,
+                gh::milo_convert::gh1_camera_helper_filter_from_game_config(gh::milo::read_file(argv[7])));
+            const auto payload = gh::milo::serialize_directory(result.main_directory);
+            const auto bytes = gh::milo::serialize_container(gh::milo::make_object_aligned_container(payload));
+            const auto verify = gh::milo::parse_directory(gh::milo::container_payload(gh::milo::parse_container(bytes)));
+            if (!verify.boundaries_exact || gh::milo::serialize_directory(verify) != payload)
+                throw std::runtime_error("Recompiled camera directory failed native round trip");
+            write_file(output, bytes);
+            std::cout << "recompiled " << result.records << " cameras / " << result.keyframes
+                      << " frames / " << result.shaky_records << " shaky records\n";
+            return 0;
+        } catch (const std::exception& ex) {
+            std::cerr << "milo_convert_tool: " << ex.what() << '\n';
+            return 2;
+        }
+    }
+    if (command == "rebind-gh1-camera-paths") {
+        try {
+            if (argc != 6 || std::string(argv[4]) != "--out")
+                throw std::runtime_error("Usage: rebind-gh1-camera-paths input.milo_ps2 cam_paths.dtb --out output.milo_ps2");
+            const fs::path output = argv[5];
+            if (fs::absolute(input).lexically_normal() == fs::absolute(output).lexically_normal())
+                throw std::runtime_error("Use a separate output file; source assets must remain unchanged");
+            const auto source = gh::milo::parse_container(gh::milo::read_file(input.string()));
+            const auto directory = gh::milo::parse_directory(gh::milo::container_payload(source));
+            const auto result = gh::milo_convert::rebind_gh1_venue_camera_paths(
+                gh::milo::read_file(argv[3]), directory);
+            const auto payload = gh::milo::serialize_directory(result.main_directory);
+            const auto bytes = gh::milo::serialize_container(gh::milo::make_container(payload));
+            const auto verify = gh::milo::parse_directory(gh::milo::container_payload(gh::milo::parse_container(bytes)));
+            if (!verify.boundaries_exact || gh::milo::serialize_directory(verify) != payload)
+                throw std::runtime_error("Rebound camera directory failed native round trip");
+            write_file(output, bytes);
+            std::cout << "rebound " << result.records << " cameras / " << result.keyframes << " frames\n";
+            return 0;
+        } catch (const std::exception& ex) {
+            std::cerr << "milo_convert_tool: " << ex.what() << '\n';
+            return 2;
+        }
+    }
     if (command == "rebuild-venue-waypoints") {
         try {
             if (argc != 6 || std::string(argv[4]) != "--out")
@@ -2847,6 +2920,7 @@ int main(int argc, char** argv) {
             bool rebind_template_rig = false;
             bool preserve_donor_bind_offsets = false;
             bool preserve_donor_hand_mesh_bind_offsets = false;
+            bool retarget_rb2_face_rig = false;
             for (int i = 3; i < argc; ++i) {
                 const std::string arg = argv[i];
                 if (arg == "--donor" && i + 1 < argc)
@@ -2860,6 +2934,8 @@ int main(int argc, char** argv) {
                 else if (arg ==
                          "--preserve-donor-hand-mesh-bind-offsets")
                     preserve_donor_hand_mesh_bind_offsets = true;
+                else if (arg == "--retarget-rb2-face-rig")
+                    retarget_rb2_face_rig = true;
                 else if (arg == "--out" && i + 1 < argc)
                     output = argv[++i];
                 else usage();
@@ -2871,7 +2947,6 @@ int main(int argc, char** argv) {
                 throw std::runtime_error(
                     "donor bind-offset preservation requires "
                     "--rebind-template-rig");
-
             const auto template_container = gh::milo::parse_container(
                 gh::milo::read_file(input.string()));
             auto directory = gh::milo::parse_directory(
@@ -3036,6 +3111,110 @@ int main(int argc, char** argv) {
                         "merge-character-render-payload template transform "
                         "hierarchy contains a cycle");
             }
+            const std::map<std::string, std::string> rb2_face_aliases = {
+                {"bone_L-eye.mesh", "eye-L.mesh"},
+                {"bone_R-eye.mesh", "eye-R.mesh"},
+                {"bone_L-lid.mesh", "bone_L-upperlid.mesh"},
+                {"bone_R-lid.mesh", "bone_R-upperlid.mesh"},
+                {"bone_L-lipcorner.mesh", "bone_lip-L-corner.mesh"},
+                {"bone_R-lipcorner.mesh", "bone_lip-R-corner.mesh"},
+                {"bone_liptop_left.mesh", "bone_upperlip-L1.mesh"},
+                {"bone_liptop_mid.mesh", "bone_upperlip-center.mesh"},
+                {"bone_liptop_right.mesh", "bone_upperlip-R1.mesh"},
+                {"bone_lowlip_left.mesh", "bone_lowerlip-L1.mesh"},
+                {"bone_lowlip_mid.mesh", "bone_lowerlip-center.mesh"},
+                {"bone_lowlip_right.mesh", "bone_lowerlip-R1.mesh"},
+            };
+            size_t source_proportion_face_targets_repositioned = 0;
+            if (retarget_rb2_face_rig && !rebind_template_rig) {
+                // Source-proportion retargeting keeps the RB2 bind skeleton so
+                // Casey's rotations act around Penelope's authored pivots. Move
+                // the GH2 face-channel targets onto the equivalent RB2 pivots;
+                // donor skin slots are aliased to these targets below without
+                // changing their bind offsets.
+                for (const auto& [source, target] : rb2_face_aliases) {
+                    const auto source_transform = donor_transforms.find(source);
+                    if (source_transform == donor_transforms.end())
+                        throw std::runtime_error(
+                            "RB2 face-rig donor is missing " + source);
+
+                    const auto target_transform_entry =
+                        template_entries.find({"Trans", target});
+                    if (target_transform_entry != template_entries.end()) {
+                        auto positioned = source_transform->second;
+                        auto& target_entry =
+                            directory.entries[target_transform_entry->second];
+                        target_entry.body_bytes =
+                            gh::milo_object::serialize_trans9(positioned);
+                        target_entry.size = target_entry.body_bytes.size();
+                        template_transforms[target] = positioned;
+                        template_bind_worlds[target] = positioned.world;
+                        ++source_proportion_face_targets_repositioned;
+                        continue;
+                    }
+
+                    const auto target_mesh_entry =
+                        template_entries.find({"Mesh", target});
+                    if (target_mesh_entry != template_entries.end()) {
+                        auto& target_entry =
+                            directory.entries[target_mesh_entry->second];
+                        auto target_mesh = gh::milo_object::parse_mesh28(
+                            target_entry.body_bytes,
+                            static_cast<uint32_t>(directory.dir_version));
+                        target_mesh.transformable.local =
+                            source_transform->second.local;
+                        target_mesh.transformable.world =
+                            source_transform->second.world;
+                        target_mesh.transformable.parent =
+                            source_transform->second.parent;
+                        target_entry.body_bytes =
+                            gh::milo_object::serialize_mesh28(
+                                target_mesh,
+                                static_cast<uint32_t>(directory.dir_version));
+                        target_entry.size = target_entry.body_bytes.size();
+                        template_bind_worlds[target] =
+                            source_transform->second.world;
+                        ++source_proportion_face_targets_repositioned;
+                        continue;
+                    }
+
+                    throw std::runtime_error(
+                        "RB2 face-rig target is missing " + target);
+                }
+            }
+            if (retarget_rb2_face_rig) {
+                for (const char* eye_name : {"eye-L.mesh", "eye-R.mesh"}) {
+                    const auto eye = std::find_if(
+                        directory.entries.begin(), directory.entries.end(),
+                        [&](const gh::milo::Entry& entry) {
+                            return entry.type == "Mesh" &&
+                                   entry.name == eye_name;
+                        });
+                    if (eye == directory.entries.end())
+                        throw std::runtime_error(
+                            "RB2 face-rig target is missing eye mesh " +
+                            std::string(eye_name));
+                    const auto mesh = gh::milo_object::parse_mesh28(
+                        eye->body_bytes,
+                        static_cast<uint32_t>(directory.dir_version));
+                    const auto parent = template_bind_worlds.find(
+                        mesh.transformable.parent);
+                    const auto bind_world =
+                        parent == template_bind_worlds.end()
+                            ? mesh.transformable.local
+                            : multiply_affine_transform(
+                                  mesh.transformable.local,
+                                  parent->second);
+                    template_bind_worlds.emplace(
+                        eye_name, bind_world);
+                }
+                for (const auto& [source, target] : rb2_face_aliases) {
+                    (void)source;
+                    if (template_bind_worlds.count(target) == 0)
+                        throw std::runtime_error(
+                            "RB2 face-rig target is missing " + target);
+                }
+            }
             float max_template_stored_chain_delta = 0.0f;
             for (const auto& [name, transform] : template_transforms) {
                 const auto& chain_world = template_bind_worlds.at(name);
@@ -3053,7 +3232,12 @@ int main(int argc, char** argv) {
                     std::string current = donor_bone;
                     std::set<std::string> visited;
                     while (!current.empty() && visited.insert(current).second) {
-                        if (template_transforms.count(current)) return current;
+                        if (retarget_rb2_face_rig) {
+                            const auto alias = rb2_face_aliases.find(current);
+                            if (alias != rb2_face_aliases.end())
+                                return alias->second;
+                        }
+                        if (template_bind_worlds.count(current)) return current;
                         const auto donor_transform =
                             donor_transforms.find(current);
                         if (donor_transform == donor_transforms.end()) break;
@@ -3257,6 +3441,22 @@ int main(int argc, char** argv) {
                                 mesh,
                                 static_cast<uint32_t>(directory.dir_version));
                         render_entry.size = render_entry.body_bytes.size();
+                    } else if (render_entry.type == "Mesh" &&
+                               retarget_rb2_face_rig) {
+                        auto mesh = gh::milo_object::parse_mesh28(
+                            render_entry.body_bytes,
+                            static_cast<uint32_t>(directory.dir_version));
+                        for (auto& slot : mesh.bone_slots) {
+                            const auto alias = rb2_face_aliases.find(slot.bone);
+                            if (alias == rb2_face_aliases.end()) continue;
+                            slot.bone = alias->second;
+                            ++mesh_bind_slots_remapped;
+                        }
+                        render_entry.body_bytes =
+                            gh::milo_object::serialize_mesh28(
+                                mesh,
+                                static_cast<uint32_t>(directory.dir_version));
+                        render_entry.size = render_entry.body_bytes.size();
                     }
                     template_entries.emplace(key, directory.entries.size());
                     directory.entries.push_back(std::move(render_entry));
@@ -3325,6 +3525,8 @@ int main(int argc, char** argv) {
                       << meshes_with_bind_slots_preserved
                       << " mesh_bind_slots_remapped="
                       << mesh_bind_slots_remapped
+                      << " source_proportion_face_targets_repositioned="
+                      << source_proportion_face_targets_repositioned
                       << " max_bind_residual=" << max_bind_residual
                       << " max_template_stored_chain_delta="
                       << max_template_stored_chain_delta

@@ -2285,6 +2285,56 @@ int main(int argc, char** argv) {
                     model.native_upper_twist_sibling_count;
             }
             if (!bundle_path.empty()) {
+                // Arena::Crowd promotes selected GH1 flat-card transforms to
+                // one of these six source RndDir archetypes. They are runtime
+                // venue assets, not selectable band characters, so preserve
+                // their RndDir structure and package them beside crowd_main.
+                // The DTA-authored actor/head/material recipe is applied by
+                // gameplay when it instantiates the selected region.
+                constexpr std::array<std::string_view, 6>
+                    crowd_archetypes = {
+                        "crowd_male01", "crowd_male02", "crowd_male03",
+                        "crowd_female01", "crowd_female02",
+                        "crowd_female03"};
+                for (const std::string_view crowd : crowd_archetypes) {
+                    const std::string source_path =
+                        "charsys/crowd/gen/" + std::string(crowd) +
+                        ".rnd_ps2";
+                    const auto source_container = gh::milo::parse_container(
+                        read_virtual(source_path));
+                    const auto source_directory = gh::milo::parse_directory(
+                        gh::milo::container_payload(source_container));
+                    const auto converted =
+                        gh::milo_convert::convert_gh1_directory_to_gh2_rnddir(
+                            source_directory, std::string(crowd));
+                    if (!converted.complete)
+                        throw std::runtime_error(
+                            "crowd model conversion incomplete: " +
+                            source_path);
+                    const auto target_payload =
+                        gh::milo::serialize_directory(converted.directory);
+                    const auto target_bytes = gh::milo::serialize_container(
+                        gh::milo::make_container(target_payload));
+                    const auto repeat =
+                        gh::milo_convert::convert_gh1_directory_to_gh2_rnddir(
+                            source_directory, std::string(crowd));
+                    if (gh::milo::serialize_container(gh::milo::make_container(
+                            gh::milo::serialize_directory(repeat.directory))) !=
+                        target_bytes)
+                        throw std::runtime_error(
+                            "crowd model conversion is nondeterministic: " +
+                            source_path);
+                    const std::string relative =
+                        "char/crowd/og/gen/" + std::string(crowd) +
+                        ".milo_ps2";
+                    write_bundle_file(fs::path(bundle_path), relative,
+                                      target_bytes);
+                    venue_bundle_records.push_back(
+                        {relative, "venue-crowd-model", source_path,
+                         target_bytes.size()});
+                }
+            }
+            if (!bundle_path.empty()) {
                 std::map<std::string, std::string>
                     source_surface_by_character;
                 for (const auto& surface :
@@ -3084,6 +3134,8 @@ int main(int argc, char** argv) {
         std::set<std::string> venue_start_handlers;
         std::map<std::string, gh::milo_object::TransAnim6>
             shared_camera_animations;
+        std::vector<uint8_t> shared_camera_path_policy;
+        std::optional<float> shared_camera_helper_filter;
         std::map<std::string, size_t> blockers;
         std::map<std::pair<std::string, uint32_t>, size_t>
             semantic_field_instances;
@@ -3096,6 +3148,11 @@ int main(int argc, char** argv) {
         size_t dtb_trailing_bytes = 0;
         std::map<uint32_t, size_t> dtb_control_words;
         for (const auto& entry : archive.entries()) {
+            if (entry.full_path == "arena/gen/cam_paths.dtb")
+                shared_camera_path_policy = archive.read_entry(entry, ark_paths);
+            if (entry.full_path == "config/gen/gh.dtb")
+                shared_camera_helper_filter = gh::milo_convert::gh1_camera_helper_filter_from_game_config(
+                    archive.read_entry(entry, ark_paths));
             const std::string source_extension =
                 extension(entry.name);
             if (source_extension != ".dtb" &&
@@ -5433,8 +5490,13 @@ int main(int argc, char** argv) {
                                 self(self, child);
                             visiting_animations.erase(name);
                         };
+                    // children_owner is an inheritance/ownership link; the
+                    // serialized member lists on this View are the members
+                    // it actually dispatches.  Using the owner's lists here
+                    // falsely aliases distinct lighting views (notably the
+                    // GH1 Theatre verse/chorus/solo groups).
                     for (const auto& name :
-                         owner->second.animatable.objects)
+                         source_view.animatable.objects)
                         append_animation(
                             append_animation, name);
                     std::vector<
@@ -5482,7 +5544,7 @@ int main(int argc, char** argv) {
                             visiting_drawables.erase(name);
                         };
                     for (const auto& name :
-                         owner->second.drawable.objects)
+                         source_view.drawable.objects)
                         append_drawable(
                             append_drawable, name);
                     std::vector<
@@ -7258,18 +7320,20 @@ int main(int argc, char** argv) {
                             "converted campaths directory is missing");
                     const auto camera_bytes =
                         archive.read_entry(entry, ark_paths);
+                    if (!shared_camera_helper_filter)
+                        throw std::runtime_error("GH1 game config cam_filter is required for camera conversion");
                     const auto converted =
                         gh::milo_convert::
                             convert_gh1_venue_cameras_to_gh2_camshots(
-                                camera_bytes, main->second,
+                                camera_bytes, shared_camera_path_policy, main->second,
                                 campaths->second,
-                                shared_camera_animations);
+                                shared_camera_animations, shared_camera_helper_filter);
                     const auto repeat =
                         gh::milo_convert::
                             convert_gh1_venue_cameras_to_gh2_camshots(
-                                camera_bytes, main->second,
+                                camera_bytes, shared_camera_path_policy, main->second,
                                 campaths->second,
-                                shared_camera_animations);
+                                shared_camera_animations, shared_camera_helper_filter);
                     if (gh::milo::serialize_directory(
                             converted.main_directory) !=
                             gh::milo::serialize_directory(

@@ -38,8 +38,11 @@ struct FoFiXStarPowerState {
 
 FoFiXHitWindow fofix_hit_window_for_bpm(double bpm);
 
-// GH2 exposes one signed sync value. It shifts the input-judgement clock in
-// milliseconds while the audio position remains the presentation master.
+// Soundcheck's Audio value delays/advances the complete chart presentation
+// against the decoded audio-master position. Video/Input then shifts only the
+// input judgement clock. Neither value changes the hit-window width.
+double calibrated_presentation_time(double audio_time_sec,
+                                    int audio_offset_ms);
 double calibrated_judgement_time(double audio_time_sec, int sync_offset_ms);
 
 bool fofix_note_in_window(double song_time,

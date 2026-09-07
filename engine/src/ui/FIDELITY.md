@@ -554,25 +554,47 @@ never DEFINED as a handler are true engine primitives needing grounded C++:
   boolean helpers also treat authored `TRUE`/`FALSE` symbols as booleans, so
   stock calls such as `options set_pscan TRUE` preserve the intended option
   state.
-- **Lag calibration state/countdown surface - `[DTB-SURFACE]` +
-  `[VERBATIM-DATA]`.** Stock `options.dta::LagPanel lag_panel` owns the
-  `lag_screen`/`pause_lag_screen` text, groups, helpbar state, sync-offset sign,
-  reset button, autocalibrate countdown, hit capture, and cue calls. The
-  interpreter now covers the authored helpers this panel needs (`array`, `int`,
-  and `thread_task` sleep segmentation), while `ghogx_ui_test` pins enter-time
-  `options get_sync_offset` negation, `update_text`/`update_helpbar` for
-  `init` and `calibrating`, `DUp`/`DDown` hit recording, `reset_to_zero.btn`
-  numeric reset, first countdown beats, `practice_hat play`, sync-click cue
-  playback, success-state text, and exit-time `options set_sync_offset`
-  writeback. The stored value now persists in `GHOGX_PROFILE_V2`, defaults to
-  zero, clamps to +/-500 ms, and reaches gameplay as the signed input-judgment
-  clock `audio_time + sync_offset_ms / 1000`; audio remains the master and
-  presentation clock. This preserves the authored panel's negated enter/exit
-  sign: a negative stored value compensates late physical input. Gameplay-rule
-  tests pin both directions without widening the 100 ms hit window, and the
-  two-process release audit proves `-73` saves and reloads exactly. Real guitar,
-  display, and audio-device certification remains an open release review rather
-  than an automated fidelity claim.
+- **Practice Room Soundcheck - `[MILO-SOURCE]` + `[DTB-SURFACE]`.** The stock
+  Video Settings action still targets `lag_screen`; `ScreenManager` substitutes
+  `soundcheck_screen` at that exact route. Its presentation is not a recreated
+  approximation: the renderer loads the actual two-card Practice Room backdrop
+  from `ui/gen/practice_panel.milo_ps2`, then clones the menu typography and
+  authored transforms from `ui/gen/sel_diff_practice.milo_ps2`. A live guitar
+  strum is consumed directly from bit 5 of the gameplay-format edge mask during
+  Audio, Video/Input, and combined timing stages; the same strum axis is
+  suppressed as menu Up/Down for that frame, and playable fret edges do not
+  accidentally Confirm or Back out of a measurement. The renderer clones
+  `sd_select.lbl` and `sd_diff1.btn` through `sd_diff4.btn`, and retains their
+  source font objects, sizes, fit rules, alignment, hierarchy-derived world
+  transforms, row spacing, and stock HelpBarPanel. Soundcheck overrides those
+  source label colors to opaque foreground white for legibility against the
+  room, with the active menu row in Guitar Hero red, while retaining the
+  Clarendon title and Helvetica Black Condensed rows at their authored
+  positions. The GH2 track assets are warmed when Soundcheck opens so a timing
+  pass does not wait on lazy loading. Video/Input and adaptive stages composite
+  the full-frame GH2 highway, including an opaque source `track_surface.tex`
+  underlay so the fretboard remains visible against the bright room.
+
+  The guided path has a four-beat count-in, eight-hit robust audio/click pass,
+  an eight-hit silent video/input pass against the GH2 highway, a result page,
+  and a result page. Test Setup is a one-beat, 16-hit adaptive pass over 24
+  green-note opportunities: it reports early/centered/late while playing, then
+  learns the player's robust timing center and fine-tunes Video/Input. Manual
+  Fine Tune still exposes both signed values, adaptive play, and reset without
+  changing the gameplay hit window. `practice_hat` and `sync_click.cue` come
+  from the stock SFX surface. Median/MAD outlier rejection plus a trimmed mean
+  prevents one bad strum from dominating the result.
+
+  `audio_offset_ms` shifts the complete chart presentation against the decoded
+  audio-master clock; `video_input_offset_ms` then shifts only input judgment.
+  Both values clamp to +/-500 ms and persist in `GHOGX_PROFILE_V2`. Profiles
+  that contain only legacy `sync_offset` migrate that value to Video/Input and
+  start Audio at zero; the legacy key remains mirrored for stock-script
+  compatibility. `ghogx_soundcheck_calibration_test` walks every stage and
+  save/cancel behavior, `ghogx_soundcheck_profile_migration_test` proves the
+  legacy and two-value disk formats, and `ghogx_gameplay_rules_test` pins both
+  timing directions and the unchanged hit-window width. Real guitar, display,
+  and audio-device certification remains an open hardware review.
 - **P-scan switch behavior lock-in - `[DTB-SURFACE]` + `[MILO-SOURCE]`.**
   Stock `options.dta::PSCAN_SWITCH_SCREEN_HANDLERS` drives
   `pscan_switch_screen` and its `pscan_switching.milo` panel. `ghogx_ui_test`
@@ -1004,3 +1026,31 @@ actual decoded audio-bank playback, profilemgr/content_mgr/memcard.
   `dl_title.lbl` is bottom-center), so rendered BandLabel text now anchors the
   wrapped block from those vertical bits instead of treating every label as
   middle-aligned.
+- **Manage Band prototype - `[WIP]` + `[DTB-SURFACE]` + `[MILO-SOURCE]` +
+  `[ENGINE-BRIDGE]`.** This is a functional data-flow and rendering prototype,
+  not an accepted release-quality screen. The stock `manage_band_screen` route, profile
+  rename/delete flow, and screen transitions remain authoritative. Its panel
+  instances the stock `multi_sel_character.milo_ps2` room and camera while
+  masking only that instance's portrait rack and multiplayer selectors; the
+  real `multi_sel_character_screen` continues to render its source portrait
+  rack, P1/P2 highlights, character previews, and outfit overlays unchanged.
+  Manage Band uses the source P1 character placer for authored animated
+  character/outfit previews and the stock `multi_sel_guitar.milo_ps2`
+  `guitar_multi0.pxy`/`guitar_multi0.filt`/`guitar01.env` chain for live guitar
+  and bass previews. A single seven-row wrapping list on the right edits
+  catalog-backed favorite guitarist/outfit, guitar/finish, bass/finish,
+  Scruffy bass, backing-performer outfits, and Favorite Venue. The venue
+  submenu resolves the highlighted stable venue ID to one of the 14 approved
+  960x720 establishing shots, draws it centered in the left 40% pane with a
+  -3-degree photo treatment, and caches the uploaded texture until the
+  selection changes. Canonical venue names are used; only Red Octane carries a
+  GH1/GH2 suffix. The setup payload verifies all 14 source hashes and installs
+  the release-owned images beside the base GEN archive under
+  `venue-previews/`. Stable
+  symbols persist inside each versioned profile record. Backing outfit choices
+  are passed into both Career and Quickplay band construction; Career retains
+  authority over the player guitarist, player guitar, and gig venue. The
+  diagnostic `--manageband` route enters this same screen directly without
+  adding another menu implementation. Layout, interaction polish, complete
+  category proof, Career/Quickplay application proof, and the dynamic-reel
+  portrait defect recorded in `TO_DO.MD` remain open acceptance gates.

@@ -1,4 +1,5 @@
 #include "game/gameplay_rules.h"
+#include "game/camera_intro_timing.h"
 
 #include <cmath>
 #include <cstdio>
@@ -21,6 +22,21 @@ int failures = 0;
 
 int main() {
   using namespace ghogx::game;
+
+  // The camera runs on elapsed presentation time, but the highway must cross
+  // task-clock zero without adding/removing the user's audio calibration.
+  for (int offset : {-500, -150, 0, 150, 500}) {
+    const double prior_raw = ghogx::camera::intro_song_seconds(10.0 - 1.0/30.0, 10.0);
+    const double prior_visual = calibrated_presentation_time(prior_raw, offset);
+    const double zero_visual = calibrated_presentation_time(0.0, offset);
+    CHECK(std::fabs((zero_visual - prior_visual) - 1.0/30.0) < 1.0e-9,
+          "calibrated highway crosses preroll boundary without offset jump");
+    CHECK(std::fabs(zero_visual + offset/1000.0) < 1.0e-9,
+          "preroll endpoint matches the calibrated song-clock origin");
+    // UI/SFX task timing uses the raw clock, not the calibrated chart clock.
+    CHECK(std::fabs(ghogx::camera::intro_track_elapsed(10.0 + 0.05, 10.0, -2.0) - 2.05) < 1.0e-9,
+          "meter task remains at +2.05 seconds regardless of calibration");
+  }
 
   CHECK(gh1_arena_nondraw_helper_mesh("target_parent.mesh"),
         "GH1 Arena consumes target_parent as temporary runtime data");
@@ -61,6 +77,12 @@ int main() {
   CHECK(fofix_note_in_window(calibrated_judgement_time(10.075, -75),
                              10.0, window),
         "negative stored offset compensates a physically late input");
+  CHECK(std::fabs(calibrated_presentation_time(10.0, 75) - 9.925) <
+            1.0e-9,
+        "positive audio latency delays the complete chart presentation");
+  CHECK(std::fabs(calibrated_presentation_time(10.0, -75) - 10.075) <
+            1.0e-9,
+        "negative audio latency advances the complete chart presentation");
 
   CHECK(fofix_match_frets(0b00001, 0b00001), "green matches green");
   CHECK(fofix_match_frets(0b00011, 0b00010),

@@ -12,6 +12,8 @@ add_library(ghogx_ui_core STATIC
     screen_loader.cpp   screen_loader.h
     config_db.cpp       config_db.h
     meta_objects.cpp    meta_objects.h
+    manage_band_panel.cpp manage_band_panel.h
+    soundcheck_panel.cpp soundcheck_panel.h
 )
 target_include_directories(ghogx_ui_core PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/..)
 target_link_libraries(ghogx_ui_core PUBLIC
@@ -89,6 +91,31 @@ else()
 endif()
 add_test(NAME ghogx_ui_test COMMAND ghogx_ui_test)
 
+add_executable(ghogx_soundcheck_calibration_test
+    soundcheck_calibration_test.cpp)
+target_link_libraries(ghogx_soundcheck_calibration_test PRIVATE ghogx_ui_core)
+if(MSVC)
+    target_compile_options(ghogx_soundcheck_calibration_test PRIVATE /W4)
+else()
+    target_compile_options(ghogx_soundcheck_calibration_test PRIVATE
+        -Wall -Wextra)
+endif()
+add_test(NAME ghogx_soundcheck_calibration_test
+         COMMAND ghogx_soundcheck_calibration_test)
+
+add_executable(ghogx_soundcheck_profile_migration_test
+    soundcheck_profile_migration_test.cpp)
+target_link_libraries(ghogx_soundcheck_profile_migration_test PRIVATE
+    ghogx_ui_core)
+if(MSVC)
+    target_compile_options(ghogx_soundcheck_profile_migration_test PRIVATE /W4)
+else()
+    target_compile_options(ghogx_soundcheck_profile_migration_test PRIVATE
+        -Wall -Wextra)
+endif()
+add_test(NAME ghogx_soundcheck_profile_migration_test
+         COMMAND ghogx_soundcheck_profile_migration_test)
+
 add_executable(ghogx_panel_external_dependency_test
     panel_external_dependency_test.cpp)
 target_include_directories(ghogx_panel_external_dependency_test PRIVATE
@@ -116,6 +143,18 @@ else()
 endif()
 add_test(NAME ghogx_character_variant_catalog_test
          COMMAND ghogx_character_variant_catalog_test)
+
+add_executable(ghogx_addon_preferred_guitar_test
+    addon_preferred_guitar_test.cpp)
+target_link_libraries(ghogx_addon_preferred_guitar_test PRIVATE ghogx_ui_core)
+if(MSVC)
+    target_compile_options(ghogx_addon_preferred_guitar_test PRIVATE /W4)
+else()
+    target_compile_options(ghogx_addon_preferred_guitar_test PRIVATE
+        -Wall -Wextra)
+endif()
+add_test(NAME ghogx_addon_preferred_guitar_test
+         COMMAND ghogx_addon_preferred_guitar_test)
 
 add_executable(ghogx_dlc_import_catalog_test dlc_import_catalog_test.cpp)
 target_link_libraries(ghogx_dlc_import_catalog_test PRIVATE ghogx_ui_core)

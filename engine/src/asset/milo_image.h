@@ -24,6 +24,11 @@ struct Image {
   bool valid() const { return width > 0 && height > 0 && !rgba.empty(); }
 };
 
+// Load an ordinary uncompressed Windows BMP from the loose filesystem. This
+// is used for release-owned UI artwork that is intentionally kept outside the
+// source game ARK (for example approved venue-select photographs).
+Image load_bmp_file(const std::string& path);
+
 // CPU reconstruction of RB2's instrument two-color material. Diffuse alpha
 // interpolates primary to secondary; a valid mask preserves fixed-color
 // diffuse channels. Without a mask, the primary color modulates the diffuse.

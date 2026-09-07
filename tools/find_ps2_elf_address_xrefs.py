@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import argparse
+import struct
 from pathlib import Path
 
 from capstone import (
@@ -29,6 +30,8 @@ def main() -> int:
     parser.add_argument("elf", type=Path)
     parser.add_argument("address", nargs="+", type=parse_int)
     parser.add_argument("--max-results", type=int, default=128)
+    parser.add_argument("--pointer-data", action="store_true",
+                        help="Find aligned pointer words (e.g. virtual tables), not instructions")
     parser.add_argument(
         "--mips64",
         action="store_true",
@@ -45,8 +48,23 @@ def main() -> int:
             (int(segment["p_vaddr"]), segment.data())
             for segment in elf.iter_segments()
             if segment["p_type"] == "PT_LOAD"
-            and int(segment["p_flags"]) & 1
+            and (args.pointer_data or int(segment["p_flags"]) & 1)
         ]
+
+    if args.pointer_data:
+        results = 0
+        for base, data in segments:
+            for target in sorted(targets):
+                needle = struct.pack("<I", target)
+                offset = data.find(needle)
+                while offset >= 0:
+                    if (base + offset) % 4 == 0:
+                        print(f"pointer {base + offset:#010x} -> {target:#010x}")
+                        results += 1
+                        if results >= args.max_results:
+                            return 0
+                    offset = data.find(needle, offset + 1)
+        return 0
 
     disassembler = Cs(
         CS_ARCH_MIPS,

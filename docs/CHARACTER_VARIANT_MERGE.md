@@ -84,6 +84,10 @@ user-maintained catalog. A character addon may declare:
     "id": "example_character",
     "label": "Example Character",
     "portrait": "ui/image/dlc/example/portrait.bmp_ps2",
+    "preferred_guitar": "guitar_sg",
+    "preferred_guitar_finish": "guitar_sg_default",
+    "preferred_guitar_paint_primary": 0,
+    "preferred_guitar_paint_secondary": 1,
     "outfits": [{
       "selection": "example_character_default",
       "label": "Standard",
@@ -105,6 +109,12 @@ are rejected. A package cannot replace a base-ARK path unless that exact path
 appears in its `replaces` array. Package application is transactional: a late
 validation error rolls back earlier character, song, guitar, finish, venue,
 quickplay, and setlist mutations from that manifest.
+
+Preferred-guitar fields may be inherited from the character or overridden by
+an outfit. They are a source-authored fallback only: the menu resolves them
+when the player has no saved guitar selection, never over an explicit player
+choice. The referenced guitar must exist in the merged catalog; otherwise the
+normal first-guitar fallback remains in force.
 
 All manifest asset values are normalized ARK-relative paths. Files live under
 `DLC/<package>/content/<same path>`; references may also resolve an unchanged

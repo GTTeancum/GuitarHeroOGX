@@ -1,0 +1,21 @@
+{
+  "schema_version": 1,
+  "package_id": "rb2.penelope_mcqueen",
+  "files": [
+    {
+      "path": "char/rb2_penelope_mcqueen/anims/gen/rock1_viseme.milo_ps2",
+      "size": 6788,
+      "sha256": "29a993371edc31afea4d7c09906d0d3ff964edcc7e9978ac23c550d765f22cfe"
+    },
+    {
+      "path": "char/rb2_penelope_mcqueen/og/gen/rb2_penelope_mcqueen.milo_ps2",
+      "size": 1292448,
+      "sha256": "108dca2308468383fa90c6fe11c4eb460670d725d034661ee33657c9411cf7ce"
+    },
+    {
+      "path": "ui/image/dlc/rb2_penelope_mcqueen/portrait.bmp_ps2",
+      "size": 32800,
+      "sha256": "f46596cb3602dad0e6bcf7353dd82a75a8732e5c76229df82183f9e40cb49572"
+    }
+  ]
+}

@@ -2,6 +2,16 @@
 
 #include "game/gameplay.h"
 #include "game/gameplay_rules.h"
+#include "game/camera_filter.h"
+#include "game/camera_projection.h"
+#include "game/camera_rotation.h"
+#include "game/camera_reference_policy.h"
+#include "game/camera_intro_timing.h"
+#include "game/camera_weighted_selection.h"
+#include "game/camera_source_random.h"
+#include "game/camera_path_timing.h"
+#include "game/camera_path_transform.h"
+#include "game/camera_shake_transform.h"
 #include "render/window_d3d9.h"
 
 #include "asset/milo_image.h"
@@ -45,6 +55,9 @@ namespace ghogx::game {
 namespace {
 
 constexpr float kMaxAuthoredGameLightColor = 64.0f;
+
+using CameraSourceRand = ghogx::camera::SourceRand;
+CameraSourceRand& camera_selection_random();
 
 double tempo_bpm_at_tick(const ghogx::chart::Chart& chart, uint32_t tick) {
     uint32_t us_per_beat = 500000;
@@ -1631,9 +1644,12 @@ struct DecodedCamShot {
     float path_frame = -1.0f;
     float legacy_path_frame_ignored = -1.0f;
     bool has_legacy_path_frame_ignored = false;
+    float path_ease = 0.0f;
+    bool has_legacy_path_ease = false;
     bool source_cached_stream = false;
     std::string category;
     int platform_only = 0;
+    float selection_weight = 1.0f;
     bool ps3_per_pixel = false;
     int disabled_flags = 0;
     int flags = 0;
@@ -1820,10 +1836,6 @@ float convert_fov_like_miloeditor(float fov, float aspect_ratio) {
     return std::atan(aspect_ratio * std::tan(0.5f * fov)) * 2.0f;
 }
 
-constexpr float kCamShotAngleByteScale = 81.16902f;
-constexpr float kCamShotAngleByteInv = 0.012319971f;
-constexpr float kCamShotBlurByteScale = 255.0f;
-constexpr float kCamShotBlurByteInv = 0.0039215689f;
 constexpr float kCamShotFrameSourceDefaultFov = 1.2217305f;
 constexpr float kCamShotFrameSourceDefaultZoomFov = 0.0f;
 constexpr float kCamShotFrameSourceDefaultBlurDepth = 0.35f;
@@ -1845,21 +1857,12 @@ constexpr int kMiloPlatformPS3 = 4;
 [[maybe_unused]] constexpr int kMiloPlatformWii = 5;
 constexpr int kGh2SourceMiloPlatform = kMiloPlatformPS2;
 
-float camshot_u8_runtime_field(float value, float scale, float inv_scale) {
-    if (!std::isfinite(value)) return 0.0f;
-    const int raw = std::clamp(static_cast<int>(value * scale), 0, 255);
-    return static_cast<float>(raw) * inv_scale;
-}
-
-float camshot_s8_runtime_field(float value, float scale, float inv_scale) {
-    if (!std::isfinite(value)) return 0.0f;
-    const int raw = std::clamp(static_cast<int>(value * scale), -128, 127);
-    return static_cast<float>(raw) * inv_scale;
+float camshot_gh2_float_field(float value) {
+    return std::isfinite(value) ? value : 0.0f;
 }
 
 float camshot_source_field_of_view(float value) {
-    return camshot_u8_runtime_field(value, kCamShotAngleByteScale,
-                                    kCamShotAngleByteInv);
+    return camshot_gh2_float_field(value);
 }
 
 float camshot_source_default_field_of_view() {
@@ -1867,8 +1870,7 @@ float camshot_source_default_field_of_view() {
 }
 
 float camshot_source_angular_offset(float value) {
-    return camshot_u8_runtime_field(value, kCamShotAngleByteScale,
-                                    kCamShotAngleByteInv);
+    return camshot_gh2_float_field(value);
 }
 
 float camshot_source_default_angular_offset() {
@@ -1877,8 +1879,7 @@ float camshot_source_default_angular_offset() {
 }
 
 float camshot_source_zoom_field_of_view(float value) {
-    return camshot_s8_runtime_field(value, kCamShotAngleByteScale,
-                                    kCamShotAngleByteInv);
+    return camshot_gh2_float_field(value);
 }
 
 float camshot_source_default_zoom_field_of_view() {
@@ -1887,8 +1888,7 @@ float camshot_source_default_zoom_field_of_view() {
 }
 
 float camshot_source_blur_field(float value) {
-    return camshot_u8_runtime_field(value, kCamShotBlurByteScale,
-                                    kCamShotBlurByteInv);
+    return camshot_gh2_float_field(value);
 }
 
 float camshot_source_default_blur_depth() {
@@ -2510,6 +2510,11 @@ Gameplay::CameraKey::TargetRef read_camshot_subpart_like_miloeditor(
     Gameplay::CameraKey::TargetRef ref;
     ref.entity = r.symbol();
     ref.subpart = r.symbol();
+    // GH2 SubPart::Load consumes both strings, then returns null when the
+    // owning object name is empty.  A leftover subpart name is not an
+    // unqualified performer target and must never be completed from the shot
+    // category/name.
+    if (ref.entity.empty()) ref.subpart.clear();
     return ref;
 }
 
@@ -2532,6 +2537,7 @@ Gameplay::CameraKey read_camshot_frame_like_miloeditor(
         source_camshot_frame_world_offset(raw_world_offset);
     for (int axis = 0; axis < 3; ++axis) {
         // Hmx Transform camera frames use m.y as the look axis and m.z as up.
+        key.source_x[axis] = world_offset.row[0][axis];
         key.forward[axis] = world_offset.row[1][axis];
         key.up[axis] = world_offset.row[2][axis];
         key.eye[axis] = world_offset.pos[axis];
@@ -2646,7 +2652,11 @@ std::optional<DecodedCamShot> read_camshot_like_miloeditor(
         }
         shot.looping = r.boolean();
         if (shot.revision > 0x1e) shot.loop_keyframe = r.i32();
-        if (shot.revision < 0x28) (void)r.f32();
+        if (shot.revision < 0x28) {
+            // GH2 Save2643E4 / property26873C: CamShot::path_ease (+54).
+            shot.path_ease = r.f32();
+            shot.has_legacy_path_ease = true;
+        }
         shot.near_plane = r.f32();
         shot.far_plane = r.f32();
         shot.use_depth_of_field = r.boolean();
@@ -2658,7 +2668,8 @@ std::optional<DecodedCamShot> read_camshot_like_miloeditor(
             shot.has_legacy_path_frame_ignored = true;
         }
         if (shot.revision > 2) shot.category = r.symbol();
-        if (shot.revision > 2 && shot.revision < 0x26) (void)r.f32();
+        if (shot.revision > 2 && shot.revision < 0x26)
+            shot.selection_weight = r.f32(); // GH2 Load2650A8 -> shot+44.
         if (shot.revision > 0x22) {
             shot.platform_only = r.i32();
         } else if (shot.revision > 0x21) {
@@ -2790,8 +2801,35 @@ std::optional<DecodedCamShot> read_camshot_like_miloeditor(
         if (!legacy_anim_ref.empty()) shot.anims.push_back(legacy_anim_ref);
 
         shot.disabled_flags = prop_int(shot.props, "disabled", 0);
+        size_t gh1_helper_frame_index = 0;
         for (auto& [key, off] : shot.frames) {
             key.category = shot.category;
+            key.selection_weight = shot.selection_weight;
+            const auto helper_filter = shot.props.find("gh1_helper_filter");
+            if (helper_filter != shot.props.end()) {
+                if (helper_filter->second.kind != MiloValue::Kind::Float ||
+                    !std::isfinite(helper_filter->second.f))
+                    throw std::runtime_error("Invalid GH1 camera helper filter metadata");
+                key.has_gh1_helper = true;
+                key.gh1_helper_filter = helper_filter->second.f;
+                key.gh1_helper_target = prop_bool(shot.props, "gh1_helper_target", false);
+                key.gh1_helper_parent = prop_bool(shot.props, "gh1_helper_parent", false);
+                const auto shake = shot.props.find("gh1_helper_shake_keys");
+                if (prop_bool(shot.props, "shaky", false)) {
+                if (shake == shot.props.end() || shake->second.kind != MiloValue::Kind::Array ||
+                    shake->second.children.size() != shot.frames.size())
+                    throw std::runtime_error("Invalid GH1 camera helper shake key count");
+                const auto& sample = shake->second.children[gh1_helper_frame_index];
+                if (sample.kind != MiloValue::Kind::Array || sample.children.size() != 3)
+                    throw std::runtime_error("Invalid GH1 camera helper shake vector");
+                for (size_t axis = 0; axis < 3; ++axis) {
+                    if (sample.children[axis].kind != MiloValue::Kind::Float)
+                        throw std::runtime_error("Invalid GH1 camera helper shake axis");
+                    key.gh1_helper_shake[axis] = sample.children[axis].f;
+                }
+                }
+            }
+            ++gh1_helper_frame_index;
             key.shot_filter = shot.filter;
             key.has_shot_filter = true;
             key.clamp_height = shot.clamp_height;
@@ -2803,6 +2841,8 @@ std::optional<DecodedCamShot> read_camshot_like_miloeditor(
             key.has_use_depth_of_field = true;
             key.path_frame = shot.path_frame;
             key.has_path_frame = true;
+            key.path_ease = shot.path_ease;
+            key.has_legacy_path_ease = shot.has_legacy_path_ease;
             key.legacy_path_frame_ignored = shot.legacy_path_frame_ignored;
             key.has_legacy_path_frame_ignored =
                 shot.has_legacy_path_frame_ignored;
@@ -2847,6 +2887,8 @@ std::optional<DecodedCamShot> read_camshot_like_miloeditor(
             key.path_anim = shot.path;
             key.has_path_anim = !shot.path.empty();
             key.distance = prop_symbol(shot.props, "distance", "null");
+            key.camera_target_fallback = prop_symbol(shot.props, "gh1_camera_target_fallback");
+            key.camera_parent_fallback = prop_symbol(shot.props, "gh1_camera_parent_fallback");
             key.facing = prop_symbol(shot.props, "facing", "null");
             key.solo = prop_symbol(shot.props, "solo", "ok");
             key.special = prop_bool(shot.props, "special", false);
@@ -2863,6 +2905,8 @@ std::optional<DecodedCamShot> read_camshot_like_miloeditor(
             key.disabled_flags = prop_int(shot.props, "disabled", 0);
             key.flags = shot.flags;
             key.hide_crowd = prop_bool(shot.props, "hide_crowd", false);
+            key.has_gh1_crowd_region = shot.props.count("crowd_region") != 0;
+            key.gh1_crowd_region = prop_int(shot.props, "crowd_region", -1);
             key.crowd_face_camera =
                 key.crowd_face_camera ||
                 prop_bool(shot.props, "crowd_face_camera", false);
@@ -2966,19 +3010,19 @@ std::string camshot_target_refs_load_debug_string(
 }
 
 void sync_primary_camshot_target(Gameplay::CameraKey& key) {
-    key.target_refs.erase(
-        std::remove_if(key.target_refs.begin(), key.target_refs.end(),
-                       camshot_target_ref_empty),
-        key.target_refs.end());
-    if (key.target_refs.empty()) {
+    // Keep null slots: retail SameTargets compares the serialized list's
+    // length and pointer/subpart identities independently of HasTargets.
+    const auto primary = std::find_if(key.target_refs.begin(), key.target_refs.end(),
+        [](const auto& ref) { return !camshot_target_ref_empty(ref); });
+    if (primary == key.target_refs.end()) {
         key.target_entity.clear();
         key.target_subpart.clear();
         key.target_source_object.clear();
         return;
     }
-    key.target_entity = key.target_refs.front().entity;
-    key.target_subpart = key.target_refs.front().subpart;
-    key.target_source_object = key.target_refs.front().source_object;
+    key.target_entity = primary->entity;
+    key.target_subpart = primary->subpart;
+    key.target_source_object = primary->source_object;
 }
 
 void resolve_unqualified_camshot_target(std::string_view shot_name,
@@ -3033,6 +3077,7 @@ void copy_camshot_shot_fields(const Gameplay::CameraKey& from,
     to.camshot_alt_revision = from.camshot_alt_revision;
     to.camshot_source_cached_stream = from.camshot_source_cached_stream;
     to.category = from.category;
+    to.selection_weight = from.selection_weight;
     to.shot_filter = from.shot_filter;
     to.has_shot_filter = from.has_shot_filter;
     to.clamp_height = from.clamp_height;
@@ -3044,6 +3089,8 @@ void copy_camshot_shot_fields(const Gameplay::CameraKey& from,
     to.has_use_depth_of_field = from.has_use_depth_of_field;
     to.path_frame = from.path_frame;
     to.has_path_frame = from.has_path_frame;
+    to.path_ease = from.path_ease;
+    to.has_legacy_path_ease = from.has_legacy_path_ease;
     to.legacy_path_frame_ignored = from.legacy_path_frame_ignored;
     to.has_legacy_path_frame_ignored =
         from.has_legacy_path_frame_ignored;
@@ -3102,6 +3149,13 @@ void copy_camshot_ref_fields(const Gameplay::CameraKey& from,
     to.parent_entity = from.parent_entity;
     to.parent_subpart = from.parent_subpart;
     to.parent_source_object = from.parent_source_object;
+    to.camera_target_fallback = from.camera_target_fallback;
+    to.camera_parent_fallback = from.camera_parent_fallback;
+    to.has_gh1_helper = from.has_gh1_helper;
+    to.gh1_helper_filter = from.gh1_helper_filter;
+    to.gh1_helper_target = from.gh1_helper_target;
+    to.gh1_helper_parent = from.gh1_helper_parent;
+    to.gh1_helper_shake = from.gh1_helper_shake;
     to.use_parent_rotation = from.use_parent_rotation;
     to.camshot_refs_decoded = from.camshot_refs_decoded;
     to.camshot_pose_body_offset = from.camshot_pose_body_offset;
@@ -3135,6 +3189,8 @@ void copy_camshot_runtime_fields(const Gameplay::CameraKey& from,
     to.disabled_flags = from.disabled_flags;
     to.flags = from.flags;
     to.hide_crowd = from.hide_crowd;
+    to.has_gh1_crowd_region = from.has_gh1_crowd_region;
+    to.gh1_crowd_region = from.gh1_crowd_region;
     to.crowd_face_camera = from.crowd_face_camera;
     to.force_char_lod = from.force_char_lod;
     to.next_shot_ref = from.next_shot_ref;
@@ -3368,6 +3424,13 @@ build_camera_performer_target_requests(
             add_target(source_object);
         };
     auto request_camera_key_targets = [&](const Gameplay::CameraKey& key) {
+        auto request_fallback = [&](const std::string& fallback) {
+            const auto separator = fallback.find("::");
+            if (separator != std::string::npos)
+                request_performer_target(fallback.substr(0, separator), fallback.substr(separator + 2), {});
+        };
+        request_fallback(key.camera_target_fallback);
+        request_fallback(key.camera_parent_fallback);
         request_performer_target(key.target_entity, key.target_subpart, {});
         for (const auto& ref : key.target_refs) {
             request_performer_target(ref.entity, ref.subpart, ref.source_object);
@@ -3378,6 +3441,8 @@ build_camera_performer_target_requests(
                                  key.focus_target_subpart,
                                  key.focus_target_source_object);
         for (const auto& pos : key.positions) {
+            request_fallback(pos.camera_target_fallback);
+            request_fallback(pos.camera_parent_fallback);
             request_performer_target(pos.target_entity, pos.target_subpart, {});
             for (const auto& ref : pos.target_refs) {
                 request_performer_target(ref.entity, ref.subpart,
@@ -4035,9 +4100,15 @@ VenueCameraPolicy load_venue_camera_policy(const std::string& hdr_path,
     return p;
 }
 
+float source_camshot_frame_span(const Gameplay::CameraKey& key);
+bool camera_source_shot_ok(const Gameplay::CameraKey& key,
+                          const Gameplay::CameraKey* previous,
+                          std::string_view current_walkspot);
+
 struct IntroCameraSelection {
     std::string shot;
     std::string anim = "Intro.tnm";
+    float duration_frames = 0.0f;
     std::string distance;
     std::string facing;
     bool hide_crowd = false;
@@ -4343,7 +4414,11 @@ std::vector<Gameplay::CameraKey> load_gh1_regular_camera_keys(
                 const float fov_degrees =
                     record.fov_in +
                     (record.fov_out - record.fov_in) * framing_t;
-                pos.fov = fov_degrees * 0.01745329251994329577f;
+                // GH1 RndCam::UpdateLocal (SLUS_212.24:1B1FBC) takes
+                // horizontal FOV; the shared GH2 driver takes vertical FOV.
+                // Convert at the source 4:3 YRatio, not the output viewport.
+                pos.fov = convert_fov_like_miloeditor(
+                    fov_degrees * 0.01745329251994329577f, 0.75f);
                 pos.has_fov = true;
                 pos.near_plane = record.near_plane;
                 pos.far_plane = record.far_plane;
@@ -4405,6 +4480,10 @@ IntroCameraSelection select_intro_camera_anim(const std::string& hdr_path,
             std::string shot;
             std::string anim;
             std::string category;
+            float duration_frames = 0.0f;
+            float selection_weight = 1.0f;
+            bool selection_used = false;
+            Gameplay::CameraKey eligibility_key;
             bool direct_camshot_pose = false;
             std::string distance;
             std::string facing;
@@ -4452,20 +4531,20 @@ IntroCameraSelection select_intro_camera_anim(const std::string& hdr_path,
                 }
                 continue;
             }
-            bool is_intro = decoded_shot->category == "INTRO" ||
-                            decoded_shot->category == "INTRO_FAST" ||
-                            decoded_shot->category == "INTRO_ENCORE";
-            std::string shot_lower(de.name);
-            std::transform(shot_lower.begin(), shot_lower.end(),
-                           shot_lower.begin(), [](unsigned char c) {
-                               return static_cast<char>(std::tolower(c));
-                           });
-            if (shot_lower.rfind("intro", 0) == 0) is_intro = true;
-            if (!is_intro) continue;
+            if (decoded_shot->category != category) continue;
             Candidate c;
             c.shot = de.name;
             c.anim = {};
             c.category = decoded_shot->category;
+            c.selection_weight = decoded_shot->selection_weight;
+            if (!decoded_shot->frames.empty())
+                c.eligibility_key = decoded_shot->frames.front().first;
+            c.eligibility_key.name = de.name;
+            // GamePanel reads the selected CamShot's mDuration, not the
+            // duration of its referenced TransAnim. Path samples have no
+            // CamShot frame timing and would incorrectly report zero here.
+            for (const auto& frame : decoded_shot->frames)
+                c.duration_frames += source_camshot_frame_span(frame.first);
             c.hide_list_refs = decoded_shot->hide_list;
             c.show_list_refs = decoded_shot->show_list;
             c.gen_hide_list_refs = decoded_shot->gen_hide_list;
@@ -4491,30 +4570,20 @@ IntroCameraSelection select_intro_camera_anim(const std::string& hdr_path,
             candidates.push_back(std::move(c));
         }
         if (!candidates.empty()) {
-            const bool has_exact_category = std::any_of(
-                candidates.begin(), candidates.end(),
-                [&](const Candidate& candidate) {
-                    return candidate.category == category;
-                });
-            if (has_exact_category) {
-                candidates.erase(
-                    std::remove_if(candidates.begin(), candidates.end(),
-                                   [&](const Candidate& candidate) {
-                                       return candidate.category != category;
-                                   }),
-                    candidates.end());
-            }
-            const bool has_transanim_candidate = std::any_of(
-                candidates.begin(), candidates.end(),
-                [](const Candidate& c) { return !c.direct_camshot_pose; });
-            if (has_transanim_candidate) {
-                candidates.erase(
-                    std::remove_if(candidates.begin(), candidates.end(),
-                                   [](const Candidate& c) {
-                                       return c.direct_camshot_pose;
-                                   }),
-                    candidates.end());
-            }
+            ghogx::camera::WeightedSelection pool;
+            pool.append_category(candidates, category, [](const Candidate& c) {
+                return camera_source_shot_ok(c.eligibility_key, nullptr, {});
+            });
+            const float draw = camera_selection_random().float_range(0.0f, pool.total());
+            const auto pick = pool.choose(draw);
+            if (!pick) return {};
+            std::fprintf(stderr,
+                "[camera-select] route=intro category=%s candidates=%zu total=%.6f draw=%.6f selected=%s weight=%.6f source=GH2_weighted_used_cycle\n",
+                category.c_str(), pool.size(), pool.total(), draw,
+                candidates[*pick].shot.c_str(), candidates[*pick].selection_weight);
+            // The temporary selection list is discarded after returning; the
+            // shared registry receives the selected shot's used marker below.
+            candidates = {candidates[*pick]};
             std::fprintf(stderr,
                          "[world] intro CamShot %s -> %s (hide_crowd=%d crowd_face_camera=%d force_char_lod=%d)\n",
                          candidates.front().shot.c_str(),
@@ -4525,6 +4594,7 @@ IntroCameraSelection select_intro_camera_anim(const std::string& hdr_path,
             IntroCameraSelection selected;
             selected.shot = candidates.front().shot;
             selected.anim = candidates.front().anim;
+            selected.duration_frames = candidates.front().duration_frames;
             selected.distance = candidates.front().distance;
             selected.facing = candidates.front().facing;
             selected.hide_crowd = candidates.front().hide_crowd;
@@ -10668,7 +10738,8 @@ std::optional<unsigned> gh1_numbered_spot_index(
 }
 
 std::map<std::string, std::array<float, 16>> build_venue_camera_target_worlds(
-    const ghogx::milo_scene::Scene& scene) {
+    const ghogx::milo_scene::Scene& scene,
+    bool include_gh1_arena_spot_aliases = false) {
     std::map<std::string, std::array<float, 16>> out;
     auto add_target = [&](std::string name,
                           const std::array<float, 16>& world) {
@@ -10714,14 +10785,23 @@ std::map<std::string, std::array<float, 16>> build_venue_camera_target_worlds(
         // these sequential helper Mesh names. Preserve the authored transform
         // verbatim; role selection is applied later from charsys/band_spots.
         const std::string lower_name = lower_ascii(mesh.name);
-        if (const auto index =
-                gh1_numbered_spot_index(lower_name, "stage_spot_")) {
-            add_target("gh1_stage_spot_" + std::to_string(*index),
-                       gh1_arena_spot_world(world));
-        } else if (const auto walk_index =
-                       gh1_numbered_spot_index(lower_name, "walk_spot_")) {
-            add_target("gh1_walk_spot_" + std::to_string(*walk_index),
-                       gh1_arena_spot_world(world));
+        // GH2 venues can retain stage_spot/walk_spot editor meshes while
+        // their live CharSys and CamShot::ShotOk state uses Waypoint objects.
+        // Only converted/raw GH1 camera routes expose these meshes through
+        // Arena::stage_spots/Arena::walk_spots.  Keeping the alias creation
+        // route-scoped prevents the similarly named GH2 editor geometry from
+        // replacing Waypoint::FindNearest in the shared camera predicate.
+        if (include_gh1_arena_spot_aliases) {
+            if (const auto index =
+                    gh1_numbered_spot_index(lower_name, "stage_spot_")) {
+                add_target("gh1_stage_spot_" + std::to_string(*index),
+                           gh1_arena_spot_world(world));
+            } else if (const auto walk_index =
+                           gh1_numbered_spot_index(lower_name,
+                                                  "walk_spot_")) {
+                add_target("gh1_walk_spot_" + std::to_string(*walk_index),
+                           gh1_arena_spot_world(world));
+            }
         }
         const std::array<float, 3> bounds_centroid = {
             (mesh.bb_min[0] + mesh.bb_max[0]) * 0.5f,
@@ -11011,8 +11091,10 @@ std::map<std::string, std::array<float, 16>> build_venue_camera_target_worlds(
 
 void merge_venue_camera_target_worlds(
     std::map<std::string, std::array<float, 16>>& into,
-    const ghogx::milo_scene::Scene& scene) {
-    auto scene_targets = build_venue_camera_target_worlds(scene);
+    const ghogx::milo_scene::Scene& scene,
+    bool include_gh1_arena_spot_aliases = false) {
+    auto scene_targets = build_venue_camera_target_worlds(
+        scene, include_gh1_arena_spot_aliases);
     for (auto& [name, world] : scene_targets) into[name] = world;
 }
 
@@ -11027,6 +11109,81 @@ std::optional<std::string> worldcrowd_actor_milo_path(
     std::string_view actor_name) {
     if (actor_name.empty()) return std::nullopt;
     return "char/crowd/og/gen/" + std::string(actor_name) + ".milo_ps2";
+}
+
+struct Gh1CrowdActorRecipe {
+    std::string actor_name;
+    uint8_t head_index = 0;
+    uint8_t material_index = 0;
+};
+
+std::vector<Gh1CrowdActorRecipe> gh1_crowd_actor_recipe(
+    std::string_view venue_name) {
+    // Exact normal-mode pool assembled by GH1 arena/crowd.dta. Repeated
+    // archetypes are intentionally separate Character instances: each owns
+    // its selected head/material and independent animation graph state.
+    std::vector<Gh1CrowdActorRecipe> out = {
+        {"crowd_male01", 0, 0},   {"crowd_male02", 4, 1},
+        {"crowd_male03", 5, 2},   {"crowd_female01", 1, 0},
+        {"crowd_female03", 5, 2}, {"crowd_female02", 0, 0},
+        {"crowd_male01", 3, 0},   {"crowd_female03", 3, 0},
+        {"crowd_male02", 1, 0},   {"crowd_male03", 2, 0},
+        {"crowd_female02", 4, 1}, {"crowd_male01", 5, 2},
+        {"crowd_male03", 4, 1},   {"crowd_male03", 1, 0},
+        {"crowd_female03", 1, 0}, {"crowd_female01", 5, 2},
+    };
+    const std::string venue = lower_ascii(venue_name);
+    if (venue == "gh1_fest") {
+        out[10] = {"crowd_female01", 2, 0};
+    }
+    if (venue == "gh1_arena" || venue == "gh1_big_club" ||
+        venue == "gh1_theatre") {
+        out.resize(11);
+    }
+    return out;
+}
+
+void configure_gh1_crowd_actor(
+    ghogx::character::Character& character,
+    const Gh1CrowdActorRecipe& recipe) {
+    const bool female = recipe.actor_name.find("female") != std::string::npos;
+    const std::string head = "crowd_" +
+                             std::string(female ? "female" : "male") +
+                             std::to_string(static_cast<int>(recipe.head_index) + 1) +
+                             "_head.mesh";
+    std::string outfit_stem;
+    if (recipe.actor_name == "crowd_male01")
+        outfit_stem = "crowd_male1outfit";
+    else if (recipe.actor_name == "crowd_male02")
+        outfit_stem = "crowd_male2outfit";
+    else if (recipe.actor_name == "crowd_male03")
+        outfit_stem = "crowd_male3outfit";
+    else if (recipe.actor_name == "crowd_female01")
+        outfit_stem = "crowd_female1outfit";
+    else if (recipe.actor_name == "crowd_female02")
+        outfit_stem = "crowd_female2outfit";
+    else
+        outfit_stem = "crowd_female3outfit";
+    const std::array<std::string, 3> materials = {
+        outfit_stem + ".mat", outfit_stem + "02.mat",
+        outfit_stem + "03.mat"};
+    const std::string selected_material =
+        materials[std::min<size_t>(recipe.material_index,
+                                   materials.size() - 1)];
+    for (auto& mesh : character.meshes) {
+        const std::string name = lower_ascii(mesh.name);
+        const bool crowd_head =
+            name.rfind(female ? "crowd_female" : "crowd_male", 0) == 0 &&
+            name.find("_head.mesh") != std::string::npos;
+        if (crowd_head) mesh.showing = name == head;
+        if (name.rfind("hand0_", 0) == 0 || name.rfind("hand1_", 0) == 0)
+            mesh.showing = false;
+        if (name.rfind("hand2_", 0) == 0) mesh.showing = true;
+        if (std::find(materials.begin(), materials.end(), mesh.material) !=
+            materials.end()) {
+            mesh.material = selected_material;
+        }
+    }
 }
 
 bool load_clip_first_from_milos(
@@ -11071,22 +11228,40 @@ std::vector<std::string> worldcrowd_actor_clip_candidates(
             names.push_back(std::move(name));
     };
     auto add_family = [&](std::string_view stem) {
+        const bool gh1_family = actor.rfind("crowd_", 0) == 0;
+        auto add_stem = [&](std::string suffix) {
+            add(std::string(stem) + suffix);
+            if (gh1_family) add("crowd_" + std::string(stem) + suffix);
+        };
         if (group == "bad" || group == "boot") {
-            add(std::string(stem) + "_bad");
-            add(std::string(stem) + "_idle_01");
-            add(std::string(stem) + "_idle_02");
+            add_stem("_bad");
+            add_stem("_boo");
+            add_stem("_idle");
+            add_stem("_idle_01");
+            add_stem("_idle_02");
         } else if (group == "ok" || group == "okay") {
-            add(std::string(stem) + "_ok");
-            add(std::string(stem) + "_idle_01");
-            add(std::string(stem) + "_idle_02");
+            add_stem("_ok");
+            add_stem("_clap");
+            add_stem("_idle");
+            add_stem("_idle_01");
+            add_stem("_idle_02");
         } else if (group == "great" || group == "peak") {
-            add(std::string(stem) + "_dance");
-            add(std::string(stem) + "_ok");
-            add(std::string(stem) + "_idle_01");
+            add_stem("_2armpump");
+            add_stem("_1armpump");
+            add_stem("_clap_high");
+            add_stem("_jump_01");
+            add_stem("_jump");
+            add_stem("_dance");
+            add_stem("_ok");
+            add_stem("_idle_01");
+        } else if (group == "idle") {
+            add_stem("_idle");
+            add_stem("_idle_01");
+            add_stem("_idle_02");
         } else if (group == "lighter_slow" || group == "lighter_fast") {
-            add(std::string(stem) + "_" + group);
-            add(std::string(stem) + "_dance");
-            add(std::string(stem) + "_ok");
+            add_stem("_" + group);
+            add_stem("_dance");
+            add_stem("_ok");
         }
     };
     if (actor.find("female") != std::string::npos) {
@@ -14348,7 +14523,7 @@ std::map<std::string, std::string> load_venue_camera_postprocess_summaries(
         if (debug_camera_enabled() || debug_venue_filters_enabled()) {
             std::fprintf(
                 stderr,
-                "[world] venue camera RndPostProc assets: source_reader=MiloEditor::RndPostProc.Read source_color_xfm=MiloEditor::RndColorXfm.Read sources=%zu decoded=%zu source_visible_prefix=%zu aliases=%zu render_effect=postprocessor_pipeline_deferred\n",
+                "[world] venue camera RndPostProc assets: source_reader=MiloEditor::RndPostProc.Read source_color_xfm=MiloEditor::RndColorXfm.Read sources=%zu decoded=%zu source_visible_prefix=%zu aliases=%zu ps2_runtime_effect=not_applicable_HX_XBOX_only\n",
                 milo_paths.size(), decoded_objects, prefix_objects,
                 out.size());
         }
@@ -15039,6 +15214,7 @@ ghogx::render::MiloSceneRenderer::MeshTransformSample sample_mesh_transform(
     ghogx::render::MiloSceneRenderer::MeshTransformSample sample;
     sample.has_source_frame = true;
     sample.source_frame = frame;
+    sample.rotation_slerp = anim.rotation_slerp;
     if (!anim.translation_keys.empty()) {
         sample.has_translation = true;
         sample.translation_is_absolute = true;
@@ -17381,6 +17557,144 @@ load_venue_anim_filters(const std::string& hdr_path,
     return out;
 }
 
+std::string source_filter_task_key(const Gameplay::VenueAnimFilter& filter) {
+    return filter.name + '\x1f' + filter.target_ref;
+}
+
+Gameplay::SourceVenueAnimTask::Ptr source_filter_task_for(
+    Gameplay::ActiveVenueAnimFilter& active,
+    const Gameplay::VenueAnimFilter& filter) {
+    const auto key = source_filter_task_key(filter);
+    const auto found = active.source_tasks.find(key);
+    if (found != active.source_tasks.end()) return found->second;
+    Gameplay::SourceVenueAnimTaskPayload payload;
+    payload.filter = filter;
+    payload.event_name = active.event_name;
+    payload.persistent = active.persistent;
+    payload.shot_scoped = active.shot_scoped;
+    payload.polled = active.polled;
+    auto task = std::make_shared<Gameplay::SourceVenueAnimTask>(
+        std::move(payload), active.start_time + filter.event_delay_seconds,
+        filter.event_blend_seconds);
+    active.source_tasks.emplace(key, task);
+    return task;
+}
+
+size_t start_source_venue_filter_tasks(
+    Gameplay::ActiveVenueAnimFilter& started,
+    std::vector<Gameplay::ActiveVenueAnimFilter>& running) {
+    // PollAnim and CamShot-owned SetFrame are not TaskMgr AnimTasks. Do not
+    // adopt them as outgoing tasks merely because they touch the same object.
+    if (started.polled || started.shot_scoped) return 0;
+    auto incoming = std::move(started.filters);
+    started.filters.clear();
+    size_t replaced = 0;
+    for (const auto& filter : incoming) {
+        Gameplay::SourceVenueAnimTask::Ptr outgoing;
+        const auto detach = [&](Gameplay::ActiveVenueAnimFilter& active) {
+            if (active.polled || active.shot_scoped) return;
+            for (auto it = active.filters.begin(); it != active.filters.end();) {
+                if (!venue_filters_share_authored_target(*it, filter)) {
+                    ++it;
+                    continue;
+                }
+                auto candidate = source_filter_task_for(active, *it);
+                if (!candidate->finished()) outgoing = std::move(candidate);
+                active.source_tasks.erase(source_filter_task_key(*it));
+                it = active.filters.erase(it);
+                ++replaced;
+            }
+        };
+        for (auto it = running.begin(); it != running.end();) {
+            detach(*it);
+            if (it->filters.empty()) it = running.erase(it);
+            else ++it;
+        }
+        detach(started);  // Two source Animate calls in the same event.
+        Gameplay::SourceVenueAnimTaskPayload payload;
+        payload.filter = filter;
+        payload.event_name = started.event_name;
+        payload.persistent = started.persistent;
+        auto task = std::make_shared<Gameplay::SourceVenueAnimTask>(
+            std::move(payload), started.start_time + filter.event_delay_seconds,
+            filter.event_blend_seconds, std::move(outgoing));
+        started.source_tasks[source_filter_task_key(filter)] = std::move(task);
+        started.filters.push_back(filter);
+    }
+    return replaced;
+}
+
+struct SourceFilterPublication {
+    // Keeps a retired outgoing payload alive through this publication batch.
+    std::shared_ptr<const Gameplay::SourceVenueAnimTaskPayload> owner;
+    const Gameplay::VenueAnimFilter* filter = nullptr;
+    std::string_view event_name;
+    double start_time = 0;
+    float elapsed = 0;
+    float blend = 1;
+    bool finishes = false;
+    bool polled = false;
+    bool persistent = false;
+};
+
+std::vector<SourceFilterPublication> poll_source_venue_filter_tasks(
+    Gameplay::ActiveVenueAnimFilter& active, double now,
+    const ghogx::chart::Chart& chart) {
+    std::vector<SourceFilterPublication> publications;
+    for (const auto& filter : active.filters) {
+        if (active.polled || active.shot_scoped) {
+            const double start = active.start_time + filter.event_delay_seconds;
+            SourceFilterPublication pub;
+            pub.filter = &filter;
+            pub.event_name = active.event_name;
+            pub.start_time = start;
+            pub.elapsed = static_cast<float>(now - start);
+            pub.blend = venue_filter_source_blend_at(filter, pub.elapsed);
+            pub.polled = active.polled;
+            pub.persistent = active.persistent;
+            publications.push_back(std::move(pub));
+            continue;
+        }
+        auto task = source_filter_task_for(active, filter);
+        task->poll_once(
+            now, [&](const auto& payload, double start, float elapsed,
+                     float blend, bool may_finish) {
+                const bool passed_end = !venue_filter_loops(payload->filter) &&
+                    elapsed > venue_filter_duration_seconds(payload->filter, &chart, start);
+                SourceFilterPublication pub;
+                pub.owner = payload;
+                pub.filter = &payload->filter;
+                pub.event_name = payload->event_name;
+                pub.start_time = start;
+                pub.elapsed = elapsed;
+                pub.blend = blend;
+                pub.finishes = may_finish && passed_end;
+                pub.persistent = payload->persistent;
+                publications.push_back(std::move(pub));
+                return passed_end;
+            });
+        if (now < task->start_time()) {
+            SourceFilterPublication waiting;
+            waiting.owner = task->payload;
+            waiting.filter = &waiting.owner->filter;
+            waiting.event_name = waiting.owner->event_name;
+            waiting.start_time = task->start_time();
+            waiting.elapsed = static_cast<float>(now - waiting.start_time);
+            waiting.persistent = active.persistent;
+            publications.push_back(std::move(waiting));
+        }
+    }
+    return publications;
+}
+
+bool source_venue_filter_tasks_finished(const Gameplay::ActiveVenueAnimFilter& active) {
+    if (active.polled || active.shot_scoped) return false;
+    return std::all_of(active.filters.begin(), active.filters.end(), [&](const auto& filter) {
+        const auto it = active.source_tasks.find(source_filter_task_key(filter));
+        return it != active.source_tasks.end() && it->second->finished();
+    });
+}
+
 std::vector<Gameplay::VenueAnimFilter> load_world_fx_anim_filters(
     const std::string& hdr_path, const std::string& ark_path,
     const std::string& milo_path,
@@ -18604,13 +18918,34 @@ std::vector<Gameplay::CameraKey> load_regular_camera_keys(
     return out;
 }
 
-double intro_camera_duration_seconds(const ghogx::chart::Chart& chart) {
-    // world_objects_worldbase.dta intro_start_msg sets camera_bars_left to 6.
-    // The downbeat handler decrements it once per bar before regular camera
-    // selection resumes, so convert six 4/4 bars through the MIDI tempo map.
-    if (chart.ticks_per_beat == 0) return 0.0;
-    const uint32_t intro_ticks = chart.ticks_per_beat * 4u * 6u;
-    return chart.tick_to_sec(intro_ticks);
+double load_track_extend_seconds(const std::string& hdr_path,
+                                 const std::string& ark_path) {
+    auto ark = gh::ark::ArkV3Reader::load(hdr_path);
+    auto entry = ark.find("ui/gen/game.dtb");
+    if (!entry) throw std::runtime_error("Missing source ui/gen/game.dtb intro timing");
+    const auto tree = gh::dtb::parse(ark.read_entry(*entry, {ark_path}));
+    // game.dtb defines {new GamePanel game (...)}, not a keyed (game ...) row.
+    const gh::dtb::Node* game = nullptr;
+    for (const auto& root : tree.root) {
+        if (!root || !gh::dtb::is_array(*root)) continue;
+        const auto& fields = gh::dtb::children(*root);
+        if (fields.size() >= 3 && fields[0] && fields[1] && fields[2] &&
+            gh::dtb::as_string(*fields[0]).value_or("") == "new" &&
+            gh::dtb::as_string(*fields[1]).value_or("") == "GamePanel" &&
+            gh::dtb::as_string(*fields[2]).value_or("") == "game") {
+            game = root.get();
+            break;
+        }
+    }
+    auto timing = game ? gh::dtb::find_keyed(*game, "track_extend_sec") : nullptr;
+    if (!timing) throw std::runtime_error("Missing source game.track_extend_sec");
+    const auto& values = gh::dtb::children(*timing);
+    if (values.size() < 2 || !values[1])
+        throw std::runtime_error("Invalid source game.track_extend_sec");
+    const auto value = gh::dtb::as_float(*values[1]);
+    if (!value || !std::isfinite(*value))
+        throw std::runtime_error("Non-numeric source game.track_extend_sec");
+    return *value;
 }
 
 size_t authored_section_slot_at(const ghogx::chart::Chart& chart,
@@ -19538,35 +19873,19 @@ std::string camera_source_filter_list_label(
     return join_log_names(labels);
 }
 
-struct CameraSourceRand {
-    uint32_t index_a = 0;
-    uint32_t index_b = 0x67;
-    std::array<uint32_t, 0x100> values = {};
-
-    void seed(uint32_t seed_value) {
-        for (uint32_t i = 0; i < values.size(); ++i) {
-            const uint32_t rand_lo = seed_value * 0x41C64E6Du + 0x3039u;
-            seed_value = rand_lo * 0x41C64E6Du + 0x3039u;
-            values[i] = ((rand_lo >> 16) & 0xFFFFu) |
-                        (seed_value & 0x7FFF0000u);
-        }
-        index_a = 0;
-        index_b = 0x67;
-    }
-
-    uint32_t next() {
-        const uint32_t result = values[index_a] ^ values[index_b];
-        values[index_a] = result;
-        if (0xF9u <= ++index_a) index_a = 0;
-        if (0xF9u <= ++index_b) index_b = 0;
-        return result;
-    }
-
-    size_t int_range(size_t high_exclusive) {
-        if (high_exclusive == 0) return 0;
-        return static_cast<size_t>(next() % high_exclusive);
-    }
-};
+CameraSourceRand& camera_selection_random() {
+    // GH2 2D9D58/2D9D78: process-lifetime gRand starts at 0x29A.
+    // Camera picks, duration draws and CamShot::Shake all consume this one
+    // stream. Other source subsystems can still interleave additional draws;
+    // those require matched-retail lifecycle traces rather than reseeding a
+    // camera-only substitute.
+    static CameraSourceRand random = [] {
+        CameraSourceRand value;
+        value.seed(0x29Au);
+        return value;
+    }();
+    return random;
+}
 
 void randomize_camera_category_order(std::vector<Gameplay::CameraKey>& keys,
                                      int source_seed,
@@ -19617,8 +19936,12 @@ enum class CameraSourceShotOkReturn {
     kStringReject,
     kIntAccept,
     kIntReject,
-    kNativeDeferredAccept,
+    kNativeSpecialCategoryAccept,
+    kNativeSpecialReject,
+    kNativeStarpowerReject,
+    kNativeFarStarpowerReject,
     kNativeBadWaypointReject,
+    kNativeAccept,
 };
 
 bool camera_source_shot_ok_accepts(CameraSourceShotOkReturn result) {
@@ -19628,11 +19951,15 @@ bool camera_source_shot_ok_accepts(CameraSourceShotOkReturn result) {
     switch (result) {
     case CameraSourceShotOkReturn::kStringReject:
     case CameraSourceShotOkReturn::kIntReject:
+    case CameraSourceShotOkReturn::kNativeSpecialReject:
+    case CameraSourceShotOkReturn::kNativeStarpowerReject:
+    case CameraSourceShotOkReturn::kNativeFarStarpowerReject:
     case CameraSourceShotOkReturn::kNativeBadWaypointReject:
         return false;
     case CameraSourceShotOkReturn::kUnhandledAccept:
     case CameraSourceShotOkReturn::kIntAccept:
-    case CameraSourceShotOkReturn::kNativeDeferredAccept:
+    case CameraSourceShotOkReturn::kNativeSpecialCategoryAccept:
+    case CameraSourceShotOkReturn::kNativeAccept:
         return true;
     }
     return true;
@@ -19649,10 +19976,18 @@ const char* camera_source_shot_ok_return_label(
         return "int_accept";
     case CameraSourceShotOkReturn::kIntReject:
         return "int_reject";
-    case CameraSourceShotOkReturn::kNativeDeferredAccept:
-        return "native_deferred_accept";
+    case CameraSourceShotOkReturn::kNativeSpecialCategoryAccept:
+        return "native_special_category_accept";
+    case CameraSourceShotOkReturn::kNativeSpecialReject:
+        return "native_special_string_reject";
+    case CameraSourceShotOkReturn::kNativeStarpowerReject:
+        return "native_starpower_string_reject";
+    case CameraSourceShotOkReturn::kNativeFarStarpowerReject:
+        return "native_far_starpower_string_reject";
     case CameraSourceShotOkReturn::kNativeBadWaypointReject:
-        return "native_bad_waypoint_reject";
+        return "native_bad_waypoint_string_reject";
+    case CameraSourceShotOkReturn::kNativeAccept:
+        return "native_int_accept";
     }
     return "unknown";
 }
@@ -19667,10 +20002,14 @@ const char* camera_source_shot_ok_return_class(
     case CameraSourceShotOkReturn::kIntAccept:
     case CameraSourceShotOkReturn::kIntReject:
         return "default_DataInt";
-    case CameraSourceShotOkReturn::kNativeDeferredAccept:
-        return "native_deferred";
+    case CameraSourceShotOkReturn::kNativeSpecialCategoryAccept:
+    case CameraSourceShotOkReturn::kNativeAccept:
+        return "default_DataInt";
+    case CameraSourceShotOkReturn::kNativeSpecialReject:
+    case CameraSourceShotOkReturn::kNativeStarpowerReject:
+    case CameraSourceShotOkReturn::kNativeFarStarpowerReject:
     case CameraSourceShotOkReturn::kNativeBadWaypointReject:
-        return "native_bad_waypoint";
+        return "kDataString";
     }
     return "unknown";
 }
@@ -19686,10 +20025,16 @@ const char* camera_source_shot_ok_type_switch_effect(
         return "handled_int_true_accept";
     case CameraSourceShotOkReturn::kIntReject:
         return "return_false_int_zero";
-    case CameraSourceShotOkReturn::kNativeDeferredAccept:
-        return "deferred_accept_until_cam_shot_ok_body_recovered";
+    case CameraSourceShotOkReturn::kNativeSpecialCategoryAccept:
+        return "handled_int_true_special_category_accept";
+    case CameraSourceShotOkReturn::kNativeAccept:
+        return "handled_int_true_accept";
+    case CameraSourceShotOkReturn::kNativeSpecialReject:
+        return "return_false_string_shot_is_special";
+    case CameraSourceShotOkReturn::kNativeStarpowerReject:
+    case CameraSourceShotOkReturn::kNativeFarStarpowerReject:
     case CameraSourceShotOkReturn::kNativeBadWaypointReject:
-        return "recovered_native_field_reject";
+        return "return_false_string_bad_waypoint";
     }
     return "unknown";
 }
@@ -19785,18 +20130,53 @@ bool camera_source_bad_waypoint_rejects(
     return camera_source_bad_waypoint_match_ref(key, current_walkspot) != nullptr;
 }
 
-CameraSourceShotOkReturn camera_source_deferred_cam_shot_ok_return(
-    const Gameplay::CameraKey& key) {
-    (void)key;
-    return CameraSourceShotOkReturn::kNativeDeferredAccept;
+struct CameraSourceGuitarist0State {
+    bool playing_starpower = false;
+    bool playing_far_starpower = false;
+    float starpower_flag_weight = 0.0f;
+    float far_starpower_flag_weight = 0.0f;
+};
+
+CameraSourceGuitarist0State g_camera_source_guitarist0_state;
+
+bool camera_source_cam_shot_ok_special_category(
+    std::string_view category) {
+    // GH2 SLUS_214.47 cam_shot_ok, 0x0011f8c8..0x0011f9c8.
+    static constexpr std::array<std::string_view, 8> kAlwaysAccepted = {
+        "WIN", "WIN_ENCORE", "WIN_GAME", "LOSE", "LIGHTER", "INTRO",
+        "INTRO_ENCORE", "INTRO_FAST"};
+    return std::find(kAlwaysAccepted.begin(), kAlwaysAccepted.end(),
+                     category) != kAlwaysAccepted.end();
+}
+
+CameraSourceShotOkReturn camera_source_shared_camshot_predicate_return(
+    const Gameplay::CameraKey& key, std::string_view current_walkspot) {
+    // Shared retail predicate at 0x0011f628. It reads guitarist0's two
+    // distinct CharDriver state bits before consulting bad_waypoints.
+    if (g_camera_source_guitarist0_state.playing_starpower &&
+        !key.starpower_ok) {
+        return CameraSourceShotOkReturn::kNativeStarpowerReject;
+    }
+    if (g_camera_source_guitarist0_state.playing_far_starpower &&
+        !key.far_starpower_ok) {
+        return CameraSourceShotOkReturn::kNativeFarStarpowerReject;
+    }
+    if (camera_source_bad_waypoint_rejects(key, current_walkspot)) {
+        return CameraSourceShotOkReturn::kNativeBadWaypointReject;
+    }
+    return CameraSourceShotOkReturn::kNativeAccept;
 }
 
 CameraSourceShotOkReturn camera_source_cam_shot_ok_return(
     const Gameplay::CameraKey& key, std::string_view current_walkspot) {
-    if (camera_source_bad_waypoint_rejects(key, current_walkspot)) {
-        return CameraSourceShotOkReturn::kNativeBadWaypointReject;
+    if (camera_source_cam_shot_ok_special_category(key.category)) {
+        return CameraSourceShotOkReturn::kNativeSpecialCategoryAccept;
     }
-    return camera_source_deferred_cam_shot_ok_return(key);
+    if (key.special) {
+        return CameraSourceShotOkReturn::kNativeSpecialReject;
+    }
+    return camera_source_shared_camshot_predicate_return(key,
+                                                         current_walkspot);
 }
 
 struct CameraSourceShotOkProbe {
@@ -19805,9 +20185,9 @@ struct CameraSourceShotOkProbe {
     bool accepted = true;
     CameraSourceBadWaypointMatch bad_waypoint_match;
     std::string source_previous_name;
-    const char* cam_shot_ok = "native_deferred";
-    const char* cam_shot_ok_recovered = "none";
-    const char* cam_shot_ok_unrecovered = "native_deferred_rest";
+    const char* cam_shot_ok = "native_recovered";
+    const char* cam_shot_ok_recovered = "all";
+    const char* cam_shot_ok_unrecovered = "none";
 };
 
 CameraSourceShotOkProbe camera_source_shot_ok_probe(
@@ -19822,16 +20202,7 @@ CameraSourceShotOkProbe camera_source_shot_ok_probe(
     probe.accepted = camera_source_shot_ok_accepts(probe.source_return);
     probe.bad_waypoint_match =
         camera_source_bad_waypoint_match(key, current_walkspot);
-    probe.cam_shot_ok =
-        probe.source_return == CameraSourceShotOkReturn::kNativeBadWaypointReject
-            ? "bad_waypoints"
-            : "native_deferred";
-    probe.cam_shot_ok_recovered =
-        probe.bad_waypoint_match.ref ? "bad_waypoints" : "none";
-    probe.cam_shot_ok_unrecovered =
-        probe.source_return == CameraSourceShotOkReturn::kNativeBadWaypointReject
-            ? "native_bypassed_after_bad_waypoints"
-            : "native_deferred_rest";
+    probe.cam_shot_ok = camera_source_shot_ok_return_label(probe.source_return);
     return probe;
 }
 
@@ -19841,20 +20212,26 @@ bool camera_source_shot_ok(const Gameplay::CameraKey& key,
     // ihatecompvir CamShot::ShotOk sends shot_ok(prev_shot). GH2's
     // world/camshot.dta declares that script argument but calls native
     // cam_shot_ok with only $this, so keep previous-shot state diagnostic-only.
-    // GH2's editor schema pins bad_waypoints as a native rejection rule; the
-    // rest of cam_shot_ok remains explicit native_deferred_accept until recovered.
+    // GH2's native body is recovered from SLUS_214.47: terminal categories
+    // bypass normal checks, special normal shots reject, then the shared
+    // starpower/far-starpower/bad-waypoint predicate runs.
     const CameraSourceShotOkProbe probe =
         camera_source_shot_ok_probe(key, previous, current_walkspot);
     if (debug_camera_enabled() || debug_venue_filters_enabled()) {
         std::fprintf(
             stderr,
-            "[world] camera shot_ok: pipeline_scope=normal_gameplay_camera priority=gameplay_camera source_dispatch_recovered=CamShot::ShotOk hidden_gameplay_blocker=cam_shot_ok_rest source_msg=shot_ok source_script=world/camshot.dta::shot_ok source_dtb=world/gen/camshot.dtb:77-78 source_script_body=cam_shot_ok_this_no_prev_arg source_call=CamShot::ShotOk(prev_shot) source_return_gate=CamShot::ShotOk_TypeSwitch source_return_class=%s source_type_switch_effect=%s source_script_args=prev_shot source_prev_shot_visible=1 native_call=cam_shot_ok($this) shot=%s previous=%s native_prev_shot_visible=0 cam_shot_ok=%s source_return=%s result=%s current_walkspot=%s current_walkspot_key=%s bad_waypoint_match=%s bad_waypoint_match_mode=%s bad_waypoint_match_key=%s bad_waypoints=%zu cam_shot_ok_recovered=%s cam_shot_ok_unrecovered=%s freecam_priority=deferred_last freecam_affects_gameplay=0\n",
+            "[world] camera shot_ok: pipeline_scope=normal_gameplay_camera priority=gameplay_camera source_dispatch_recovered=CamShot::ShotOk native_body=GH2_SLUS_214.47_0x0011f8c8 shared_predicate=0x0011f628 source_msg=shot_ok source_script=world/camshot.dta::shot_ok source_dtb=world/gen/camshot.dtb:77-78 source_script_body=cam_shot_ok_this_no_prev_arg source_call=CamShot::ShotOk(prev_shot) source_return_gate=CamShot::ShotOk_TypeSwitch source_return_class=%s source_type_switch_effect=%s source_script_args=prev_shot source_prev_shot_visible=1 native_call=cam_shot_ok($this) shot=%s previous=%s native_prev_shot_visible=0 cam_shot_ok=%s source_return=%s result=%s playing_starpower=%d starpower_ok=%d playing_far_starpower=%d far_starpower_ok=%d special=%d special_category_bypass=%d current_walkspot=%s current_walkspot_key=%s bad_waypoint_match=%s bad_waypoint_match_mode=%s bad_waypoint_match_key=%s bad_waypoints=%zu cam_shot_ok_recovered=%s cam_shot_ok_unrecovered=%s freecam_priority=deferred_last freecam_affects_gameplay=0\n",
             camera_source_shot_ok_return_class(probe.source_return),
             camera_source_shot_ok_type_switch_effect(probe.source_return),
             key.name.c_str(), probe.source_previous_name.c_str(),
             probe.cam_shot_ok,
             camera_source_shot_ok_return_label(probe.source_return),
             probe.accepted ? "accept" : "reject",
+            g_camera_source_guitarist0_state.playing_starpower ? 1 : 0,
+            key.starpower_ok ? 1 : 0,
+            g_camera_source_guitarist0_state.playing_far_starpower ? 1 : 0,
+            key.far_starpower_ok ? 1 : 0, key.special ? 1 : 0,
+            camera_source_cam_shot_ok_special_category(key.category) ? 1 : 0,
             std::string(current_walkspot).c_str(),
             probe.bad_waypoint_match.current_key.c_str(),
             probe.bad_waypoint_match.ref
@@ -19872,35 +20249,51 @@ bool camera_source_shot_ok(const Gameplay::CameraKey& key,
 struct CameraSourceCheckShotProbe {
     bool accepted = true;
     uint32_t camera_beat_state = 0;
-    const char* cam_check_shot = "native_deferred";
-    const char* source_return = "native_deferred_accept";
+    CameraSourceShotOkReturn predicate_return =
+        CameraSourceShotOkReturn::kNativeAccept;
+    const char* cam_check_shot = "native_recovered";
+    const char* source_return = "native_int_accept";
     const char* source_reject_action = "pick_new_shot";
 };
 
 CameraSourceCheckShotProbe camera_source_check_shot_probe(
-    const Gameplay::CameraKey& key, uint32_t camera_beat_state) {
+    const Gameplay::CameraKey& key, uint32_t camera_beat_state,
+    std::string_view current_walkspot) {
     // GH2 world_objects_worldbase.dta::beat stores [camera_beat], then
     // world/camshot.dta::check_shot calls native cam_check_shot $this. The
-    // hidden native body may read script state, but no beat is passed as an
-    // explicit argument, so native behavior stays deferred and permissive.
-    (void)key;
+    // cam_check_shot at 0x0011f848 is a thin wrapper around the shared retail
+    // predicate at 0x0011f628. camera_beat remains script state only.
     CameraSourceCheckShotProbe probe;
     probe.camera_beat_state = camera_beat_state;
+    probe.predicate_return =
+        camera_source_shared_camshot_predicate_return(key, current_walkspot);
+    probe.accepted =
+        probe.predicate_return == CameraSourceShotOkReturn::kNativeAccept;
+    probe.source_return = probe.accepted ? "native_int_accept"
+                                         : "native_int_reject";
     return probe;
 }
 
 bool camera_source_check_shot(const Gameplay::CameraKey& key,
                               uint32_t camera_beat_state,
+                              std::string_view current_walkspot,
                               const char* source_caller) {
     const CameraSourceCheckShotProbe probe =
-        camera_source_check_shot_probe(key, camera_beat_state);
+        camera_source_check_shot_probe(key, camera_beat_state,
+                                       current_walkspot);
     if (debug_camera_enabled() || debug_venue_filters_enabled()) {
         std::fprintf(
             stderr,
-            "[world] camera check_shot: pipeline_scope=normal_gameplay_camera priority=gameplay_camera hidden_gameplay_blocker=cam_check_shot_native source_msg=check_shot source_script=world/camshot.dta::check_shot source_dtb=world/gen/camshot.dtb:72-73 source_script_body=cam_check_shot_this_no_args source_caller=%s source_script_args=none source_camera_beat_var_visible=1 native_call=cam_check_shot($this) shot=%s camera_beat_state=%u native_beat_arg_visible=0 source_reject_action=%s cam_check_shot=%s source_return=%s result=%s freecam_priority=deferred_last freecam_affects_gameplay=0\n",
+            "[world] camera check_shot: pipeline_scope=normal_gameplay_camera priority=gameplay_camera native_body=GH2_SLUS_214.47_0x0011f848 shared_predicate=0x0011f628 source_msg=check_shot source_script=world/camshot.dta::check_shot source_dtb=world/gen/camshot.dtb:72-73 source_script_body=cam_check_shot_this_no_args source_caller=%s source_script_args=none source_camera_beat_var_visible=1 native_call=cam_check_shot($this) shot=%s camera_beat_state=%u native_beat_arg_visible=0 source_reject_action=%s cam_check_shot=%s source_return=%s predicate_result=%s playing_starpower=%d starpower_ok=%d playing_far_starpower=%d far_starpower_ok=%d current_walkspot=%s result=%s freecam_priority=deferred_last freecam_affects_gameplay=0\n",
             source_caller ? source_caller : "", key.name.c_str(),
             probe.camera_beat_state, probe.source_reject_action,
             probe.cam_check_shot, probe.source_return,
+            camera_source_shot_ok_return_label(probe.predicate_return),
+            g_camera_source_guitarist0_state.playing_starpower ? 1 : 0,
+            key.starpower_ok ? 1 : 0,
+            g_camera_source_guitarist0_state.playing_far_starpower ? 1 : 0,
+            key.far_starpower_ok ? 1 : 0,
+            std::string(current_walkspot).c_str(),
             probe.accepted ? "accept" : "reject");
     }
     return probe.accepted;
@@ -19954,9 +20347,9 @@ std::string camera_source_guitarist0_actually_walking_source(
 }
 
 constexpr const char* kCameraRecoveredRuntimeList =
-    "venue_loading,dependency_discovery,animation_routing,lighting,environ,redoctane_motion,camera_selection,camera_intro_previous_context_bridge,camera_camshot_platform_ok_gate,camera_manager_syncobjects_category_buckets,camera_manager_random_seed_bridge,camera_one_bar_to_seek_latch_replay,camera_worldbase_beat_check_shot_bridge,camera_worldbase_downbeat_duration_bridge,camera_worldbase_script_filter_bridge,camera_manager_handle_routes,camera_manager_make_category_filters,camera_manager_onpick_return_bridge,camera_banddirector_findnext_filter_bridge,camera_manager_numcamerashots_prescan_bridge,camera_manager_onnum_return_bridge,camera_manager_first_shot_ok_hook,camera_manager_findshot_category_scan,camera_camshot_disable_bitmask_bridge,camera_manager_findshot_disabled_gate,camera_manager_shotmatches_filters,camera_camshot_radio_flags_bridge,camera_manager_findshot_moveitem,camera_manager_findshot_return_bridge,camera_manager_pickshot_return_bridge,camera_manager_pickshot_no_acceptable_warning,camera_manager_pickshot_pending,camera_manager_pickshot_same_shot_restart_bridge,camera_manager_force_shot_pending,camera_manager_force_shot_action_return_bridge,camera_manager_shotafter_order_bridge,camera_manager_shotafter_expr_return_bridge,camera_manager_cycle_shot_pending_bridge,camera_manager_cycle_shot_return_bridge,camera_manager_current_next_state,camera_manager_current_next_expr_return_bridge,camera_manager_iterate_shot_bridge,camera_manager_randomize_category_noop,camera_worlddir_camshot_overrides_disable,camera_camshot_copy_runtime_fields,camera_lifecycle,camera_manager_enter_reset_bridge,camera_camshot_endanim_bridge,camera_camshot_postprocess_select_reset,camera_camshot_force_char_lod_bridge,camera_camshot_crowd_payload_bridge,camera_camshot_crowd_message_handlers,camera_camshot_startanim_state_reset,camera_camshot_startanim_handler_noops,camera_camshot_getcam_rndcam_bridge,camera_camshot_animtarget_bridge,camera_camshot_manims_lifecycle,camera_manager_startshot_side_effects,camera_camshot_glow_spot_bridge,camera_camshot_shotok_typeswitch,camera_camshot_shotok_prev_arg_bridge,camera_current_walkspot_waypoint_bridge,camera_camshot_shot_ok_bad_waypoints,camera_camshot_check_shot_probe_boundary,camera_manager_milocamera_poll_gate,camera_manager_prepoll_poll_order,camera_camshot_setpreframe_noop,camera_manager_calcframe_units,camera_manager_poll_setframe_bridge,camera_camshot_update_target_cache,camera_camshot_setfrustum,camera_same_target_screen_offset,camera_camshot_clamp_height_bridge,camera_camshot_dofproc,camera_camshot_shake_tail,camera_camshot_setlocalxfm_tail,camera_rndcam_updatelocal_projection,camera_camshot_dohide_unhide_visibility,camera_visibility,camera_camshot_checkshotstarted_runtime_bridge,camera_shot_started_postswitch,camera_camshot_checkshotover_predicate_bridge,camera_shot_over,camera_camshot_setshotover_latch_bridge,camera_camshot_shot_over_next_shot_bridge,camera_camshot_cacheframes_duration,camera_camshot_endframe_duration_bridge,camera_camshot_duration_seconds,camera_camshot_getkey_looping,camera_frame_pair_timing,camera_camshot_setframe_last_pair_bridge,camera_camshot_onsetpos_boundary,camera_camshot_hastargets_boundary,camera_camshot_position_handler_return_bridge,camera_path_transanim_timing,camera_trace_complete_writer_bridge,camera_fov_anim_atframe";
+    "venue_loading,dependency_discovery,animation_routing,lighting,environ,redoctane_motion,camera_selection,camera_intro_previous_context_bridge,camera_camshot_platform_ok_gate,camera_manager_syncobjects_category_buckets,camera_manager_random_seed_bridge,camera_one_bar_to_seek_latch_replay,camera_worldbase_beat_check_shot_bridge,camera_worldbase_downbeat_duration_bridge,camera_worldbase_script_filter_bridge,camera_manager_handle_routes,camera_manager_make_category_filters,camera_manager_onpick_return_bridge,camera_banddirector_findnext_filter_bridge,camera_manager_numcamerashots_prescan_bridge,camera_manager_onnum_return_bridge,camera_manager_first_shot_ok_hook,camera_manager_findshot_category_scan,camera_camshot_disable_bitmask_bridge,camera_manager_findshot_disabled_gate,camera_manager_shotmatches_filters,camera_camshot_radio_flags_bridge,camera_manager_findshot_moveitem,camera_manager_findshot_return_bridge,camera_manager_pickshot_return_bridge,camera_manager_pickshot_no_acceptable_warning,camera_manager_pickshot_pending,camera_manager_pickshot_same_shot_restart_bridge,camera_manager_force_shot_pending,camera_manager_force_shot_action_return_bridge,camera_manager_shotafter_order_bridge,camera_manager_shotafter_expr_return_bridge,camera_manager_cycle_shot_pending_bridge,camera_manager_cycle_shot_return_bridge,camera_manager_current_next_state,camera_manager_current_next_expr_return_bridge,camera_manager_iterate_shot_bridge,camera_manager_randomize_category_noop,camera_worlddir_camshot_overrides_disable,camera_camshot_copy_runtime_fields,camera_lifecycle,camera_manager_enter_reset_bridge,camera_camshot_endanim_bridge,camera_camshot_postprocess_select_reset,camera_camshot_force_char_lod_bridge,camera_camshot_crowd_payload_bridge,camera_camshot_crowd_message_handlers,camera_camshot_startanim_state_reset,camera_camshot_startanim_handler_noops,camera_camshot_getcam_rndcam_bridge,camera_camshot_animtarget_bridge,camera_camshot_manims_lifecycle,camera_manager_startshot_side_effects,camera_camshot_glow_spot_bridge,camera_camshot_shotok_typeswitch,camera_camshot_shotok_prev_arg_bridge,camera_current_walkspot_waypoint_bridge,camera_camshot_shot_ok_bad_waypoints,camera_camshot_check_shot_native,camera_manager_milocamera_poll_gate,camera_manager_prepoll_poll_order,camera_camshot_setpreframe_noop,camera_manager_calcframe_units,camera_manager_poll_setframe_bridge,camera_camshot_update_target_cache,camera_camshot_setfrustum,camera_same_target_screen_offset,camera_camshot_clamp_height_bridge,camera_camshot_dofproc,camera_camshot_shake_native_body,camera_camshot_shake_rng,camera_camshot_shake_spring_state,camera_camshot_shake_local_transform,camera_camshot_setlocalxfm_tail,camera_rndcam_updatelocal_projection,camera_camshot_dohide_unhide_visibility,camera_visibility,camera_camshot_checkshotstarted_runtime_bridge,camera_shot_started_postswitch,camera_camshot_checkshotover_predicate_bridge,camera_shot_over,camera_camshot_setshotover_latch_bridge,camera_camshot_shot_over_next_shot_bridge,camera_camshot_cacheframes_duration,camera_camshot_endframe_duration_bridge,camera_camshot_duration_seconds,camera_camshot_getkey_looping,camera_frame_pair_timing,camera_camshot_setframe_last_pair_bridge,camera_camshot_onsetpos_editor_boundary,camera_camshot_hastargets_boundary,camera_camshot_position_handler_return_bridge,camera_path_transanim_timing,camera_trace_complete_writer_bridge,camera_fov_anim_atframe";
 
-constexpr size_t kCameraOpenGameplayBlockers = 4;
+constexpr size_t kCameraOpenGameplayBlockers = 0;
 
 size_t camera_count_csv_tokens(std::string_view csv) {
     size_t count = 0;
@@ -19972,47 +20365,40 @@ size_t camera_count_csv_tokens(std::string_view csv) {
     return count;
 }
 
-std::string camera_hidden_gameplay_blockers(bool build_transform_active,
-                                            bool cam_shot_ok_active,
-                                            bool cam_check_shot_active,
-                                            bool charwalk_gate_active) {
-    std::string blockers;
-    auto append = [&](const char* blocker) {
-        if (!blockers.empty()) blockers += "|";
-        blockers += blocker;
-    };
-    if (build_transform_active) append("BuildTransform");
-    if (cam_shot_ok_active) append("cam_shot_ok_rest");
-    if (cam_check_shot_active) append("cam_check_shot_native");
-    if (charwalk_gate_active) append("CharWalk");
-    return blockers.empty() ? std::string("none") : blockers;
+std::string camera_hidden_gameplay_blockers() {
+    return "none";
 }
 
-std::string camera_deferred_gameplay_blockers(bool cam_shot_ok_active,
-                                              bool cam_check_shot_active,
-                                              bool charwalk_gate_active) {
-    std::string blockers;
-    auto append = [&](const char* blocker) {
-        if (!blockers.empty()) blockers += "|";
-        blockers += blocker;
-    };
-    if (!cam_shot_ok_active) append("cam_shot_ok_rest");
-    if (!cam_check_shot_active) append("cam_check_shot_native");
-    if (!charwalk_gate_active) append("CharWalk");
-    return blockers.empty() ? std::string("none") : blockers;
+std::string camera_deferred_gameplay_blockers() {
+    // FreeCamera and CamShot::OnSetPos are authoring/debug facilities. GH2's
+    // RndPostProc selection is HX_XBOX-only, so none are deferred blockers for
+    // the normal PS2 gameplay camera pipeline.
+    return "none";
 }
 
 bool camera_source_guitarist0_playing_starpower(
-    bool native_player0_star_power_active) {
+    float native_player0_starpower_flag_weight,
+    float native_player0_far_starpower_flag_weight) {
     // GH2 world_objects_worldbase.dta gates both downbeat check_camera_shot and
     // regular/solo starpower_ok filters through {guitarist0 playing_starpower}.
-    // Native currently has a single player0 star-power state for that source
-    // object, so keep the bridge named instead of scattering star_power_.active.
-    return native_player0_star_power_active;
+    // The retail handlers at 0x0010B9E8 and 0x0010C948 call
+    // CharDriver::EvaluateFlags for 0x00080000 and 0x00004000 respectively,
+    // then return weight > 0. Do the same against the live main-driver stack;
+    // these are authored clip flags, not inferred temporal star-power phases.
+    g_camera_source_guitarist0_state.starpower_flag_weight =
+        std::clamp(native_player0_starpower_flag_weight, 0.0f, 1.0f);
+    g_camera_source_guitarist0_state.far_starpower_flag_weight =
+        std::clamp(native_player0_far_starpower_flag_weight, 0.0f, 1.0f);
+    g_camera_source_guitarist0_state.playing_starpower =
+        g_camera_source_guitarist0_state.starpower_flag_weight > 0.0f;
+    g_camera_source_guitarist0_state.playing_far_starpower =
+        g_camera_source_guitarist0_state.far_starpower_flag_weight > 0.0f;
+    return g_camera_source_guitarist0_state.playing_starpower;
 }
 
 const char* camera_source_guitarist0_playing_starpower_source() {
-    return "guitarist0::playing_starpower(native_player0_star_power_active)";
+    return "GH2_CharDriver::EvaluateFlags(0x00080000/0x00004000);"
+           "retail_handlers_0x0010B9E8/0x0010C948";
 }
 
 const char* camera_source_gamecfg_mode() {
@@ -20440,46 +20826,30 @@ size_t camera_category_bucket_index(
 
 template <typename Predicate>
 std::optional<size_t> choose_regular_camera_key_index_by_category(
-    const std::vector<Gameplay::CameraKey>& keys,
+    std::vector<Gameplay::CameraKey>& keys,
     const Gameplay::CameraKey* previous,
     CameraShotMode mode,
     std::string_view current_walkspot,
     size_t normal_category_cursor,
     Predicate&& predicate) {
-    auto scan_category = [&](std::string_view category)
-        -> std::optional<size_t> {
-        for (size_t i = 0; i < keys.size(); ++i) {
-            const auto& key = keys[i];
-            if (key.category != category) continue;
-            if (key.disabled_flags != 0) {
-                if (debug_camera_enabled() || debug_venue_filters_enabled()) {
-                    std::fprintf(
-                        stderr,
-                        "[world] camera FindCameraShot: shot=%s skipped disabled=0x%08x\n",
-                        key.name.c_str(),
-                        static_cast<unsigned int>(key.disabled_flags));
-                }
-                continue;
-            }
-            if (!predicate(key)) continue;
-            if (!camera_source_shot_ok(key, previous, current_walkspot)) continue;
-            return i;
-        }
-        return std::nullopt;
+    (void)normal_category_cursor; // GH2 does not round-robin categories.
+    ghogx::camera::WeightedSelection pool;
+    auto eligible = [&](const Gameplay::CameraKey& key) {
+        return key.disabled_flags == 0 && predicate(key) &&
+               camera_source_shot_ok(key, previous, current_walkspot);
     };
-
     if (mode == CameraShotMode::Lighter) {
-        return scan_category("LIGHTER");
+        pool.append_category(keys, "LIGHTER", eligible);
+    } else {
+        for (const auto category : kNormalCamShotCategoryOrder)
+            pool.append_category(keys, category, eligible);
     }
-    const size_t cursor =
-        normal_category_cursor % kNormalCamShotCategoryOrder.size();
-    for (size_t offset = 0; offset < kNormalCamShotCategoryOrder.size();
-         ++offset) {
-        const auto category = kNormalCamShotCategoryOrder[
-            (cursor + offset) % kNormalCamShotCategoryOrder.size()];
-        if (auto selected = scan_category(category)) return selected;
-    }
-    return std::nullopt;
+    const float draw = camera_selection_random().float_range(0.0f, pool.total());
+    const auto selected = pool.choose(draw);
+    std::fprintf(stderr,
+        "[camera-select] route=regular candidates=%zu total=%.6f draw=%.6f selected=%s source=GH2_weighted_used_cycle\n",
+        pool.size(), pool.total(), draw, selected ? keys[*selected].name.c_str() : "<none>");
+    return selected;
 }
 
 template <typename Predicate>
@@ -20554,7 +20924,6 @@ const Gameplay::CameraKey* choose_regular_camera_key_scripted(
             source_previous ? source_previous->name.c_str() : "",
             num_shots);
     }
-    camera_source_first_shot_ok(camera_source_pick_shot_category(mode));
     std::optional<size_t> selected =
         choose_regular_camera_key_index_by_category(
             keys, source_previous, mode, current_walkspot,
@@ -20566,53 +20935,7 @@ const Gameplay::CameraKey* choose_regular_camera_key_scripted(
                                          source_filters);
         return nullptr;
     }
-    const size_t selected_index = *selected;
-    const std::string selected_category = keys[selected_index].category;
-    const std::string selected_name = keys[selected_index].name;
-    size_t category_cursor_after = category_cursor_before;
-    if (mode != CameraShotMode::Lighter) {
-        const auto selected_category_it =
-            std::find(kNormalCamShotCategoryOrder.begin(),
-                      kNormalCamShotCategoryOrder.end(), selected_category);
-        if (selected_category_it != kNormalCamShotCategoryOrder.end()) {
-            const size_t selected_category_index = static_cast<size_t>(
-                std::distance(kNormalCamShotCategoryOrder.begin(),
-                              selected_category_it));
-            category_cursor_after =
-                (selected_category_index + 1) %
-                kNormalCamShotCategoryOrder.size();
-            normal_category_cursor = category_cursor_after;
-        }
-    }
-    const size_t selected_bucket_index =
-        camera_category_bucket_index(keys, selected_category, selected_index);
-    const std::string before_order =
-        camera_category_bucket_order_for_log(keys, selected_category);
-    Gameplay::CameraKey chosen = std::move(keys[selected_index]);
-    keys.erase(keys.begin() + static_cast<std::ptrdiff_t>(selected_index));
-    auto insert_pos = keys.end();
-    for (auto it = keys.begin(); it != keys.end(); ++it) {
-        if (it->category == selected_category) insert_pos = std::next(it);
-    }
-    auto inserted = keys.insert(insert_pos, std::move(chosen));
-    if (debug_camera_enabled() || debug_venue_filters_enabled()) {
-        const std::string after_order =
-            camera_category_bucket_order_for_log(keys, selected_category);
-        std::fprintf(
-            stderr,
-            "[world] camera FindCameraShot move: source_manager=CameraManager::FindCameraShot shot=%s category=%s bucket_index=%zu source_move=MoveItem(end) source_return=CamShot before=%s after=%s\n",
-            selected_name.c_str(), selected_category.c_str(),
-            selected_bucket_index, before_order.c_str(), after_order.c_str());
-        std::fprintf(
-            stderr,
-            "[world] camera category cursor: mode=%s selected=%s category=%s before=%zu after=%zu scan=%s result=advance_after_accept\n",
-            camera_shot_mode_label(mode), selected_name.c_str(),
-            selected_category.c_str(), category_cursor_before,
-            category_cursor_after,
-            camera_source_pick_shot_scan_scope(mode, category_cursor_before)
-                .c_str());
-    }
-    return &*inserted;
+    return &keys[*selected];
 }
 
 size_t camera_source_category_prescan_count(
@@ -20669,27 +20992,18 @@ const Gameplay::CameraKey* choose_camera_key_source_category(
             num_shots, source_category_caller, source_filter_label.c_str(),
             source_filters.size());
     }
-    camera_source_first_shot_ok(category);
-
-    std::optional<size_t> selected;
-    for (size_t i = 0; i < keys.size(); ++i) {
-        const auto& key = keys[i];
-        if (key.category != category) continue;
-        if (key.disabled_flags != 0) {
-            if (debug_camera_enabled() || debug_venue_filters_enabled()) {
-                std::fprintf(
-                    stderr,
-                    "[world] camera FindCameraShot: shot=%s skipped disabled=0x%08x\n",
-                    key.name.c_str(),
-                    static_cast<unsigned int>(key.disabled_flags));
-            }
-            continue;
-        }
-        if (!camera_shot_matches_source_filters(key, source_filters)) continue;
-        if (!camera_source_shot_ok(key, source_previous, current_walkspot)) continue;
-        selected = i;
-        break;
-    }
+    ghogx::camera::WeightedSelection pool;
+    pool.append_category(keys, category, [&](const Gameplay::CameraKey& key) {
+        return key.disabled_flags == 0 &&
+               camera_shot_matches_source_filters(key, source_filters) &&
+               camera_source_shot_ok(key, source_previous, current_walkspot);
+    });
+    const float draw = camera_selection_random().float_range(0.0f, pool.total());
+    const auto selected = pool.choose(draw);
+    std::fprintf(stderr,
+        "[camera-select] route=category category=%s candidates=%zu total=%.6f draw=%.6f selected=%s source=GH2_weighted_used_cycle\n",
+        std::string(category).c_str(), pool.size(), pool.total(), draw,
+        selected ? keys[*selected].name.c_str() : "<none>");
 
     if (!selected) {
         if (debug_camera_enabled() || debug_venue_filters_enabled()) {
@@ -20703,32 +21017,7 @@ const Gameplay::CameraKey* choose_camera_key_source_category(
         return nullptr;
     }
 
-    const size_t selected_index = *selected;
-    const std::string selected_category = keys[selected_index].category;
-    const std::string selected_name = keys[selected_index].name;
-    const size_t selected_bucket_index =
-        camera_category_bucket_index(keys, selected_category, selected_index);
-    const std::string before_order =
-        camera_category_bucket_order_for_log(keys, selected_category);
-    Gameplay::CameraKey chosen = std::move(keys[selected_index]);
-    keys.erase(keys.begin() + static_cast<std::ptrdiff_t>(selected_index));
-    auto insert_pos = keys.end();
-    for (auto it = keys.begin(); it != keys.end(); ++it) {
-        if (it->category == selected_category) insert_pos = std::next(it);
-    }
-    auto inserted = keys.insert(insert_pos, std::move(chosen));
-    if (debug_camera_enabled() || debug_venue_filters_enabled()) {
-        const std::string after_order =
-            camera_category_bucket_order_for_log(keys, selected_category);
-        std::fprintf(
-            stderr,
-            "[world] camera FindCameraShot move: source_manager=CameraManager::FindCameraShot source_category_caller=%s shot=%s category=%s bucket_index=%zu source_move=MoveItem(end) source_return=CamShot source_msg=%s before=%s after=%s\n",
-            source_category_caller,
-            selected_name.c_str(), selected_category.c_str(),
-            selected_bucket_index, std::string(source_message).c_str(),
-            before_order.c_str(), after_order.c_str());
-    }
-    return &*inserted;
+    return &keys[*selected];
 }
 
 uint32_t camera_source_one_bar_to_trigger_tick(
@@ -20893,18 +21182,14 @@ int source_random_int_camera_duration_bars(int min_bars, int max_bars,
     if (min_bars <= 0) min_bars = 1;
     if (max_bars < min_bars) max_bars = min_bars;
     const size_t span = static_cast<size_t>(max_bars - min_bars + 1);
-    CameraSourceRand rand;
     // world_objects_worldbase.dta::get_shot_duration uses random_int for this
     // source-script route.
     // DataFunc::DataRandomInt calls RandomInt(low, high). That global source
     // Rand starts as gRand(0x29A), and Rand::Int(low, high) treats high as
     // exclusive, so the authored inclusive duration row is submitted as
     // [min, max + 1) here.
-    rand.seed(0x29Au);
-    size_t bucket = 0;
-    for (size_t i = 0; i <= draw_index; ++i) {
-        bucket = rand.int_range(span);
-    }
+    (void)draw_index; // Diagnostic ordinal, not a request to reseed/replay RNG.
+    const size_t bucket = camera_selection_random().int_range(span);
     return min_bars + static_cast<int>(bucket);
 }
 
@@ -21560,11 +21845,36 @@ std::array<float, 3> camera_key_local_up(const Gameplay::CameraKey& key) {
     return {0.0f, 0.0f, 1.0f};
 }
 
+std::array<float, 3> camera_key_local_source_x(
+    const Gameplay::CameraKey& key) {
+    if (key.has_quat) {
+        float q[4] = {key.quat[0], key.quat[1], key.quat[2], key.quat[3]};
+        const float n =
+            std::sqrt(q[0] * q[0] + q[1] * q[1] + q[2] * q[2] +
+                      q[3] * q[3]);
+        if (n > 0.0001f) {
+            for (float& v : q) v /= n;
+        }
+        const float x = q[0], y = q[1], z = q[2], w = q[3];
+        return {1.0f - 2.0f * (y * y + z * z),
+                2.0f * (x * y + z * w),
+                2.0f * (x * z - y * w)};
+    }
+    if (key.has_basis) {
+        return {key.source_x[0], key.source_x[1], key.source_x[2]};
+    }
+    const auto forward = camera_key_local_forward(key);
+    const auto up = camera_key_local_up(key);
+    return camera_cross_axis(forward, up);
+}
+
 void populate_camera_generated_source_rows(Gameplay::CameraKey& key) {
+    const auto source_x = camera_key_local_source_x(key);
     const auto forward = camera_key_local_forward(key);
     const auto up = camera_key_local_up(key);
     for (int axis = 0; axis < 3; ++axis) {
         key.generated_source_position[axis] = key.eye[axis];
+        key.generated_source_x[axis] = source_x[axis];
         key.generated_source_forward[axis] = forward[axis];
         key.generated_source_up[axis] = up[axis];
     }
@@ -21575,6 +21885,10 @@ struct CameraResultRows {
     std::string source;
     std::array<float, 3> position = {0.0f, 0.0f, 0.0f};
     std::array<float, 3> forward = {0.0f, 1.0f, 0.0f};
+    // Raw source m.x row used by GH2's Matrix3 -> Quat interpolation.  The
+    // renderer-facing `right` axis has the opposite sign.
+    std::array<float, 3> source_x = {1.0f, 0.0f, 0.0f};
+    bool has_source_x = false;
     std::array<float, 3> right = {1.0f, 0.0f, 0.0f};
     std::array<float, 3> up = {0.0f, 0.0f, 1.0f};
     bool screen_offset_consumed = false;
@@ -21591,11 +21905,24 @@ struct CameraResultRows {
 };
 
 constexpr float kNativeValidationAspect = 16.0f / 9.0f;
-// Rnd::Rnd defaults to kWidescreen and Rnd::YRatio() returns 0.5625 for that
-// source aspect. LocalProjectXfm stores projection scale, so local screen-offset
-// translation uses the reciprocal x/y ratio.
-constexpr float kCamShotSourceYRatio = 0.5625f;
-constexpr float kCamShotSourceFrustumAspect = 1.0f / kCamShotSourceYRatio;
+// Retail BuildTransform reads RndCam::LocalProjectXfm(), whose X scale is
+// rebuilt from TheRnd->YRatio() whenever the output aspect changes. Keep the
+// native solver on the same GHOGX_CAMERA_ASPECT contract as the renderer; a
+// fixed widescreen ratio misframes every authored horizontal screen offset in
+// the normal 4:3 game mode.
+float camera_source_frustum_aspect() {
+    const char* value = env_value("GHOGX_CAMERA_ASPECT");
+    if (!value) return kNativeValidationAspect;
+    if (std::strcmp(value, "4:3") == 0) return 4.0f / 3.0f;
+    if (std::strcmp(value, "16:9") == 0) return 16.0f / 9.0f;
+    char* end = nullptr;
+    const float parsed = std::strtof(value, &end);
+    if (end != value && std::isfinite(parsed) && parsed >= 0.5f &&
+        parsed <= 4.0f) {
+        return parsed;
+    }
+    return kNativeValidationAspect;
+}
 constexpr const char* kCamShotBuildTransformAuditStatus =
     "gh2_SLUS_214.47_0x00267008_full_body;"
     "Interp_outgoing_call_0x002666b8;"
@@ -21620,7 +21947,7 @@ constexpr const char* kCamShotUpdateLocalSourceSearch =
     "SLUS_214.47_SetFrustum_0x001b1ee0_calls_UpdateLocal_0x001b1f50;"
     "retail_MIPS64_disassembly";
 constexpr const char* kCamShotVisiblePoseUnits =
-    "CameraManager,GetKey,Interp_outgoing_incoming_pair,BuildTransform_frame_pair_contract,OnHasTargets,SetFrustum,DOF,Shake_tail,SetLocalXfm_tail,RndCam_UpdateLocal_projection";
+    "CameraManager,GetKey,Interp_outgoing_incoming_pair,BuildTransform_frame_pair_contract,OnHasTargets,SetFrustum,DOF,Shake_native_body,SetLocalXfm_tail,RndCam_UpdateLocal_projection";
 constexpr const char* kCamShotHiddenPoseBodies =
     "CamShot::OnSetPos_editor_path";
 
@@ -21657,7 +21984,7 @@ camera_source_local_project_scale_for_fov(float y_fov) {
     if (!std::isfinite(tan_y) || tan_y <= 0.000001f) {
         return std::nullopt;
     }
-    const float tan_x = tan_y * kCamShotSourceFrustumAspect;
+    const float tan_x = tan_y * camera_source_frustum_aspect();
     if (!std::isfinite(tan_x) || tan_x <= 0.000001f) {
         return std::nullopt;
     }
@@ -21684,8 +22011,10 @@ float camera_dot_axis(const std::array<float, 3>& a,
 void camera_orthonormalize_result_rows(CameraResultRows& rows) {
     rows.forward = camera_normalized_axis(rows.forward, {0.0f, 1.0f, 0.0f});
     rows.up = camera_normalized_axis(rows.up, {0.0f, 0.0f, 1.0f});
-    rows.right = camera_normalized_axis(camera_cross_axis(rows.up, rows.forward),
-                                        {1.0f, 0.0f, 0.0f});
+    rows.source_x = camera_normalized_axis(
+        camera_cross_axis(rows.forward, rows.up), {1.0f, 0.0f, 0.0f});
+    rows.has_source_x = true;
+    rows.right = {-rows.source_x[0], -rows.source_x[1], -rows.source_x[2]};
     rows.up = camera_normalized_axis(camera_cross_axis(rows.forward, rows.right),
                                      rows.up);
 }
@@ -23800,12 +24129,19 @@ CameraResultRows camera_source_seed_result_rows_for_key(
         rows.position = {key.generated_source_position[0],
                          key.generated_source_position[1],
                          key.generated_source_position[2]};
+        rows.source_x = {key.generated_source_x[0],
+                         key.generated_source_x[1],
+                         key.generated_source_x[2]};
+        rows.has_source_x = true;
         rows.forward = {key.generated_source_forward[0],
                         key.generated_source_forward[1],
                         key.generated_source_forward[2]};
         rows.up = {key.generated_source_up[0], key.generated_source_up[1],
                    key.generated_source_up[2]};
-        camera_orthonormalize_result_rows(rows);
+        const auto renderer_right = camera_normalized_axis(
+            rows.source_x, {1.0f, 0.0f, 0.0f});
+        rows.right = {-renderer_right[0], -renderer_right[1],
+                      -renderer_right[2]};
         camera_apply_clamp_height_to_result_rows(rows, key, targets);
         return rows;
     }
@@ -23818,15 +24154,22 @@ CameraResultRows camera_source_seed_result_rows_for_key(
                       : "source_seed";
     rows.position = camera_authored_eye_for_key(key, targets,
                                                 cached_parent_world);
+    rows.source_x = camera_key_local_source_x(key);
+    rows.has_source_x = true;
     rows.forward = camera_key_local_forward(key);
     rows.up = camera_key_local_up(key);
     if (parent_world && key.use_parent_rotation) {
+        rows.source_x =
+            transform_vector_game(*parent_world, rows.source_x.data());
         rows.forward = transform_vector_game(*parent_world, rows.forward.data());
         rows.up = transform_vector_game(*parent_world, rows.up.data());
     }
-    camera_apply_pose_span_source_basis(rows, key, targets,
-                                        cached_parent_world);
-    camera_orthonormalize_result_rows(rows);
+    // Retail BuildTransform copies the authored basis (0x267394..0x2673a8).
+    // Position-key travel direction is not an orientation constraint.
+    const auto renderer_right = camera_normalized_axis(
+        rows.source_x, {1.0f, 0.0f, 0.0f});
+    rows.right = {-renderer_right[0], -renderer_right[1],
+                  -renderer_right[2]};
     camera_apply_clamp_height_to_result_rows(rows, key, targets);
     return rows;
 }
@@ -23834,30 +24177,26 @@ CameraResultRows camera_source_seed_result_rows_for_key(
 std::optional<std::array<float, 2>> camera_project_target_screen_norm(
     CameraResultRows rows,
     const Gameplay::CameraKey& key,
-    const std::array<float, 3>& target) {
+    const std::array<float, 3>& target, bool gh1_source_helper = false) {
     if (!key.has_fov) return std::nullopt;
     const auto project = camera_source_local_project_scale_for_fov(key.fov);
     if (!project) return std::nullopt;
-    camera_orthonormalize_result_rows(rows);
-    const std::array<float, 3> delta = {
-        target[0] - rows.position[0], target[1] - rows.position[1],
-        target[2] - rows.position[2]};
-    const float depth = camera_dot_axis(delta, rows.forward);
-    if (!std::isfinite(depth) || std::abs(depth) <= 0.000001f) {
-        return std::nullopt;
-    }
-    // Hmx::Transform stores m.x as Cross(m.y, m.z).  CameraResultRows::right
-    // is renderer-facing and has the opposite handedness, so retail RndCam
-    // projection must use the reconstructed source m.x axis here as well as
-    // in BuildTransform's local screen-offset translation.
-    const auto source_transform_x = camera_normalized_axis(
-        camera_cross_axis(rows.forward, rows.up), {-1.0f, 0.0f, 0.0f});
-    const float x = camera_dot_axis(delta, source_transform_x) /
-                    (depth * project->tan_x);
-    const float y =
-        camera_dot_axis(delta, rows.up) / (depth * project->tan_y);
-    if (!std::isfinite(x) || !std::isfinite(y)) return std::nullopt;
-    return std::array<float, 2>{(x + 1.0f) * 0.5f, (1.0f - y) * 0.5f};
+    // WorldToScreen1B1270 reads the cached full-affine worldProjection. The
+    // target-cache caller supplies the prior camera basis and current base
+    // frustum, as BuildTransform does. Do not reconstruct a unit look-at basis.
+    const std::array<float, 3> source_x = rows.has_source_x ? rows.source_x :
+        std::array<float, 3>{-rows.right[0], -rows.right[1], -rows.right[2]};
+    const ghogx::camera::CameraAffineRows world{{source_x, rows.forward,
+                                                rows.up, rows.position}};
+    const auto projector = gh1_source_helper
+        ? ghogx::camera::gh1_camera_world_projection
+        : ghogx::camera::source_camera_world_projection;
+    const auto world_projection = projector(world,
+        project->local_project_m_x_x, project->local_project_m_z_x);
+    if (!world_projection) return std::nullopt;
+    // The native stage camera renders the full viewport. Retail saved
+    // default.cam+2D4 confirms Rect(0,0,1,1); no venue-dependent rectangle.
+    return ghogx::camera::source_camera_world_to_screen(*world_projection, target);
 }
 
 float camera_result_builder_shot_filter_step(
@@ -23868,8 +24207,8 @@ float camera_result_builder_shot_filter_step(
     if (out_projected_delta) *out_projected_delta = 1.0f;
     const float shot_filter =
         key.has_shot_filter ? key.shot_filter : kCamShotSourceDefaultFilter;
-    if (!std::isfinite(shot_filter) || shot_filter <= 0.0f) {
-        return 0.0f;
+    if (!std::isfinite(shot_filter) || shot_filter == 0.0f) {
+        return ghogx::camera::target_filter_step(shot_filter, 1.0f);
     }
     float projected_delta = 1.0f;
     if (const auto projected =
@@ -23881,13 +24220,13 @@ float camera_result_builder_shot_filter_step(
         if (std::isfinite(len)) projected_delta = std::min(len, 1.0f);
     }
     if (out_projected_delta) *out_projected_delta = projected_delta;
-    return std::clamp(shot_filter * projected_delta, 0.0f, 1.0f);
+    return ghogx::camera::target_filter_step(shot_filter, projected_delta);
 }
 
 bool camera_shot_filter_applies(const Gameplay::CameraKey& key) {
     const float shot_filter =
         key.has_shot_filter ? key.shot_filter : kCamShotSourceDefaultFilter;
-    return std::isfinite(shot_filter) && shot_filter > 0.0f;
+    return std::isfinite(shot_filter) && shot_filter != 0.0f;
 }
 
 std::array<float, 3> camera_result_builder_filtered_target(
@@ -23906,15 +24245,9 @@ std::array<float, 3> camera_result_builder_filtered_target(
             state->has_filtered_target = true;
         }
         filter_step = 1.0f;
-    } else if (filter_step >= 1.0f) {
-        state->filtered_target = target;
-    } else if (filter_step > 0.0f) {
-        const float old_weight = 1.0f - filter_step;
-        for (int axis = 0; axis < 3; ++axis) {
-            state->filtered_target[axis] =
-                state->filtered_target[axis] * old_weight +
-                target[axis] * filter_step;
-        }
+    } else {
+        state->filtered_target = ghogx::camera::target_filter_blend(
+            state->filtered_target, target, filter_step);
     }
     if (out_filter_step) *out_filter_step = filter_step;
     if (out_projected_delta) *out_projected_delta = projected_delta;
@@ -24070,12 +24403,15 @@ bool camera_apply_clamp_height_to_result_rows(
     CameraResultRows& rows,
     const Gameplay::CameraKey& key,
     const std::unordered_map<std::string, CameraTarget>& targets) {
-    if (!key.has_clamp_height || !std::isfinite(key.clamp_height) ||
+    // Retail 0x2673ac skips the complete parent/clamp block without a parent.
+    if (!camera_parent_world_for_key(key, targets, nullptr) ||
+        !key.has_clamp_height || !std::isfinite(key.clamp_height) ||
         key.clamp_height <= 0.0f) {
         return false;
     }
     const auto target_update = camera_update_targets_like_camshot(key, targets);
-    if (target_update.resolved_count != 1u) return false;
+    if (target_update.resolved_count != 1u || key.target_refs.size() > 1u)
+        return false;
     const float clamped_z = target_update.centroid[2] + key.clamp_height;
     if (!std::isfinite(clamped_z) || !std::isfinite(rows.position[2]) ||
         rows.position[2] >= clamped_z) {
@@ -24338,16 +24674,34 @@ std::optional<CameraResultRows> camera_rejected_target_candidate_rows_for_key(
     return rows;
 }
 
+std::array<float, 16> camera_source_interp_transform(
+    const std::array<float, 16>& from,
+    const std::array<float, 16>& to, float t);
+
 CameraResultRows camera_lerp_result_rows(const CameraResultRows& a,
                                          const CameraResultRows& b,
                                          float t) {
     CameraResultRows rows;
     rows.source = a.source == b.source ? a.source : a.source + "->" + b.source;
+    const auto source_transform = [](const CameraResultRows& value) {
+        const auto x = value.has_source_x
+                           ? value.source_x
+                           : camera_cross_axis(value.forward, value.up);
+        return std::array<float, 16>{
+            x[0], x[1], x[2], 0,
+            value.forward[0], value.forward[1], value.forward[2], 0,
+            value.up[0], value.up[1], value.up[2], 0,
+            value.position[0], value.position[1], value.position[2], 1};
+    };
+    const auto transform = camera_source_interp_transform(
+        source_transform(a), source_transform(b), t);
     for (int i = 0; i < 3; ++i) {
-        rows.position[i] = a.position[i] + (b.position[i] - a.position[i]) * t;
-        rows.forward[i] = a.forward[i] + (b.forward[i] - a.forward[i]) * t;
-        rows.up[i] = a.up[i] + (b.up[i] - a.up[i]) * t;
+        rows.position[i] = transform[12 + i];
+        rows.source_x[i] = transform[i];
+        rows.forward[i] = transform[4 + i];
+        rows.up[i] = transform[8 + i];
     }
+    rows.has_source_x = true;
     rows.has_custom_view = a.has_custom_view || b.has_custom_view;
     rows.has_custom_projection =
         a.has_custom_projection || b.has_custom_projection;
@@ -24368,7 +24722,9 @@ CameraResultRows camera_lerp_result_rows(const CameraResultRows& a,
             rows.custom_projection[i] = ap[i] + (bp[i] - ap[i]) * t;
         }
     }
-    camera_orthonormalize_result_rows(rows);
+    // Matrix3 Interp already produced the source basis. Do not replace it
+    // with a normalized forward/up look-at (especially at blend endpoints).
+    rows.right = {-rows.source_x[0], -rows.source_x[1], -rows.source_x[2]};
     return rows;
 }
 
@@ -24424,7 +24780,10 @@ CameraResultRows camera_result_rows_from_source_frame(
         rows.custom_view[i] = frame.custom_view[i];
         rows.custom_projection[i] = frame.custom_projection[i];
     }
-    camera_orthonormalize_result_rows(rows);
+    // Saved result_frame.right is exactly -source m.x. Reconstructing it
+    // from forward/up discards the prior frame's MakeRotMatrix scale.
+    rows.source_x = {-frame.right[0], -frame.right[1], -frame.right[2]};
+    rows.has_source_x = true;
     return rows;
 }
 
@@ -24436,9 +24795,13 @@ CameraResultRows camera_source_setframe_blend_result_rows(
         std::isfinite(source_setframe_blend)
             ? std::clamp(source_setframe_blend, 0.0f, 1.0f)
             : 1.0f;
-    if (!previous_frame.valid || blend >= 0.9999f) return desired_rows;
-    CameraResultRows previous_rows =
-        camera_result_rows_from_source_frame(previous_frame);
+    // 266C5C..266C74 calls Matrix3 Interp even at blend=1. Its endpoint
+    // quaternion conversion is not equivalent to returning desired_rows.
+    CameraResultRows previous_rows = previous_frame.valid
+        ? camera_result_rows_from_source_frame(previous_frame) : desired_rows;
+    // This path now runs at blend=1 too. Do not append the entire previous
+    // frame's diagnostic expression recursively for every frame of a song.
+    previous_rows.source = "source_previous_worldxfm";
     CameraResultRows blended =
         camera_lerp_result_rows(previous_rows, desired_rows, blend);
     blended.source = "source_setframe_blend(" + blended.source + ")";
@@ -24469,31 +24832,53 @@ std::vector<Gameplay::CameraKey> regular_camera_path_keys(
     double song_time,
     double start_time,
     const ghogx::chart::Chart* chart,
-    const std::unordered_map<std::string, CameraTarget>& targets) {
+    const std::unordered_map<std::string, CameraTarget>& targets,
+    const std::vector<Gameplay::CameraKey>* external_positions = nullptr) {
     std::vector<Gameplay::CameraKey> keys;
-    if (!shot.has_path_anim || shot.positions.empty()) {
+    // Regular CamShots own their path poses in `positions`. A native or
+    // converted INTRO selection may instead arrive as a CamShot plus an
+    // external TransAnim; load_camera_position_keys preserves that TransAnim
+    // as a flat vector so GH1 VenueCam can use the same loader. Treat that flat
+    // vector as the selected CamShot's position page, exactly as
+    // CamShot::SetFrame does after CameraManager::CalcFrame. Evaluating only
+    // the first flat record turns a retail fly-through into a static camera.
+    const auto& positions = external_positions ? *external_positions
+                                               : shot.positions;
+    if ((!shot.has_path_anim && !external_positions) || positions.empty()) {
         keys.push_back(shot);
         return keys;
     }
     const auto shape = camera_pose_span_debug_shape_for_key(shot, targets);
-    keys.reserve(shot.positions.size());
+    keys.reserve(positions.size());
     const float now_frame = static_cast<float>(song_time * 30.0);
     const float source_frame =
         camera_source_local_frame(shot, song_time, start_time, chart);
-    const float first_frame = shot.positions.front().frame;
+    const float first_frame = positions.front().frame;
+    float path_end_frame = 0.0f;
+    const auto include_page_end = [&](const auto& page) {
+        if (!page.empty()) path_end_frame = std::max(path_end_frame, page.back().frame);
+    };
+    include_page_end(positions);
+    include_page_end(shot.path_source_translation_page);
+    include_page_end(shot.path_source_rotation_page);
+    include_page_end(shot.path_source_scale_page);
+    const float authored_path_frame = shot.has_legacy_path_ease
+        ? ghogx::camera::source_path_frame(source_frame,
+              source_camshot_duration_frames(shot), path_end_frame, shot.path_ease)
+        : first_frame + source_frame;
     const bool has_source_pages =
         !shot.path_source_translation_page.empty() ||
         !shot.path_source_rotation_page.empty() ||
         !shot.path_source_scale_page.empty();
     if (has_source_pages) {
-        // RndTransAnim::SetFrame evaluates its owned key pages at the current
-        // CameraManager::CalcFrame.  Replaying only the merged authored knots
+        // GH2 maps CalcFrame through duration/path_ease and path EndFrame
+        // before evaluating its owned pages. Replaying only the merged authored knots
         // made spline flybys piecewise-linear and produced visible velocity
         // changes at each knot.  Evaluate the decoded pages directly instead;
         // this preserves the authored spline, repeat, and quaternion mode and
         // does not blend across CamShots or add a native-only smoothing pass.
-        Gameplay::CameraKey sampled = shot.positions.front();
-        const float authored_frame = first_frame + source_frame;
+        Gameplay::CameraKey sampled = positions.front();
+        const float authored_frame = authored_path_frame;
         if (!shot.path_source_translation_page.empty()) {
             const auto eye = sample_rnd_transanim_trans_keys(
                 shot.path_source_translation_page, authored_frame,
@@ -24531,9 +24916,11 @@ std::vector<Gameplay::CameraKey> regular_camera_path_keys(
                 last_motion_sample = report_key;
                 std::fprintf(
                     stderr,
-                    "[camera-motion] sampled shot=%s local=%.3f authored=%.3f eye=(%.3f %.3f %.3f)\n",
+                    "[camera-motion] sampled shot=%s local=%.3f authored=%.3f eye=(%.3f %.3f %.3f) duration=%.3f path_end=%.3f path_ease=%.3f mapping=%s\n",
                     shot.name.c_str(), source_frame, authored_frame,
-                    sampled.eye[0], sampled.eye[1], sampled.eye[2]);
+                    sampled.eye[0], sampled.eye[1], sampled.eye[2],
+                    source_camshot_duration_frames(shot), path_end_frame,
+                    shot.path_ease, shot.has_legacy_path_ease ? "GH2_duration" : "legacy_raw");
             }
         }
         sampled.source_path_local_frame = source_frame;
@@ -24547,14 +24934,57 @@ std::vector<Gameplay::CameraKey> regular_camera_path_keys(
                 sampled.path_pose_span[axis] = shape.span[axis];
             sampled.has_path_pose_span = true;
         }
+        if (shot.has_legacy_path_ease && !shot.source_camshot_keyframes.empty()) {
+            // The path replaces the transform inside EACH BuildTransform;
+            // GetKey still selects the CamShot's outgoing/incoming settings.
+            // The old single sampled record froze FOV, target and screen offset
+            // at key 0 and skipped the first-offset * path composition.
+            const auto rows_for_key = [](const Gameplay::CameraKey& key) {
+                return ghogx::camera::CameraAffineRows{
+                    camera_key_local_source_x(key), camera_key_local_forward(key),
+                    camera_key_local_up(key),
+                    std::array<float, 3>{key.eye[0], key.eye[1], key.eye[2]}};
+            };
+            auto path_rows = rows_for_key(sampled);
+            if (sampled.has_path_scale) {
+                for (int row = 0; row < 3; ++row)
+                    for (float& value : path_rows[row])
+                        value *= sampled.path_scale[row];
+            }
+            const auto composed = ghogx::camera::source_path_transform(
+                rows_for_key(shot.source_camshot_keyframes.front()), path_rows);
+            auto frames = regular_camera_source_frame_keys(
+                shot, song_time, start_time, chart);
+            for (auto& key : frames) {
+                for (int axis = 0; axis < 3; ++axis) {
+                    key.source_x[axis] = composed[0][axis];
+                    key.forward[axis] = composed[1][axis];
+                    key.up[axis] = composed[2][axis];
+                    key.eye[axis] = composed[3][axis];
+                }
+                key.has_quat = false;
+                key.has_basis = true;
+                // Parent composition belongs to the selected CamShotFrame.
+                // Generated rows are already world-space and bypass it.
+                key.has_generated_source_rows = false;
+                key.source_path_local_frame = source_frame;
+                key.source_path_first_frame = first_frame;
+                key.source_path_authored_frame = authored_frame;
+                key.source_path_submitted_frame = now_frame;
+                key.has_source_path_frame_mapping = true;
+                key.path_anim = shot.path_anim;
+                key.has_path_anim = true;
+            }
+            return frames;
+        }
         return {std::move(sampled)};
     }
-    for (auto key : shot.positions) {
+    for (auto key : positions) {
         const float authored_frame = key.frame;
         key.source_path_local_frame = source_frame;
         key.source_path_first_frame = first_frame;
         key.source_path_authored_frame = authored_frame;
-        key.frame = now_frame + ((authored_frame - first_frame) - source_frame);
+        key.frame = now_frame + (authored_frame - authored_path_frame);
         key.source_path_submitted_frame = key.frame;
         key.has_source_path_frame_mapping = true;
         if (shape.has_sample) {
@@ -24745,72 +25175,18 @@ struct CameraSourceQuat {
 
 CameraSourceQuat camera_source_quat_from_transform(
     const std::array<float, 16>& m) {
-    // Hmx::Matrix3's row-vector rotation is the transpose of the common
-    // column-vector matrix used by the usual matrix-to-quaternion formula.
-    const float r00 = m[0], r01 = m[4], r02 = m[8];
-    const float r10 = m[1], r11 = m[5], r12 = m[9];
-    const float r20 = m[2], r21 = m[6], r22 = m[10];
-    CameraSourceQuat q;
-    const float trace = r00 + r11 + r22;
-    if (trace > 0.0f) {
-        const float s = std::sqrt(trace + 1.0f) * 2.0f;
-        q.w = 0.25f * s;
-        q.x = (r21 - r12) / s;
-        q.y = (r02 - r20) / s;
-        q.z = (r10 - r01) / s;
-    } else if (r00 > r11 && r00 > r22) {
-        const float s = std::sqrt(1.0f + r00 - r11 - r22) * 2.0f;
-        q.w = (r21 - r12) / s;
-        q.x = 0.25f * s;
-        q.y = (r01 + r10) / s;
-        q.z = (r02 + r20) / s;
-    } else if (r11 > r22) {
-        const float s = std::sqrt(1.0f + r11 - r00 - r22) * 2.0f;
-        q.w = (r02 - r20) / s;
-        q.x = (r01 + r10) / s;
-        q.y = 0.25f * s;
-        q.z = (r12 + r21) / s;
-    } else {
-        const float s = std::sqrt(1.0f + r22 - r00 - r11) * 2.0f;
-        q.w = (r10 - r01) / s;
-        q.x = (r02 + r20) / s;
-        q.y = (r12 + r21) / s;
-        q.z = 0.25f * s;
-    }
-    const float len = std::sqrt(q.x * q.x + q.y * q.y + q.z * q.z +
-                                q.w * q.w);
-    if (!std::isfinite(len) || len <= 0.000001f) return {};
-    q.x /= len;
-    q.y /= len;
-    q.z /= len;
-    q.w /= len;
-    return q;
+    const auto q = ghogx::camera::quat_from_row_matrix(
+        {{{m[0], m[1], m[2]}, {m[4], m[5], m[6]}, {m[8], m[9], m[10]}}});
+    return {q[0], q[1], q[2], q[3]};
 }
 
 std::array<float, 16> camera_source_transform_from_quat_and_position(
     const CameraSourceQuat& q,
     const std::array<float, 3>& position) {
-    const float xx = q.x * q.x;
-    const float yy = q.y * q.y;
-    const float zz = q.z * q.z;
-    const float xy = q.x * q.y;
-    const float xz = q.x * q.z;
-    const float yz = q.y * q.z;
-    const float xw = q.x * q.w;
-    const float yw = q.y * q.w;
-    const float zw = q.z * q.w;
-    return {1.0f - 2.0f * yy - 2.0f * zz,
-            2.0f * xy + 2.0f * zw,
-            2.0f * xz - 2.0f * yw,
-            0.0f,
-            2.0f * xy - 2.0f * zw,
-            1.0f - 2.0f * zz - 2.0f * xx,
-            2.0f * yz + 2.0f * xw,
-            0.0f,
-            2.0f * xz + 2.0f * yw,
-            2.0f * yz - 2.0f * xw,
-            1.0f - 2.0f * xx - 2.0f * yy,
-            0.0f,
+    const auto m = ghogx::camera::row_matrix_from_quat({q.x, q.y, q.z, q.w});
+    return {m[0][0], m[0][1], m[0][2], 0.0f,
+            m[1][0], m[1][1], m[1][2], 0.0f,
+            m[2][0], m[2][1], m[2][2], 0.0f,
             position[0], position[1], position[2], 1.0f};
 }
 
@@ -24818,31 +25194,16 @@ std::array<float, 16> camera_source_interp_transform(
     const std::array<float, 16>& from,
     const std::array<float, 16>& to,
     float t) {
-    if (t <= 0.0f) return from;
-    if (t >= 1.0f) return to;
+    // 2DA808 performs Matrix3 -> Quat -> Matrix3 even at exactly 0 and 1.
     const std::array<float, 3> position = {
         from[12] + (to[12] - from[12]) * t,
         from[13] + (to[13] - from[13]) * t,
         from[14] + (to[14] - from[14]) * t};
     const CameraSourceQuat a = camera_source_quat_from_transform(from);
     const CameraSourceQuat b = camera_source_quat_from_transform(to);
-    const float dot = a.x * b.x + a.y * b.y + a.z * b.z + a.w * b.w;
-    const float b_sign = dot < 0.0f ? -1.0f : 1.0f;
-    CameraSourceQuat out{
-        a.x + (b.x * b_sign - a.x) * t,
-        a.y + (b.y * b_sign - a.y) * t,
-        a.z + (b.z * b_sign - a.z) * t,
-        a.w + (b.w * b_sign - a.w) * t};
-    const float len = std::sqrt(out.x * out.x + out.y * out.y +
-                                out.z * out.z + out.w * out.w);
-    if (std::isfinite(len) && len > 0.000001f) {
-        out.x /= len;
-        out.y /= len;
-        out.z /= len;
-        out.w /= len;
-    } else {
-        out = a;
-    }
+    const auto q = ghogx::camera::interp_quat(
+        {a.x, a.y, a.z, a.w}, {b.x, b.y, b.z, b.w}, t);
+    const CameraSourceQuat out{q[0], q[1], q[2], q[3]};
     return camera_source_transform_from_quat_and_position(out, position);
 }
 
@@ -24894,15 +25255,9 @@ CameraSourceFrameTargetCache camera_update_frame_target_cache_like_source(
         if (!frame_state.has_filtered_target) {
             frame_state.filtered_target = cache.update.centroid;
             frame_state.has_filtered_target = true;
-        } else if (filter_step >= 1.0f) {
-            frame_state.filtered_target = cache.update.centroid;
-        } else if (filter_step > 0.0f) {
-            for (int axis = 0; axis < 3; ++axis) {
-                frame_state.filtered_target[axis] +=
-                    (cache.update.centroid[axis] -
-                     frame_state.filtered_target[axis]) * filter_step;
-            }
         }
+        frame_state.filtered_target = ghogx::camera::target_filter_blend(
+            frame_state.filtered_target, cache.update.centroid, filter_step);
         cache.last_target_pos = frame_state.filtered_target;
         builder_state->has_filtered_target = true;
         builder_state->filtered_target = frame_state.filtered_target;
@@ -24911,17 +25266,24 @@ CameraSourceFrameTargetCache camera_update_frame_target_cache_like_source(
         if (!frame_state.has_filtered_parent) {
             frame_state.filtered_parent = cache.update.parent_world;
             frame_state.has_filtered_parent = true;
+        }
+        const float shot_filter = filter_key.has_shot_filter
+                                      ? filter_key.shot_filter
+                                      : kCamShotSourceDefaultFilter;
+        if (!std::isfinite(shot_filter) || shot_filter == 0.0f) {
+            frame_state.filtered_parent = cache.update.parent_world;
         } else {
-            const float shot_filter = filter_key.has_shot_filter
-                                          ? filter_key.shot_filter
-                                          : kCamShotSourceDefaultFilter;
-            if (!std::isfinite(shot_filter) || shot_filter == 0.0f) {
-                frame_state.filtered_parent = cache.update.parent_world;
-            } else if (filter_step > 0.0f) {
-                frame_state.filtered_parent = camera_source_interp_transform(
-                    frame_state.filtered_parent, cache.update.parent_world,
-                    filter_step);
-            }
+            // UpdateTarget seeds the cache; it does not skip BuildTransform.
+            // 267400..267410 interpolates rotation even at product zero.
+            const auto& old = frame_state.filtered_parent;
+            const auto& live = cache.update.parent_world;
+            const auto position = ghogx::camera::target_filter_blend(
+                {old[12], old[13], old[14]}, {live[12], live[13], live[14]},
+                filter_step);
+            frame_state.filtered_parent = camera_source_interp_transform(
+                old, live, filter_step);
+            for (int axis = 0; axis < 3; ++axis)
+                frame_state.filtered_parent[12 + axis] = position[axis];
         }
         cache.last_parent_pos = frame_state.filtered_parent;
     }
@@ -25102,6 +25464,142 @@ void camera_apply_camshot_shake_boundary_like_source(
     cam.shake_max_angular_offset[1] = max_angular_offset_y;
 }
 
+struct CameraSourceShakeResult {
+    bool state_available = false;
+    bool impulse_applied = false;
+    std::array<float, 3> translation = {0.0f, 0.0f, 0.0f};
+    std::array<float, 3> euler = {0.0f, 0.0f, 0.0f};
+};
+
+float camera_source_vec3_length(const std::array<float, 3>& v) {
+    return std::sqrt(v[0] * v[0] + v[1] * v[1] + v[2] * v[2]);
+}
+
+void camera_source_shake_spring(
+    const std::array<float, 3>& target,
+    std::array<float, 3>& output,
+    std::array<float, 3>& velocity) {
+    ghogx::camera::source_shake_spring_step(target, output, velocity);
+}
+
+std::array<std::array<float, 3>, 3>
+camera_source_make_euler_rotation(const std::array<float, 3>& euler) {
+    return ghogx::camera::source_euler_rotation(euler);
+}
+
+CameraSourceShakeResult camera_apply_camshot_shake_like_source(
+    CameraResultRows& rows,
+    CameraResultBuilderState* state,
+    float frequency,
+    float amplitude,
+    float max_angular_offset_x,
+    float max_angular_offset_y) {
+    CameraSourceShakeResult result;
+    if (!state) return result;
+    result.state_available = true;
+
+    const float safe_frequency =
+        std::isfinite(frequency) ? frequency : 0.0f;
+    const float safe_amplitude =
+        std::isfinite(amplitude) ? amplitude : 0.0f;
+    constexpr float kDegreesToRadians = 0.01745329238474369f;
+    constexpr float kTwoPi = 6.2831854820251465f;
+    constexpr float kHalfPi = 1.5707963705062866f;
+    const std::array<float, 2> max_angular = {
+        (std::isfinite(max_angular_offset_x) ? max_angular_offset_x : 0.0f) *
+            kDegreesToRadians,
+        (std::isfinite(max_angular_offset_y) ? max_angular_offset_y : 0.0f) *
+            kDegreesToRadians};
+
+    CameraSourceRand& random = camera_selection_random();
+    if (random.unit_float() < safe_frequency) {
+        result.impulse_applied = true;
+        const float angle = random.float_range(0.0f, kTwoPi);
+        const float magnitude =
+            ghogx::camera::ee_mul(random.unit_float(), safe_amplitude);
+        const float lateral = ghogx::camera::ee_mul(
+            ghogx::camera::source_sine(
+                ghogx::camera::ee_add(angle, kHalfPi)),
+            magnitude);
+        state->shake_translation_target[0] = ghogx::camera::ee_add(
+            state->shake_translation_target[0], lateral);
+        state->shake_translation_target[1] = ghogx::camera::ee_add(
+            state->shake_translation_target[1],
+            ghogx::camera::ee_mul(lateral, 0.3330000042915344f));
+        state->shake_translation_target[2] = ghogx::camera::ee_add(
+            state->shake_translation_target[2],
+            ghogx::camera::ee_mul(ghogx::camera::source_sine(angle),
+                                  magnitude));
+        state->shake_angular_target[0] = ghogx::camera::ee_add(
+            state->shake_angular_target[0],
+            random.float_range(-max_angular[0], max_angular[0]));
+        state->shake_angular_target[1] = 0.0f;
+        state->shake_angular_target[2] = ghogx::camera::ee_add(
+            state->shake_angular_target[2],
+            random.float_range(-max_angular[1], max_angular[1]));
+    }
+
+    const float translation_len =
+        camera_source_vec3_length(state->shake_translation_target);
+    const float translation_excess =
+        ghogx::camera::ee_sub(translation_len, safe_amplitude);
+    if (translation_excess > 0.0f && translation_len > 0.000001f) {
+        // This deliberately mirrors retail's reflection-style limiter:
+        // normalize(target) * (amp - (length - amp)), not a conventional
+        // clamp to amp.
+        const float reflected =
+            ghogx::camera::ee_sub(safe_amplitude, translation_excess);
+        for (float& component : state->shake_translation_target) {
+            component = (component / translation_len) * reflected;
+        }
+    }
+    auto reflect_angular_limit = [](float value, float max_value) {
+        const float excess = ghogx::camera::ee_sub(std::abs(value), max_value);
+        if (excess <= 0.0f) return value;
+        return ghogx::camera::ee_add(
+            value, value > 0.0f ? -excess : excess);
+    };
+    state->shake_angular_target[0] = reflect_angular_limit(
+        state->shake_angular_target[0], max_angular[0]);
+    state->shake_angular_target[2] = reflect_angular_limit(
+        state->shake_angular_target[2], max_angular[1]);
+
+    camera_source_shake_spring(state->shake_translation_target,
+                               state->shake_translation_output,
+                               state->shake_translation_velocity);
+    camera_source_shake_spring(state->shake_angular_target,
+                               state->shake_angular_output,
+                               state->shake_angular_velocity);
+    result.translation = state->shake_translation_output;
+    result.euler = state->shake_angular_output;
+
+    const auto source_x = rows.has_source_x
+        ? rows.source_x : camera_cross_axis(rows.forward, rows.up);
+    const auto rotated = ghogx::camera::source_shake_transform(
+        {{source_x, rows.forward, rows.up, rows.position}},
+        result.translation, result.euler);
+    rows.position = rotated[3];
+    rows.source_x = rotated[0];
+    rows.has_source_x = true;
+    rows.right = {-rotated[0][0], -rotated[0][1], -rotated[0][2]};
+    rows.forward = rotated[1];
+    rows.up = rotated[2];
+    rows.source += "+retail_camshot_shake";
+    // GH2 RndCam::UpdatedWorldXfm (0x001B20C8..0x001B21C0) retains this
+    // MakeRotMatrix basis and forms inverse(WorldXfm) * LocalProjectXfm.  A
+    // normalized look-at would erase the executable's small sine-table scale,
+    // so submit the corresponding full-affine D3D camera view. D3D local axes
+    // are renderer-right (-source x), source-up, source-forward.
+    const std::array<float, 16> d3d_camera_world = {
+        rows.right[0], rows.right[1], rows.right[2], 0.0f,
+        rows.up[0], rows.up[1], rows.up[2], 0.0f,
+        rows.forward[0], rows.forward[1], rows.forward[2], 0.0f,
+        rows.position[0], rows.position[1], rows.position[2], 1.0f};
+    rows.custom_view = mat4_affine_inverse_game(d3d_camera_world);
+    rows.has_custom_view = true;
+    return result;
+}
+
 std::optional<std::array<float, 3>> camera_entity_only_target_alias_centroid(
     const Gameplay::CameraKey& key,
     const std::unordered_map<std::string, CameraTarget>& targets,
@@ -25214,34 +25712,33 @@ std::vector<std::string> camera_resolved_target_signature_for_key(
     const Gameplay::CameraKey& key,
     const std::unordered_map<std::string, CameraTarget>& targets) {
     std::vector<std::string> refs;
+    const auto append = [&](std::string_view entity, std::string_view subpart,
+                            std::string_view source_object) {
+        const auto id = camera_resolved_target_id_for_ref(
+            entity, subpart, source_object, targets);
+        // Null resolution is still an identity; don't collapse its slot.
+        // Preserve the subpart symbol even when two symbols resolve to the
+        // same transform, as the source compares ObjPtr and symbol separately.
+        refs.push_back(id.value_or("") + "\x1f" + std::string(subpart));
+    };
     if (!key.target_refs.empty()) {
         refs.reserve(key.target_refs.size());
         for (const auto& ref : key.target_refs) {
-            if (auto id = camera_resolved_target_id_for_ref(
-                    ref.entity, ref.subpart, ref.source_object, targets)) {
-                refs.push_back(std::move(*id));
-            }
+            append(ref.entity, ref.subpart, ref.source_object);
         }
     } else if (!key.target_entity.empty() || !key.target_subpart.empty() ||
                !key.target_source_object.empty()) {
-        if (auto id = camera_resolved_target_id_for_ref(
-                key.target_entity, key.target_subpart,
-                key.target_source_object, targets)) {
-            refs.push_back(std::move(*id));
-        }
+        append(key.target_entity, key.target_subpart, key.target_source_object);
     }
-    // CamShotFrame::SameTargets walks the resolved target list; two frames with
-    // the same objects in different authored order must stay in the non-same
-    // target branch.
     return refs;
 }
 
 bool camera_targets_match_like_camshot(const Gameplay::CameraKey& a,
                                        const Gameplay::CameraKey& b,
                                        const std::unordered_map<std::string, CameraTarget>& targets) {
-    const auto a_refs = camera_resolved_target_signature_for_key(a, targets);
-    if (a_refs.empty()) return false;
-    return a_refs == camera_resolved_target_signature_for_key(b, targets);
+    return ghogx::camera::same_target_identities(
+        camera_resolved_target_signature_for_key(a, targets),
+        camera_resolved_target_signature_for_key(b, targets));
 }
 
 std::optional<std::array<float, 16>> camera_parent_world_for_key(
@@ -25435,11 +25932,36 @@ void camera_authored_up_for_key(
     out[2] = 1.0f;
 }
 
+// Lower only an explicit source exists/else policy. In particular, the
+// ordinary SubPart resolver's entity-root fallback must not satisfy exists.
+void camera_apply_reference_fallbacks(
+    Gameplay::CameraKey& key,
+    const std::unordered_map<std::string, CameraTarget>& targets) {
+    auto use_fallback = [&](const std::string& fallback, std::string& entity,
+                            std::string& part, std::string& source_object) {
+        const auto selected = ghogx::camera::reference_fallback(entity, part, fallback,
+            [&](std::string_view object, std::string_view member) {
+                return camera_resolved_direct_object_id(object, member, targets).has_value();
+            });
+        if (!selected) return false;
+        entity = selected->first;
+        part = selected->second;
+        source_object.clear();
+        return true;
+    };
+    if (use_fallback(key.camera_target_fallback, key.target_entity,
+                     key.target_subpart, key.target_source_object)) {
+        key.target_refs = {{key.target_entity, key.target_subpart, {}}};
+    }
+    use_fallback(key.camera_parent_fallback, key.parent_entity,
+                 key.parent_subpart, key.parent_source_object);
+}
+
 void apply_camera_keys(
     ghogx::render::OrbitCamera& cam,
     const std::vector<Gameplay::CameraKey>& keys,
     double song_time,
-    const std::unordered_map<std::string, CameraTarget>& targets = {},
+    const std::unordered_map<std::string, CameraTarget>& input_targets = {},
     CameraResultBuilderState* result_builder_state = nullptr,
     const std::map<std::string, std::array<float, 16>>* venue_targets =
         nullptr,
@@ -25447,12 +25969,16 @@ void apply_camera_keys(
     const std::vector<Gameplay::CameraKey>* source_record_key_table = nullptr,
     float source_setframe_blend = 1.0f,
     const CameraVenueCrowdBoundsProof* venue_crowd_bounds = nullptr,
-    std::string* source_debug_reported_key = nullptr) {
+    std::string* source_debug_reported_key = nullptr,
+    ghogx::camera::Gh1CameraHelper* gh1_helper = nullptr) {
     if (keys.empty()) {
         camera_unset_dof_proc_like_source(cam);
         camera_unset_shake_like_no_current_camshot(cam);
         return;
     }
+    std::optional<std::unordered_map<std::string, CameraTarget>> helper_targets;
+    if (keys.front().has_gh1_helper) helper_targets = input_targets;
+    const auto& targets = helper_targets ? *helper_targets : input_targets;
     const float source_poll_blend =
         std::isfinite(source_setframe_blend)
             ? std::clamp(source_setframe_blend, 0.0f, 1.0f)
@@ -25472,9 +25998,95 @@ void apply_camera_keys(
     }
     float t = 0.0f;
     if (b->frame > a->frame) t = (frame - a->frame) / (b->frame - a->frame);
+    if (a->has_source_frame_mapping && b->has_source_frame_mapping) {
+        // Retail GetKey passes its blend directly to Interp. Reconstructing it
+        // from presentation timestamps loses precision after a long song/seek,
+        // especially once ATan easing amplifies the rounding error.
+        t = a->source_frame_key_blend;
+    }
+    // Resolve both outgoing/incoming policies before target-cache updates,
+    // SameTargets, parent composition, and aiming. Stock GH2 keys are untouched.
+    std::optional<Gameplay::CameraKey> resolved_a, resolved_b;
+    if (!a->camera_target_fallback.empty() || !a->camera_parent_fallback.empty()) {
+        resolved_a = *a;
+        camera_apply_reference_fallbacks(*resolved_a, targets);
+        a = &*resolved_a;
+    }
+    if (!b->camera_target_fallback.empty() || !b->camera_parent_fallback.empty()) {
+        resolved_b = *b;
+        camera_apply_reference_fallbacks(*resolved_b, targets);
+        b = &*resolved_b;
+    }
     t = std::clamp(t, 0.0f, 1.0f);
     const float interp_t =
         camshot_blend_ease_t(t, a->blend_ease, a->blend_ease_mode);
+    if (a->has_gh1_helper && b->has_gh1_helper && helper_targets && gh1_helper) {
+        std::vector<std::array<float, 3>> player_heads;
+        // ArenaSinger order is player order, not NPC performer order.
+        for (int player = 0; player < 2; ++player) {
+            const auto head = targets.find(camera_target_id(
+                "guitarist" + std::to_string(player), "bone_head.mesh"));
+            if (head == targets.end()) break;
+            player_heads.push_back(mat4_position_game(head->second.world));
+        }
+        if (player_heads.empty()) {
+            std::fprintf(stderr, "[gh1-camera-helper] missing live player head; retaining camera\n");
+            return;
+        }
+        if (!gh1_helper->player_index)
+            gh1_helper->player_index = static_cast<int>(player_heads.size()) - 1;
+        const bool seeded = !gh1_helper->position;
+        if (seeded) {
+            const auto initial = ghogx::camera::gh1_camera_player_point(
+                player_heads, *gh1_helper->player_index, {});
+            if (!initial) return;
+            gh1_helper->seed(*initial);
+        }
+        gh1_helper->apply_shot_selection(player_heads.size());
+        const auto live = ghogx::camera::gh1_camera_player_point(
+            player_heads, *gh1_helper->player_index, {});
+        if (!live) return;
+        Gameplay::CameraKey project_key = *a;
+        project_key.has_fov = true;
+        project_key.fov = source_previous_fov;
+        const auto projected = camera_project_target_screen_norm(
+            camera_result_rows_from_source_frame(source_previous_frame), project_key, *live,
+            true); // GH1 RndCam::UpdateWorld normalizes before transposing.
+        std::array<float, 2> desired{};
+        desired[0] = (a->screen_offset[0] + (b->screen_offset[0]-a->screen_offset[0])*interp_t + 1.0f)*0.5f;
+        desired[1] = (1.0f - a->screen_offset[1] - (b->screen_offset[1]-a->screen_offset[1])*interp_t)*0.5f;
+        const float step = projected ? ghogx::camera::gh1_camera_helper_step(
+            a->gh1_helper_filter, *projected, desired) : a->gh1_helper_filter;
+        std::array<float, 3> shake{};
+        for (size_t axis = 0; axis < 3; ++axis)
+            shake[axis] = a->gh1_helper_shake[axis] + (b->gh1_helper_shake[axis]-a->gh1_helper_shake[axis])*interp_t;
+        const auto point = gh1_helper->poll(*live, step, shake);
+        CameraTarget helper_target;
+        for (size_t axis = 0; axis < 3; ++axis) helper_target.world[12+axis] = (*point)[axis];
+        (*helper_targets)[camera_target_id("gh1_camera_helper", "position")] = helper_target;
+        auto bind_helper = [](Gameplay::CameraKey& key) {
+            if (key.gh1_helper_target) {
+                key.target_entity = "gh1_camera_helper";
+                key.target_subpart = "position";
+                key.target_source_object.clear();
+                key.target_refs = {{"gh1_camera_helper", "position", {}}};
+            }
+            if (key.gh1_helper_parent) {
+                key.parent_entity = "gh1_camera_helper";
+                key.parent_subpart = "position";
+                key.parent_source_object.clear();
+                key.use_parent_rotation = false;
+            }
+        };
+        resolved_a = *a; bind_helper(*resolved_a); a = &*resolved_a;
+        resolved_b = *b; bind_helper(*resolved_b); b = &*resolved_b;
+        if (debug_camera_enabled() && (seeded || gh1_helper->poll_count % 60 == 0))
+            std::fprintf(stderr,
+                "[gh1-camera-helper] poll=%zu seeded=%d players=%zu index=%d filter=%.6f step=%.6f live=(%.4f %.4f %.4f) helper=(%.4f %.4f %.4f) shake=(%.4f %.4f %.4f)\n",
+                gh1_helper->poll_count, seeded, player_heads.size(), *gh1_helper->player_index,
+                a->gh1_helper_filter, step, (*live)[0], (*live)[1], (*live)[2],
+                (*point)[0], (*point)[1], (*point)[2], shake[0], shake[1], shake[2]);
+    }
     auto source_calc_frame_prefix =
         [](const Gameplay::CameraKey& source_key) -> const char* {
         return source_key.has_source_frame_mapping ||
@@ -25736,7 +26348,7 @@ void apply_camera_keys(
     auto camera_source_seed_rows_for_runtime =
         [&](const Gameplay::CameraKey& key,
             const std::array<float, 16>* cached_parent_world) {
-            if (venue_targets) {
+            if (venue_targets && env_value("GHOGX_DEBUG_CAMERA_TRACE_SEED")) {
                 if (auto ps2_source_record_rows =
                         camera_ps2_source_record_trace_context_source_seed_rows(
                             *venue_targets, key)) {
@@ -25826,7 +26438,8 @@ void apply_camera_keys(
                 }
             }
         }
-        if (!env_value("GHOGX_CAMERA_DISABLE_TRACE_COMPLETE_WRITER_BRIDGE")) {
+        // Captured rows are evidence, never the default gameplay driver.
+        if (env_value("GHOGX_DEBUG_CAMERA_TRACE_WRITER_BRIDGE")) {
             if (auto writer_rows =
                     camera_trace_complete_writer_bridge_rows(key, targets)) {
                 return {*writer_rows,
@@ -25969,35 +26582,11 @@ void apply_camera_keys(
                 source_screen_offset_filtered_target_candidate =
                     *filtered_candidate;
             }
-            Gameplay::CameraKey build_key_a = *a;
-            build_key_a.has_fov = true;
-            build_key_a.fov = source_screen_offset_fov;
-            Gameplay::CameraKey build_key_b = *b;
-            build_key_b.has_fov = true;
-            build_key_b.fov = source_screen_offset_fov;
-            std::optional<CameraResultRows> same_target_build_rows_a;
-            std::optional<CameraResultRows> same_target_build_rows_b;
-            if (a_target_centroid) {
-                same_target_build_rows_a =
-                    camera_target_list_result_rows_from_seed(
-                        source_seed_a, build_key_a, *a_target_centroid,
-                        nullptr, nullptr, nullptr, false);
-            }
-            if (b_target_centroid) {
-                same_target_build_rows_b =
-                    camera_target_list_result_rows_from_seed(
-                        source_seed_b, build_key_b, *b_target_centroid,
-                        nullptr, nullptr, nullptr, false);
-            }
-            const CameraResultRows& same_target_outgoing_rows =
-                same_target_build_rows_a ? *same_target_build_rows_a
-                                         : source_seed_a;
-            const CameraResultRows& same_target_incoming_rows =
-                same_target_build_rows_b ? *same_target_build_rows_b
-                                         : source_seed_b;
+            // Interp passes !SameTargets as BuildTransform's final argument.
+            // PS2 0x267550 skips BOTH LookAt and screen translation when false;
+            // only the authored/parent/path transforms may be blended here.
             CameraResultRows same_target_pre_lookat_result =
-                camera_lerp_result_rows(same_target_outgoing_rows,
-                                        same_target_incoming_rows, interp_t);
+                camera_lerp_result_rows(source_seed_a, source_seed_b, interp_t);
             same_target_pre_lookat_result.source =
                 "source_same_target_pre_lookat_outgoing_incoming_build(" +
                 same_target_pre_lookat_result.source + ")";
@@ -26110,7 +26699,60 @@ void apply_camera_keys(
     camera_apply_camshot_shake_boundary_like_source(
         cam, has_shake_fields, shake_noise_amp, shake_noise_freq,
         max_angular_offset_x, max_angular_offset_y);
+    const CameraSourceShakeResult source_shake =
+        camera_apply_camshot_shake_like_source(
+            submitted_result, result_builder_state, shake_noise_freq,
+            shake_noise_amp, max_angular_offset_x,
+            max_angular_offset_y);
+    if (env_value("GHOGX_LOG_CAMERA_SHAKE_EVERY_FRAME")) {
+        std::fprintf(
+            stderr,
+            "[camera-shake] shot_a=%s shot_b=%s presentation_frame=%.6f "
+            "local_frame_a=%s%.6f local_frame_b=%s%.6f amp=%.9f "
+            "freq=%.9f impulse=%d translation=(%.9f %.9f %.9f) "
+            "translation_target=(%.9f %.9f %.9f) "
+            "translation_velocity=(%.9f %.9f %.9f) "
+            "euler_radians=(%.9f %.9f %.9f) "
+            "angular_target=(%.9f %.9f %.9f) "
+            "angular_velocity=(%.9f %.9f %.9f)\n",
+            a->name.c_str(), b->name.c_str(), frame,
+            source_calc_frame_prefix(*a), source_calc_frame_value(*a),
+            source_calc_frame_prefix(*b), source_calc_frame_value(*b),
+            shake_noise_amp, shake_noise_freq,
+            source_shake.impulse_applied ? 1 : 0,
+            source_shake.translation[0], source_shake.translation[1],
+            source_shake.translation[2],
+            result_builder_state->shake_translation_target[0],
+            result_builder_state->shake_translation_target[1],
+            result_builder_state->shake_translation_target[2],
+            result_builder_state->shake_translation_velocity[0],
+            result_builder_state->shake_translation_velocity[1],
+            result_builder_state->shake_translation_velocity[2],
+            source_shake.euler[0], source_shake.euler[1],
+            source_shake.euler[2],
+            result_builder_state->shake_angular_target[0],
+            result_builder_state->shake_angular_target[1],
+            result_builder_state->shake_angular_target[2],
+            result_builder_state->shake_angular_velocity[0],
+            result_builder_state->shake_angular_velocity[1],
+            result_builder_state->shake_angular_velocity[2]);
+    }
     apply_camera_result_frame(cam, submitted_result);
+    if (env_value("GHOGX_LOG_CAMERA_SUBMITTED_EVERY_FRAME")) {
+        std::fprintf(
+            stderr,
+            "[camera-transform] shot_a=%s shot_b=%s presentation_frame=%.6f local_frame_a=%s%.6f local_frame_b=%s%.6f blend=%.6f position=(%.9f %.9f %.9f) forward=(%.9f %.9f %.9f) up=(%.9f %.9f %.9f) fov=%.9f custom_view=%d source=%s\n",
+            a->name.c_str(), b->name.c_str(), frame,
+            source_calc_frame_prefix(*a), source_calc_frame_value(*a),
+            source_calc_frame_prefix(*b), source_calc_frame_value(*b),
+            source_poll_blend, submitted_result.position[0],
+            submitted_result.position[1], submitted_result.position[2],
+            submitted_result.forward[0], submitted_result.forward[1],
+            submitted_result.forward[2], submitted_result.up[0],
+            submitted_result.up[1], submitted_result.up[2], cam.fov,
+            submitted_result.has_custom_view ? 1 : 0,
+            submitted_result.source.c_str());
+    }
     if (env_value("GHOGX_DEBUG_CAMERA_MOTION") &&
         (a->has_source_path_frame_mapping ||
          b->has_source_path_frame_mapping)) {
@@ -26266,29 +26908,24 @@ void apply_camera_keys(
             submitted_result_from_ps2_trace
                 ? "retained_ps2_trace_payload"
                 : source_build_transform_order
-                ? "retail_Interp_outgoing_incoming_partial_BuildTransform"
+                ? "retail_Interp_outgoing_incoming_BuildTransform"
                 : "native_submitted_seed_or_path";
         const char* hidden_pose_boundary =
             submitted_result_from_ps2_trace
                 ? "retained_ps2_trace_payload"
                 : source_build_transform_order
-                ? "CamShotFrame::BuildTransform_remaining_math"
-                : "CamShotFrame::BuildTransform_remaining_math/path_composition";
+                ? "CamShotFrame::BuildTransform_recovered"
+                : "source_path_or_seed_transform_recovered";
         const char* source_pose_impl_tier =
             camera_source_pose_impl_tier(submitted_result_from_ps2_trace,
                                          source_build_transform_order);
         const char* source_pose_required_body =
             camera_source_pose_required_body(submitted_result_from_ps2_trace,
                                              source_build_transform_order);
-        const bool charwalk_gate_active =
-            camera_source_guitarist0_actually_walking();
         const std::string active_hidden_gameplay_blockers =
-            camera_hidden_gameplay_blockers(!submitted_result_from_ps2_trace,
-                                            false, false,
-                                            charwalk_gate_active);
+            camera_hidden_gameplay_blockers();
         const std::string deferred_hidden_gameplay_blockers =
-            camera_deferred_gameplay_blockers(false, false,
-                                              charwalk_gate_active);
+            camera_deferred_gameplay_blockers();
         const char* active_blocker_scope =
             submitted_result_from_ps2_trace
                 ? "selection_only_retained_pose"
@@ -26376,10 +27013,19 @@ void apply_camera_keys(
             "source_order=after_SetFrame_blend_before_SetLocalXfm shot_a=%s shot_b=%s "
             "local_frame=%.3f key_blend=%.3f eased_key_blend=%.3f active=%d "
             "amp=%.3f freq=%.3f max_ang=(%.3f %.3f) source_outputs=output,eulerOutput "
-            "rb2_dump=locals_only native_motion=not_synthesized freecam_priority=deferred_last freecam_affects_gameplay=0\n",
+            "native_body=GH2_SLUS_214.47_0x00262f38_0x00263408 "
+            "random_source=GH2_Rand_0x002d9b10_0x002d9c60 seed=0x29a "
+            "state_available=%d impulse=%d translation=(%.6f %.6f %.6f) "
+            "euler_radians=(%.6f %.6f %.6f) motion=source_recovered "
+            "freecam_priority=deferred_last freecam_affects_gameplay=0\n",
             a->name.c_str(), b->name.c_str(), frame, t, interp_t,
             cam.shake_active ? 1 : 0, shake_noise_amp, shake_noise_freq,
-            max_angular_offset_x, max_angular_offset_y);
+            max_angular_offset_x, max_angular_offset_y,
+            source_shake.state_available ? 1 : 0,
+            source_shake.impulse_applied ? 1 : 0,
+            source_shake.translation[0], source_shake.translation[1],
+            source_shake.translation[2], source_shake.euler[0],
+            source_shake.euler[1], source_shake.euler[2]);
         std::fprintf(
             stderr,
             "[world] camera UpdateTarget: pipeline_scope=normal_gameplay_camera priority=gameplay_camera source_class=CamShotFrame "
@@ -27552,7 +28198,7 @@ void apply_camera_keys(
         const char* under_venue_source_fix_required =
             !under_venue_concern
                 ? "none"
-                : "recover_remaining_BuildTransform_or_shot_selection";
+                : "review_authored_pose_or_shared_selection_state";
         const char* source_pose_branch =
             !source_has_any_targets
                 ? "NoTargets:BuildTransform(applyScreenOffset=1)"
@@ -27670,13 +28316,13 @@ void apply_camera_keys(
             source_filter_state_source,
             source_screen_offset_filtered_target_candidate ? "diagnostic_only"
                                                            : "none",
-            "gh2_ps2_partial_body_frame_pair_and_path_contract",
+            "gh2_ps2_full_body_frame_pair_and_path_contract",
             kCamShotBuildTransformAuditStatus,
             "parent,targetPos,targetScreenPos,filter,iframe,"
             "LinearInterpolator,ATanInterpolator,parentPos,target,height,"
             "targetDist,v",
             kCamShotLocalProjectSource, kCamShotLocalProjectAuditStatus,
-            kCamShotSourceFrustumAspect,
+            camera_source_frustum_aspect(),
             kCamShotUpdateLocalAuditStatus,
             kCamShotUpdateLocalSourceSearch,
             kCamShotUpdateLocalYRatioOwner,
@@ -27702,7 +28348,7 @@ void apply_camera_keys(
                 ? submitted_vs_crowd_min_z
                 : 0.0f,
             under_venue_concern ? 1 : 0, under_venue_basis,
-            under_venue_concern ? "under_venue_open" : "none",
+            under_venue_concern ? "under_venue_diagnostic" : "none",
             under_venue_source_fix_required,
             result_filter_state_seeded ? 1 : 0, result_filter_step,
             result_filter_projected_delta,
@@ -27761,7 +28407,7 @@ void apply_camera_keys(
             same_target_axis_proof
                 ? same_target_axis_proof->local_project_tan_y
                 : 0.0f,
-            kCamShotSourceYRatio,
+            1.0f / camera_source_frustum_aspect(),
             same_target_axis_proof ? "" : "none/",
             same_target_axis_proof ? same_target_axis_proof->right_offset
                                    : 0.0f,
@@ -28088,6 +28734,43 @@ FretPositionState current_fret_position_state(
                   std::clamp(chosen->spot_index, 1, 20));
     state.spot_name = name;
     return state;
+}
+
+bool camera_authored_parent_dependencies_resolved(
+    const Gameplay::CameraKey& shot,
+    const std::unordered_map<std::string, CameraTarget>& targets,
+    std::string* unresolved_parent = nullptr) {
+    // Retail CamShot ObjPtrs are guaranteed by the loaded world/character
+    // package.  Loose DLC can violate that asset invariant; treating a local
+    // parent-relative pose as world space then puts the camera inside geometry.
+    // Validate the same authored references at the package boundary instead of
+    // inventing collision, angle, venue, character, or shot-specific repairs.
+    auto frame_parent_resolved = [&](const Gameplay::CameraKey& frame) {
+        const bool has_authored_parent =
+            !frame.parent_entity.empty() || !frame.parent_subpart.empty() ||
+            !frame.parent_source_object.empty();
+        if (!has_authored_parent || camera_parent_for_key(frame, targets)) {
+            return true;
+        }
+        if (unresolved_parent && unresolved_parent->empty()) {
+            *unresolved_parent = frame.parent_entity;
+            if (!frame.parent_subpart.empty()) {
+                if (!unresolved_parent->empty()) unresolved_parent->append(":");
+                unresolved_parent->append(frame.parent_subpart);
+            }
+            if (!frame.parent_source_object.empty()) {
+                unresolved_parent->append(" source_object=");
+                unresolved_parent->append(frame.parent_source_object);
+            }
+        }
+        return false;
+    };
+
+    if (!frame_parent_resolved(shot)) return false;
+    for (const auto& frame : source_camshot_timing_frames(shot)) {
+        if (!frame_parent_resolved(frame)) return false;
+    }
+    return true;
 }
 
 std::string current_hand_map_name(
@@ -29835,6 +30518,8 @@ Gameplay::~Gameplay() {
 bool Gameplay::load_song(const std::string& hdr_path, const std::string& ark_path,
                           const std::string& shortname, int difficulty) {
     chart_loaded_ = false;
+    audio_master_time_ = 0.0;
+    intro_presentation_time_ = 0.0;
     song_time_    = 0.0;
     song_started_ = false;
     song_presentation_ready_ = false;
@@ -29904,6 +30589,7 @@ bool Gameplay::load_song(const std::string& hdr_path, const std::string& ark_pat
     g_camera_source_guitarist0_charwalk_state =
         CameraSourceCharWalkState::kStateNone;
     g_camera_source_guitarist0_charwalk_clip_active = false;
+    g_camera_source_guitarist0_state = {};
     highway_.reset();
     world_init_attempted_ = false;
     quickplay_rig_.reset();
@@ -29913,6 +30599,7 @@ bool Gameplay::load_song(const std::string& hdr_path, const std::string& ark_pat
     facefx_animation_.reset();
     camera_keys_.clear();
     regular_camera_keys_.clear();
+    gh1_arena_spot_route_active_ = false;
     source_intro_camera_previous_ = CameraKey{};
     has_source_intro_camera_previous_ = false;
     regular_camera_source_record_member_table_.clear();
@@ -29966,6 +30653,7 @@ bool Gameplay::load_song(const std::string& hdr_path, const std::string& ark_pat
     camera_shot_counter_ = 0;
     camera_normal_category_cursor_ = 0;
     camera_result_builder_state_.reset();
+    gh1_camera_helper_.reset();
     active_force_char_lod_ = -1;
     source_game_lost_camera_dispatched_ = false;
     source_game_won_message_dispatched_ = false;
@@ -30191,6 +30879,7 @@ bool Gameplay::load_song(const std::string& hdr_path, const std::string& ark_pat
     next_drum_cue_idx_ = 0;
     next_bass_cue_idx_ = 0;
     next_venue_cue_idx_ = 0;
+    next_music_start_event_idx_ = 0;
     next_section_venue_event_idx_ = 0;
 
     if (hdr_path.empty() || ark_path.empty()) {
@@ -30288,6 +30977,35 @@ bool Gameplay::load_song(const std::string& hdr_path, const std::string& ark_pat
                          ? authored_song_rig_
                          : resolve_quickplay_rig(hdr_path, ark_path,
                                                  shortname);
+    if (quickplay_rig_) {
+        for (std::string& member : quickplay_rig_->band) {
+            const std::string source = member;
+            if (!preferred_bassist_.empty() &&
+                source.find("bass") != std::string::npos)
+                member = preferred_bassist_;
+            else if (!preferred_drummer_.empty() &&
+                     source.find("drummer") != std::string::npos)
+                member = preferred_drummer_;
+            else if (!preferred_keyboardist_.empty() &&
+                     source.find("keyboard") != std::string::npos)
+                member = preferred_keyboardist_;
+            else if (!preferred_female_singer_.empty() &&
+                     source.find("female_singer") != std::string::npos)
+                member = preferred_female_singer_;
+            else if (!preferred_male_singer_.empty() &&
+                     source.find("singer") != std::string::npos)
+                member = preferred_male_singer_;
+        }
+        std::fprintf(
+            stderr,
+            "[world] Manage Band backing preferences: bass=%s drums=%s "
+            "keys=%s male=%s female=%s\n",
+            preferred_bassist_.empty() ? "<authored>" : preferred_bassist_.c_str(),
+            preferred_drummer_.empty() ? "<authored>" : preferred_drummer_.c_str(),
+            preferred_keyboardist_.empty() ? "<authored>" : preferred_keyboardist_.c_str(),
+            preferred_male_singer_.empty() ? "<authored>" : preferred_male_singer_.c_str(),
+            preferred_female_singer_.empty() ? "<authored>" : preferred_female_singer_.c_str());
+    }
     if (quickplay_rig_ && !authored_song_source_game_.empty()) {
         std::fprintf(stderr,
                      "[world] loose song runtime: source=%s midi=%s audio=%s\n",
@@ -31280,6 +31998,7 @@ void Gameplay::destroy_camera_manager_like_source(const char* context) {
     active_camera_shots_over_.clear();
     active_camera_skip_next_crowd_update_ = false;
     camera_result_builder_state_.reset();
+    gh1_camera_helper_.reset();
     active_force_char_lod_ = -1;
 
     if (debug_camera_enabled() || debug_venue_filters_enabled()) {
@@ -31719,6 +32438,7 @@ void Gameplay::set_diagnostic_camera_random_seed(int seed) {
 
 std::string Gameplay::camera_source_guitarist0_nearest_walkspot() const {
     const bool has_gh1_walk_spot =
+        gh1_arena_spot_route_active_ &&
         std::any_of(venue_camera_target_worlds_.begin(),
                     venue_camera_target_worlds_.end(),
                     [](const auto& target) {
@@ -31748,6 +32468,35 @@ std::string Gameplay::camera_source_guitarist0_nearest_walkspot() const {
     float best_dist2 = std::numeric_limits<float>::max();
     size_t decoded_waypoints = 0;
     size_t candidate_count = 0;
+
+    // GH1 camera.dtb bad_walk_spots indexes Arena::walk_spots.  CharSys's
+    // retail get_spot query compares the actor against that vector directly;
+    // it never compares the generated GH2 start Waypoint which may occupy the
+    // same location.  Prefer the decoded logical vector whenever it exists so
+    // a coincident start_guitarist0.way cannot mask an authored rejection.
+    if (has_gh1_walk_spot) {
+        for (const auto& target : venue_camera_target_worlds_) {
+            if (!starts_with(target.first, "gh1_walk_spot_")) continue;
+            ++candidate_count;
+            const float dx = target.second[12] - px;
+            const float dy = target.second[13] - py;
+            const float dz = target.second[14] - pz;
+            const float dist2 = dx * dx + dy * dy + dz * dz;
+            if (best_name.empty() || dist2 < best_dist2) {
+                best_name = target.first;
+                best_dist2 = dist2;
+            }
+        }
+        if (debug_camera_enabled() || debug_venue_filters_enabled()) {
+            std::fprintf(
+                stderr,
+                "[world] camera current_walkspot: source_call=CharSys::get_spot source_container=Arena::walk_spots metric=native_world_position_distance2 actor=guitarist0 position=(%.3f %.3f %.3f) result=%s distance2=%.3f candidate_count=%zu\n",
+                px, py, pz, best_name.c_str(),
+                best_name.empty() ? 0.0f : best_dist2, candidate_count);
+        }
+        return best_name;
+    }
+
     for (const auto& waypoint : venue_chars_scene_.waypoints) {
         if (!waypoint.decoded) continue;
         ++decoded_waypoints;
@@ -31759,18 +32508,6 @@ std::string Gameplay::camera_source_guitarist0_nearest_walkspot() const {
         const float dist2 = dx * dx + dy * dy + dz * dz;
         if (best_name.empty() || dist2 < best_dist2) {
             best_name = waypoint.name;
-            best_dist2 = dist2;
-        }
-    }
-    for (const auto& target : venue_camera_target_worlds_) {
-        if (!starts_with(target.first, "gh1_walk_spot_")) continue;
-        ++candidate_count;
-        const float dx = target.second[12] - px;
-        const float dy = target.second[13] - py;
-        const float dz = target.second[14] - pz;
-        const float dist2 = dx * dx + dy * dy + dz * dz;
-        if (best_name.empty() || dist2 < best_dist2) {
-            best_name = target.first;
             best_dist2 = dist2;
         }
     }
@@ -32207,6 +32944,7 @@ void Gameplay::start_camera_shot_runtime(const CameraKey& key,
     const bool skip_script_crowd_update =
         active_camera_skip_next_crowd_update_;
     end_camera_shot_runtime(skip_script_crowd_update, false);
+    if (key.has_gh1_helper) gh1_camera_helper_.begin_shot(key.name);
     active_camera_runtime_shot_ = runtime_name;
     active_camera_native_current_shot_ = runtime_name;
     active_camera_source_current_rndcam_ = "PanelDir::mCam";
@@ -32257,7 +32995,7 @@ void Gameplay::start_camera_shot_runtime(const CameraKey& key,
             !active_camera_postprocess_ref_.empty();
         std::fprintf(
             stderr,
-            "[world] camera start_shot postprocess: source_script=world/camshot.dta source_platform=HX_XBOX source_lifecycle_recovered=RndPostProc::Select/Reset shot=%s postprocess=%s source_call=%s action=%s result=%s active_postprocess=%s postproc_overrides=%zu render_effect=postprocessor_pipeline_deferred\n",
+            "[world] camera start_shot postprocess: source_script=world/camshot.dta source_platform=HX_XBOX source_lifecycle_recovered=RndPostProc::Select/Reset shot=%s postprocess=%s source_call=%s action=%s result=%s active_postprocess=%s postproc_overrides=%zu ps2_runtime_effect=not_applicable_HX_XBOX_only\n",
             active_camera_runtime_shot_.c_str(),
             active_camera_postprocess_ref_.empty()
                 ? "<none>"
@@ -32321,6 +33059,21 @@ void Gameplay::start_camera_shot_runtime(const CameraKey& key,
         resend_active_venue_event();
     }
     should_resend_excitement_ = false;
+    // GH1 Arena::SwitchCam (0x16FE98) chooses the authored region before the
+    // new camera path is polled. Do not reselect during key interpolation.
+    if (key.has_gh1_crowd_region && world_) {
+        int crowd_region = key.gh1_crowd_region;
+        if (const char* diagnostic_region =
+                env_value("GHOGX_DIAGNOSTIC_GH1_CROWD_REGION")) {
+            crowd_region = std::atoi(diagnostic_region);
+            std::fprintf(
+                stderr,
+                "[world] diagnostic GH1 crowd region override: authored=%d "
+                "forced=%d\n",
+                key.gh1_crowd_region, crowd_region);
+        }
+        world_->select_gh1_crowd_region(crowd_region);
+    }
     apply_camera_crowd_visibility(key, skip_script_crowd_update);
     const bool has_legacy_source_crowd =
         key.has_crowd_selection || !key.crowd_selection_ref.empty() ||
@@ -32898,13 +33651,6 @@ bool Gameplay::apply_venue_script_animate_to(const VenueScriptStep& step) {
         }
     }
 
-    active->erase(
-        std::remove_if(active->begin(), active->end(),
-                       [&](const ActiveVenueAnimFilter& running) {
-                           return running.event_name == event_name;
-                       }),
-        active->end());
-
     const float target = std::max(0.0f, step.anim_dest_frame);
     const float period = std::max(0.0f, step.anim_period);
     std::vector<VenueAnimFilter> filters = *source;
@@ -32931,6 +33677,7 @@ bool Gameplay::apply_venue_script_animate_to(const VenueScriptStep& step) {
     started.filters = std::move(filters);
     started.start_time = song_time_;
     started.persistent = false;
+    start_source_venue_filter_tasks(started, *active);
     active->push_back(std::move(started));
     venue_animate_to_frames_[ref] = target;
     if (debug_venue_filters_enabled()) {
@@ -33310,20 +34057,6 @@ bool Gameplay::apply_venue_script_animation(const VenueScriptStep& step) {
         filter.event_blend_seconds = blend_seconds;
         filter.event_delay_seconds = 0.0f;
     }
-    for (auto active_it = active->begin(); active_it != active->end();) {
-        active_it->filters.erase(
-            std::remove_if(active_it->filters.begin(),
-                           active_it->filters.end(),
-                           [&](const VenueAnimFilter& old_filter) {
-                               return venue_filter_replaced_by_any(old_filter,
-                                                                   filters);
-                           }),
-            active_it->filters.end());
-        if (active_it->filters.empty())
-            active_it = active->erase(active_it);
-        else
-            ++active_it;
-    }
     const float resolved_scale =
         filters.empty() ? source_scale(0) : filters.front().scale;
     ActiveVenueAnimFilter started;
@@ -33331,6 +34064,7 @@ bool Gameplay::apply_venue_script_animation(const VenueScriptStep& step) {
     started.filters = std::move(filters);
     started.start_time = song_time_;
     started.persistent = !step.anim_has_range || step.value == 1;
+    start_source_venue_filter_tasks(started, *active);
     active->push_back(std::move(started));
     if (debug_venue_filters_enabled()) {
         const int source_rate =
@@ -34467,13 +35201,26 @@ void Gameplay::apply_venue_event(const std::string& event_name,
         peak_transition = was_peak != is_peak;
         peak_transition_event = is_peak ? "peak_on" : "peak_off";
         active_venue_event_ = event_name;
-        active_venue_anim_filters_.erase(
-            std::remove_if(active_venue_anim_filters_.begin(),
-                           active_venue_anim_filters_.end(),
-                           [](const ActiveVenueAnimFilter& active) {
-                               return active.persistent && !active.polled;
-                           }),
-            active_venue_anim_filters_.end());
+        if (world_) {
+            // GH1 Arena::Crowd::update_crowd supplies the same 10/25/50/100%
+            // boot/bad/okay/great progression to both SetSizes arguments.
+            // Unlike GH2 WorldCrowd, GH1 has no widescreen 70% cap.
+            const float gh1_crowd_size =
+                worldcrowd_fullness_for_event(active_venue_event_, false);
+            if (env_value("GHOGX_DIAGNOSTIC_GH1_CROWD_3D_ONLY")) {
+                // Venue-preview proof mode: fill the camera-selected source
+                // region with promoted 3-D actors and suppress every flat
+                // card outside it. This is diagnostic-only; normal gameplay
+                // retains Arena::Crowd's authored promoted/flat fractions.
+                world_->set_gh1_crowd_sizes(1.0f, 0.0f);
+            } else {
+                world_->set_gh1_crowd_sizes(gh1_crowd_size,
+                                            gh1_crowd_size);
+            }
+        }
+        // Excitement is a source event, not an instruction to delete every
+        // AnimTask. Incoming tasks adopt the previous task for their actual
+        // AnimTarget below; unrelated authored tasks keep running.
         active_venue_material_anims_.erase(
             std::remove_if(active_venue_material_anims_.begin(),
                            active_venue_material_anims_.end(),
@@ -35077,29 +35824,13 @@ void Gameplay::apply_venue_event(const std::string& event_name,
                     }
                 }
             }
-            size_t replaced_filters = 0;
-            for (auto active_it = active_venue_anim_filters_.begin();
-                 active_it != active_venue_anim_filters_.end();) {
-                if (active_it->polled) {
-                    ++active_it;
-                    continue;
-                }
-                const size_t before = active_it->filters.size();
-                active_it->filters.erase(
-                    std::remove_if(active_it->filters.begin(),
-                                   active_it->filters.end(),
-                                   [&](const VenueAnimFilter& active) {
-                                       return venue_filter_replaced_by_any(
-                                           active, enabled_filters);
-                                   }),
-                    active_it->filters.end());
-                replaced_filters += before - active_it->filters.size();
-                if (active_it->filters.empty()) {
-                    active_it = active_venue_anim_filters_.erase(active_it);
-                } else {
-                    ++active_it;
-                }
-            }
+            ActiveVenueAnimFilter active_filter;
+            active_filter.event_name = event_name;
+            active_filter.filters = enabled_filters;
+            active_filter.start_time = song_time_;
+            active_filter.persistent = persistent;
+            const size_t replaced_filters = start_source_venue_filter_tasks(
+                active_filter, active_venue_anim_filters_);
             if (replaced_filters > 0 && debug_venue) {
                 std::ostringstream targets;
                 for (const auto& filter : enabled_filters) {
@@ -35113,11 +35844,6 @@ void Gameplay::apply_venue_event(const std::string& event_name,
                     event_name.c_str(), replaced_filters,
                     targets.str().c_str());
             }
-            ActiveVenueAnimFilter active_filter;
-            active_filter.event_name = event_name;
-            active_filter.filters = enabled_filters;
-            active_filter.start_time = song_time_;
-            active_filter.persistent = persistent;
             active_venue_anim_filters_.push_back(std::move(active_filter));
             venue_route_applied = true;
             if (debug_venue) {
@@ -35479,14 +36205,29 @@ void Gameplay::update_active_venue_material_anims() {
         if (debug_sample) {
             const float alpha =
                 it->has_alpha ? venue_material_alpha_[it->material] : -1.0f;
+            const auto tex_sample_it =
+                venue_material_tex_transforms_.find(it->material);
+            const auto* tex_sample =
+                tex_sample_it != venue_material_tex_transforms_.end()
+                    ? &tex_sample_it->second
+                    : nullptr;
             std::fprintf(
                 stderr,
-                "[world] venue MatAnim sample %s -> %s frame=%.2f alpha=%.3f color_keys=%zu alpha_keys=%zu texture_keys=%zu tex_trans_keys=%zu tex_scale_keys=%zu tex_rot_keys=%zu persistent=%d blend=%.3f blend_period=%.3f delay=%.3f filter=%s\n",
+                "[world] venue MatAnim sample %s -> %s frame=%.2f alpha=%.3f color_keys=%zu alpha_keys=%zu texture_keys=%zu tex_trans_keys=%zu tex_scale_keys=%zu tex_rot_keys=%zu tex_has_trans=%d tex_u=%.6f tex_v=%.6f tex_has_scale=%d tex_scale_u=%.6f tex_scale_v=%.6f tex_has_rot=%d tex_rot_rad=%.6f persistent=%d blend=%.3f blend_period=%.3f delay=%.3f filter=%s\n",
                 it->name.c_str(), it->material.c_str(), frame, alpha,
                 it->color_keys.size(), it->alpha_keys.size(),
                 it->texture_keys.size(),
                 it->tex_translation_keys.size(), it->tex_scale_keys.size(),
-                it->tex_rotation_keys.size(), it->persistent ? 1 : 0,
+                it->tex_rotation_keys.size(),
+                tex_sample && tex_sample->has_translation ? 1 : 0,
+                tex_sample ? tex_sample->translation[0] : 0.0f,
+                tex_sample ? tex_sample->translation[1] : 0.0f,
+                tex_sample && tex_sample->has_scale ? 1 : 0,
+                tex_sample ? tex_sample->scale[0] : 1.0f,
+                tex_sample ? tex_sample->scale[1] : 1.0f,
+                tex_sample && tex_sample->has_rotation ? 1 : 0,
+                tex_sample ? tex_sample->rotation_radians : 0.0f,
+                it->persistent ? 1 : 0,
                 source_blend, it->source_blend_period_seconds,
                 it->source_start_delay_seconds,
                 it->has_source_filter ? it->source_filter.name.c_str()
@@ -35777,31 +36518,65 @@ void Gameplay::update_active_venue_particles() {
     }
 }
 
+void Gameplay::poll_venue_presentation_tasks() {
+    // Scene tasks run during the camera introduction too. Only chart input,
+    // scoring and song audio wait for the highway's release boundary.
+    update_venue_script_tasks();
+    update_active_venue_material_anims();
+    update_active_venue_environment_anims();
+    update_active_venue_light_anims();
+    update_active_venue_particles();
+    update_active_venue_anim_filters();
+    update_active_lighting_material_anims();
+    update_active_lighting_environment_anims();
+    update_active_lighting_light_anims();
+    update_active_lighting_particles();
+    update_active_lighting_anim_filters();
+}
+
+void Gameplay::rebase_venue_presentation_tasks(double elapsed_intro) {
+    // The native presentation clock changes origin at song release. Retail
+    // task time is continuous. Preserve elapsed time/delays on every active
+    // scene task rather than restarting or pausing them for another intro.
+    const auto rebase = [elapsed_intro](auto& tasks) {
+        for (auto& task : tasks) task.start_time -= elapsed_intro;
+    };
+    rebase(active_venue_material_anims_);
+    rebase(active_venue_environment_anims_);
+    rebase(active_venue_light_anims_);
+    rebase(active_venue_particles_);
+    rebase(active_venue_anim_filters_);
+    rebase(active_lighting_material_anims_);
+    rebase(active_lighting_environment_anims_);
+    rebase(active_lighting_light_anims_);
+    rebase(active_lighting_particles_);
+    rebase(active_lighting_anim_filters_);
+    for (auto* filters : {&active_venue_anim_filters_, &active_lighting_anim_filters_})
+        for (auto& active : *filters)
+            for (auto& [key, task] : active.source_tasks) {
+                (void)key;
+                task->rebase(elapsed_intro);
+            }
+    for (auto& task : venue_script_tasks_) task.due_time -= elapsed_intro;
+    for (auto& [name, proxy] : venue_proxy_objects_)
+        if (proxy.animating) proxy.anim_start_time -= elapsed_intro;
+    active_camera_anim_start_time_ -= elapsed_intro;
+    last_venue_mat_anim_debug_time_ = last_venue_env_anim_debug_time_ = -1;
+    last_venue_light_anim_debug_time_ = last_venue_particle_debug_time_ = -1;
+    last_venue_filter_debug_time_ = -1;
+    last_lighting_mat_anim_debug_time_ = last_lighting_env_anim_debug_time_ = -1;
+    last_lighting_light_anim_debug_time_ = last_lighting_particle_debug_time_ = -1;
+    last_lighting_filter_debug_time_ = -1;
+    std::fprintf(stderr, "[world] presentation task clock rebase: intro=%.6f next=0 elapsed_preserved=1\n", elapsed_intro);
+}
+
 void Gameplay::update_active_venue_anim_filters() {
     if (!world_) return;
-    if (active_venue_anim_filters_.empty()) {
-        venue_mesh_translation_offsets_.clear();
-        venue_mesh_transform_offsets_ = venue_latched_mesh_transform_offsets_;
-        venue_mesh_position_overrides_ = venue_latched_mesh_position_overrides_;
-        venue_mesh_normal_overrides_ = venue_latched_mesh_normal_overrides_;
-        venue_mesh_texcoord_overrides_ =
-            venue_latched_mesh_texcoord_overrides_;
-        venue_mesh_color_overrides_ = venue_latched_mesh_color_overrides_;
-        world_->set_mesh_transform_offsets(venue_mesh_transform_offsets_);
-        world_->set_mesh_position_overrides(venue_mesh_position_overrides_);
-        world_->set_mesh_normal_overrides(venue_mesh_normal_overrides_);
-        world_->set_mesh_texcoord_overrides(venue_mesh_texcoord_overrides_);
-        world_->set_mesh_color_overrides(venue_mesh_color_overrides_);
-        world_->set_mesh_anim_blends({});
-        return;
-    }
+    // SetFrame leaves all channels installed. Only explicit presentation reset
+    // clears them; finishing one task must not restore another channel's base.
+    if (active_venue_anim_filters_.empty()) return;
 
     venue_mesh_translation_offsets_.clear();
-    venue_mesh_transform_offsets_ = venue_latched_mesh_transform_offsets_;
-    venue_mesh_position_overrides_ = venue_latched_mesh_position_overrides_;
-    venue_mesh_normal_overrides_ = venue_latched_mesh_normal_overrides_;
-    venue_mesh_texcoord_overrides_ = venue_latched_mesh_texcoord_overrides_;
-    venue_mesh_color_overrides_ = venue_latched_mesh_color_overrides_;
     std::map<std::string, float> venue_mesh_anim_blends;
     const double debug_stride = std::max(
         0.0f, env_float("GHOGX_DEBUG_VENUE_FILTER_STRIDE", 0.5f));
@@ -35812,39 +36587,18 @@ void Gameplay::update_active_venue_anim_filters() {
     if (debug_sample) last_venue_filter_debug_time_ = song_time_;
     for (auto it = active_venue_anim_filters_.begin();
          it != active_venue_anim_filters_.end();) {
-        const double elapsed = std::max(0.0, song_time_ - it->start_time);
-        double duration = 0.0;
-        for (const auto& filter : it->filters) {
-            const double filter_start_time =
-                it->start_time +
-                static_cast<double>(filter.event_delay_seconds);
-            const double source_duration =
-                static_cast<double>(filter.event_delay_seconds) +
-                venue_filter_duration_seconds(filter, &chart_,
-                                              filter_start_time);
-            const double blend_duration =
-                static_cast<double>(filter.event_delay_seconds) +
-                static_cast<double>(
-                    std::max(0.0f, filter.event_blend_seconds));
-            duration =
-                std::max(duration, std::max(source_duration, blend_duration));
-        }
-        const bool finishes_after_sample =
-            !it->persistent && !it->shot_scoped && !it->polled &&
-            !venue_filter_set_loops(it->filters) && elapsed >= duration;
-
-        for (const auto& filter : it->filters) {
-            const double filter_elapsed =
-                elapsed - static_cast<double>(filter.event_delay_seconds);
-            const double filter_start_time =
-                it->start_time +
-                static_cast<double>(filter.event_delay_seconds);
+        const auto publications = poll_source_venue_filter_tasks(*it, song_time_, chart_);
+        for (const auto& publication : publications) {
+            const auto& filter = *publication.filter;
+            const double filter_elapsed = publication.elapsed;
+            const double filter_start_time = publication.start_time;
+            const bool finishes_after_sample = publication.finishes;
             if (filter_elapsed < 0.0) {
                 if (debug_sample) {
                     std::fprintf(
                         stderr,
                         "[world] venue AnimFilter waiting event=%s filter=%s delay=%.3f remaining=%.3f blend=%.3f wait=%d\n",
-                        it->event_name.c_str(), filter.name.c_str(),
+                        publication.event_name.data(), filter.name.c_str(),
                         filter.event_delay_seconds, -filter_elapsed,
                         filter.event_blend_seconds,
                         filter.event_wait ? 1 : 0);
@@ -35852,21 +36606,20 @@ void Gameplay::update_active_venue_anim_filters() {
                 continue;
             }
             const float frame =
-                venue_filter_frame_at(filter, filter_elapsed, it->polled,
+                venue_filter_frame_at(filter, filter_elapsed, publication.polled,
                                       &chart_, filter_start_time);
-            const float source_blend =
-                venue_filter_source_blend_at(filter, filter_elapsed);
+            const float source_blend = publication.blend;
             if (debug_sample && filter.targets.empty() &&
                 filter.mesh_anim_targets.empty()) {
                 std::fprintf(
                     stderr,
                     "[world] venue AnimFilter source no-op event=%s filter=%s target=%s rate=%d fpu=%.1f frame=%.2f delay=%.3f blend=%.3f blend_period=%.3f wait=%d persistent=%d\n",
-                    it->event_name.c_str(), filter.name.c_str(),
+                    publication.event_name.data(), filter.name.c_str(),
                     filter.target_ref.c_str(), filter.anim_rate,
                     rnd_animatable_frames_per_unit(filter.anim_rate), frame,
                     filter.event_delay_seconds, source_blend,
                     filter.event_blend_seconds, filter.event_wait ? 1 : 0,
-                    it->persistent ? 1 : 0);
+                    publication.persistent ? 1 : 0);
             }
             for (const auto& target : filter.targets) {
                 bool source_translation = false;
@@ -35876,9 +36629,16 @@ void Gameplay::update_active_venue_anim_filters() {
                         target.anim, frame, venue_mesh_source_local_positions_,
                         target.mesh, &source_translation, &source_pos);
                 sample.blend = source_blend;
-                venue_mesh_transform_offsets_[target.mesh] = sample;
+                auto published = sample;
+                const auto current = venue_mesh_transform_offsets_.find(target.mesh);
+                world_->compose_transform_animation_sample(
+                    target.mesh,
+                    current == venue_mesh_transform_offsets_.end()
+                        ? nullptr : &current->second,
+                    published);
+                venue_mesh_transform_offsets_[target.mesh] = published;
                 if (finishes_after_sample) {
-                    venue_latched_mesh_transform_offsets_[target.mesh] = sample;
+                    venue_latched_mesh_transform_offsets_[target.mesh] = published;
                 }
                 if (sample.has_translation)
                     venue_mesh_translation_offsets_[target.mesh] =
@@ -35887,7 +36647,7 @@ void Gameplay::update_active_venue_anim_filters() {
                     std::fprintf(
                         stderr,
                         "[world] venue AnimFilter sample event=%s filter=%s mesh=%s rate=%d fpu=%.1f frame=%.2f pos=%d:%s rot=%d:%s quat=(%.5f %.5f %.5f %.5f) scale=%d:%s value=(%.3f %.3f %.3f) scale_vec=(%.3f %.3f %.3f) source_base=%d base=(%.3f %.3f %.3f) delay=%.3f blend=%.3f blend_period=%.3f wait=%d persistent=%d spline=%d/%d repeat=%d rot_slerp=%d\n",
-                        it->event_name.c_str(), filter.name.c_str(),
+                        publication.event_name.data(), filter.name.c_str(),
                         target.mesh.c_str(), filter.anim_rate,
                         rnd_animatable_frames_per_unit(filter.anim_rate), frame,
                         sample.has_translation ? 1 : 0,
@@ -35907,7 +36667,7 @@ void Gameplay::update_active_venue_anim_filters() {
                         source_blend,
                         filter.event_blend_seconds,
                         filter.event_wait ? 1 : 0,
-                        it->persistent ? 1 : 0,
+                        publication.persistent ? 1 : 0,
                         target.anim.translation_spline ? 1 : 0,
                         target.anim.scale_spline ? 1 : 0,
                         target.anim.translation_repeat ? 1 : 0,
@@ -35956,7 +36716,7 @@ void Gameplay::update_active_venue_anim_filters() {
                     std::fprintf(
                         stderr,
                         "[world] venue MeshAnim sample event=%s filter=%s mesh=%s anim=%s frame=%.2f verts=%u pos=%zu norm=%zu uv=%zu color=%zu pos_keys=%zu normal_keys=%zu uv_keys=%zu color_keys=%zu delay=%.3f blend=%.3f blend_period=%.3f wait=%d persistent=%d\n",
-                        it->event_name.c_str(), filter.name.c_str(),
+                        publication.event_name.data(), filter.name.c_str(),
                         target.mesh.c_str(), target.anim.name.c_str(), frame,
                         target.anim.vertex_count, position_count,
                         normal_count, texcoord_count, color_count,
@@ -35968,17 +36728,17 @@ void Gameplay::update_active_venue_anim_filters() {
                         source_blend,
                         filter.event_blend_seconds,
                         filter.event_wait ? 1 : 0,
-                        it->persistent ? 1 : 0);
+                        publication.persistent ? 1 : 0);
                 }
             }
         }
-        if (finishes_after_sample) {
+        if (source_venue_filter_tasks_finished(*it)) {
             if (debug_sample) {
                 std::fprintf(
                     stderr,
-                    "[world] venue AnimFilter latch event=%s filters=%zu elapsed=%.3f duration=%.3f\n",
-                    it->event_name.c_str(), it->filters.size(), elapsed,
-                    duration);
+                    "[world] venue AnimFilter latch event=%s filters=%zu elapsed=%.3f source_tasks_finished=1\n",
+                    it->event_name.c_str(), it->filters.size(),
+                    std::max(0.0, song_time_ - it->start_time));
             }
             it = active_venue_anim_filters_.erase(it);
         } else {
@@ -37175,29 +37935,13 @@ bool Gameplay::apply_lighting_event(const std::string& event_name,
                     }
                 }
             }
-            size_t replaced_filters = 0;
-            for (auto active_it = active_lighting_anim_filters_.begin();
-                 active_it != active_lighting_anim_filters_.end();) {
-                if (active_it->polled) {
-                    ++active_it;
-                    continue;
-                }
-                const size_t before = active_it->filters.size();
-                active_it->filters.erase(
-                    std::remove_if(active_it->filters.begin(),
-                                   active_it->filters.end(),
-                                   [&](const VenueAnimFilter& active) {
-                                       return venue_filter_replaced_by_any(
-                                           active, enabled_filters);
-                                   }),
-                    active_it->filters.end());
-                replaced_filters += before - active_it->filters.size();
-                if (active_it->filters.empty()) {
-                    active_it = active_lighting_anim_filters_.erase(active_it);
-                } else {
-                    ++active_it;
-                }
-            }
+            ActiveVenueAnimFilter active_filter;
+            active_filter.event_name = event_name;
+            active_filter.filters = enabled_filters;
+            active_filter.start_time = song_time_;
+            active_filter.persistent = persistent;
+            const size_t replaced_filters = start_source_venue_filter_tasks(
+                active_filter, active_lighting_anim_filters_);
             if (replaced_filters > 0 && debug_venue_filters_enabled()) {
                 std::ostringstream targets;
                 for (const auto& filter : enabled_filters) {
@@ -37211,11 +37955,6 @@ bool Gameplay::apply_lighting_event(const std::string& event_name,
                     event_name.c_str(), replaced_filters,
                     targets.str().c_str());
             }
-            ActiveVenueAnimFilter active_filter;
-            active_filter.event_name = event_name;
-            active_filter.filters = enabled_filters;
-            active_filter.start_time = song_time_;
-            active_filter.persistent = persistent;
             active_lighting_anim_filters_.push_back(std::move(active_filter));
             lighting_route_applied = true;
             for (const auto& filter : enabled_filters) {
@@ -37669,36 +38408,7 @@ void Gameplay::update_active_lighting_particles() {
 
 void Gameplay::update_active_lighting_anim_filters() {
     if (!lighting_) return;
-    if (active_lighting_anim_filters_.empty()) {
-        if (!lighting_mesh_transform_offsets_.empty() ||
-            !lighting_mesh_position_overrides_.empty() ||
-            !lighting_mesh_normal_overrides_.empty() ||
-            !lighting_mesh_texcoord_overrides_.empty() ||
-            !lighting_mesh_color_overrides_.empty()) {
-            lighting_mesh_transform_offsets_.clear();
-            lighting_mesh_position_overrides_.clear();
-            lighting_mesh_normal_overrides_.clear();
-            lighting_mesh_texcoord_overrides_.clear();
-            lighting_mesh_color_overrides_.clear();
-            lighting_->set_mesh_transform_offsets(lighting_mesh_transform_offsets_);
-            lighting_->set_mesh_position_overrides(
-                lighting_mesh_position_overrides_);
-            lighting_->set_mesh_normal_overrides(
-                lighting_mesh_normal_overrides_);
-            lighting_->set_mesh_texcoord_overrides(
-                lighting_mesh_texcoord_overrides_);
-            lighting_->set_mesh_color_overrides(
-                lighting_mesh_color_overrides_);
-            lighting_->set_mesh_anim_blends({});
-        }
-        return;
-    }
-
-    lighting_mesh_transform_offsets_.clear();
-    lighting_mesh_position_overrides_.clear();
-    lighting_mesh_normal_overrides_.clear();
-    lighting_mesh_texcoord_overrides_.clear();
-    lighting_mesh_color_overrides_.clear();
+    if (active_lighting_anim_filters_.empty()) return;
     std::map<std::string, float> lighting_mesh_anim_blends;
     const bool debug_sample =
         debug_venue_filters_enabled() &&
@@ -37707,41 +38417,17 @@ void Gameplay::update_active_lighting_anim_filters() {
     if (debug_sample) last_lighting_filter_debug_time_ = song_time_;
     for (auto it = active_lighting_anim_filters_.begin();
          it != active_lighting_anim_filters_.end();) {
-        const double elapsed = std::max(0.0, song_time_ - it->start_time);
-        double duration = 0.0;
-        for (const auto& filter : it->filters) {
-            const double filter_start_time =
-                it->start_time +
-                static_cast<double>(filter.event_delay_seconds);
-            const double source_duration =
-                static_cast<double>(filter.event_delay_seconds) +
-                venue_filter_duration_seconds(filter, &chart_,
-                                              filter_start_time);
-            const double blend_duration =
-                static_cast<double>(filter.event_delay_seconds) +
-                static_cast<double>(
-                    std::max(0.0f, filter.event_blend_seconds));
-            duration =
-                std::max(duration, std::max(source_duration, blend_duration));
-        }
-        if (!it->persistent && !venue_filter_set_loops(it->filters) &&
-            duration > 0.0 && elapsed >= duration) {
-            it = active_lighting_anim_filters_.erase(it);
-            continue;
-        }
-
-        for (const auto& filter : it->filters) {
-            const double filter_elapsed =
-                elapsed - static_cast<double>(filter.event_delay_seconds);
-            const double filter_start_time =
-                it->start_time +
-                static_cast<double>(filter.event_delay_seconds);
+        const auto publications = poll_source_venue_filter_tasks(*it, song_time_, chart_);
+        for (const auto& publication : publications) {
+            const auto& filter = *publication.filter;
+            const double filter_elapsed = publication.elapsed;
+            const double filter_start_time = publication.start_time;
             if (filter_elapsed < 0.0) {
                 if (debug_sample) {
                     std::fprintf(
                         stderr,
                         "[world] lighting AnimFilter waiting event=%s filter=%s delay=%.3f remaining=%.3f blend=%.3f wait=%d\n",
-                        it->event_name.c_str(), filter.name.c_str(),
+                        publication.event_name.data(), filter.name.c_str(),
                         filter.event_delay_seconds, -filter_elapsed,
                         filter.event_blend_seconds,
                         filter.event_wait ? 1 : 0);
@@ -37749,10 +38435,9 @@ void Gameplay::update_active_lighting_anim_filters() {
                 continue;
             }
             const float frame =
-                venue_filter_frame_at(filter, filter_elapsed, false, &chart_,
+                venue_filter_frame_at(filter, filter_elapsed, publication.polled, &chart_,
                                       filter_start_time);
-            const float source_blend =
-                venue_filter_source_blend_at(filter, filter_elapsed);
+            const float source_blend = publication.blend;
             for (const auto& target : filter.targets) {
                 bool source_translation = false;
                 std::array<float, 3> source_pos = {0.0f, 0.0f, 0.0f};
@@ -37761,12 +38446,19 @@ void Gameplay::update_active_lighting_anim_filters() {
                         target.anim, frame, lighting_mesh_source_local_positions_,
                         target.mesh, &source_translation, &source_pos);
                 sample.blend = source_blend;
-                lighting_mesh_transform_offsets_[target.mesh] = sample;
+                auto published = sample;
+                const auto current = lighting_mesh_transform_offsets_.find(target.mesh);
+                lighting_->compose_transform_animation_sample(
+                    target.mesh,
+                    current == lighting_mesh_transform_offsets_.end()
+                        ? nullptr : &current->second,
+                    published);
+                lighting_mesh_transform_offsets_[target.mesh] = published;
                 if (debug_sample) {
                     std::fprintf(
                         stderr,
                         "[world] lighting AnimFilter sample event=%s filter=%s mesh=%s rate=%d fpu=%.1f frame=%.2f pos=%d:%s rot=%d:%s scale=%d:%s value=(%.3f %.3f %.3f) source_base=%d base=(%.3f %.3f %.3f) delay=%.3f blend=%.3f blend_period=%.3f wait=%d spline=%d/%d rot_slerp=%d\n",
-                        it->event_name.c_str(), filter.name.c_str(),
+                        publication.event_name.data(), filter.name.c_str(),
                         target.mesh.c_str(), filter.anim_rate,
                         rnd_animatable_frames_per_unit(filter.anim_rate), frame,
                         sample.has_translation ? 1 : 0,
@@ -37813,7 +38505,7 @@ void Gameplay::update_active_lighting_anim_filters() {
                     std::fprintf(
                         stderr,
                         "[world] lighting MeshAnim sample event=%s filter=%s mesh=%s anim=%s frame=%.2f verts=%u pos=%zu norm=%zu uv=%zu color=%zu pos_keys=%zu normal_keys=%zu uv_keys=%zu color_keys=%zu delay=%.3f blend=%.3f blend_period=%.3f wait=%d persistent=%d\n",
-                        it->event_name.c_str(), filter.name.c_str(),
+                        publication.event_name.data(), filter.name.c_str(),
                         target.mesh.c_str(), target.anim.name.c_str(), frame,
                         target.anim.vertex_count, position_count,
                         normal_count, texcoord_count, color_count,
@@ -37825,11 +38517,14 @@ void Gameplay::update_active_lighting_anim_filters() {
                         source_blend,
                         filter.event_blend_seconds,
                         filter.event_wait ? 1 : 0,
-                        it->persistent ? 1 : 0);
+                        publication.persistent ? 1 : 0);
                 }
             }
         }
-        ++it;
+        if (source_venue_filter_tasks_finished(*it))
+            it = active_lighting_anim_filters_.erase(it);
+        else
+            ++it;
     }
     lighting_->set_mesh_transform_offsets(lighting_mesh_transform_offsets_);
     lighting_->set_mesh_position_overrides(lighting_mesh_position_overrides_);
@@ -38325,7 +39020,7 @@ void Gameplay::update_lighting_spotlight_renderer() {
 // ---------------------------------------------------------------------------
 
 bool Gameplay::is_finished() const {
-    if (!chart_loaded_) return false;
+    if (!chart_loaded_ || !song_started_) return false;
     return song_time_ >= chart_.duration_sec() + 2.0;  // 2s grace after last note
 }
 
@@ -38478,13 +39173,16 @@ void Gameplay::seek_for_diagnostic_capture(double seconds) {
     // Stock intro_skip places TrackPanel directly at TRACK_END_FRAME and does
     // not replay the extend/nowbar sequence after a diagnostic seek.
     track_intro_active_ = false;
+    intro_presentation_time_ = 0.0;
     next_track_intro_sfx_stage_ = 7;
     pending_star_phrase_award_sfx_times_.clear();
     song_time_ = std::clamp(seconds, 0.0, std::max(0.0, chart_.duration_sec()));
+    audio_master_time_ = std::max(
+        0.0, song_time_ + static_cast<double>(audio_offset_ms_) / 1000.0);
     last_anim_time_ = song_time_;
-    if (!deterministic_clock_ && audio_.seek(song_time_)) {
+    if (!deterministic_clock_ && audio_.seek(audio_master_time_)) {
         std::fprintf(stderr, "[gameplay] diagnostic audio seek: %.3f s\n",
-                     song_time_);
+                     audio_master_time_);
     }
     diagnostic_autoplay_last_note_tick_ = UINT32_MAX;
     active_sustains_.clear();
@@ -38535,6 +39233,9 @@ void Gameplay::seek_for_diagnostic_capture(double seconds) {
     skip_cues_before(chart_.bass_cues, next_bass_cue_idx_);
     skip_cues_before(chart_.venue_cues, next_venue_cue_idx_);
     skip_cues_before(chart_.lighting_cues, next_lighting_cue_idx_);
+    // Reconstruct music-start state on the next post-seek tick, after lazy
+    // venue/lighting loading. This is independent of section-event skipping.
+    next_music_start_event_idx_ = 0;
     next_section_venue_event_idx_ = 0;
     while (next_section_venue_event_idx_ < chart_.text_events.size() &&
            chart_.tick_to_sec(
@@ -38605,14 +39306,18 @@ void Gameplay::refresh_worldcrowd_actor_source_targets_for_camera() {
         const CameraKey* key = find_camera_key_by_name(regular_camera_keys_, name);
         return key && key_has_crowd_source_ref(*key);
     };
-    auto keys_have_crowd_source_ref = [&](const std::vector<CameraKey>& keys) {
-        for (const auto& key : keys) {
-            if (key_has_crowd_source_ref(key)) return true;
-        }
-        return false;
+    auto keys_have_crowd_source_ref = [&](const std::vector<CameraKey> &keys) {
+      for (const auto &key : keys) {
+        if (key_has_crowd_source_ref(key))
+          return true;
+      }
+      return false;
     };
+    // TrackPanel is still part of the authored pre-song presentation. Keep
+    // camera-owned crowd targets alive until the highway has finished its
+    // extend/nowbar sequence.
     const bool intro_camera_active =
-        intro_camera_seconds_ > 0.0 && song_time_ < intro_camera_seconds_;
+        track_intro_active_ || (song_started_ && song_time_ < 0.0);
     const bool needs_crowd_source_refresh =
         debug_camera ||
         (intro_camera_active && keys_have_crowd_source_ref(camera_keys_)) ||
@@ -38688,13 +39393,17 @@ void Gameplay::rebuild_worldcrowd_actor_runtime(ghogx::render::Window& win) {
                 static_cast<float>(win.bb_height()) >
             1.50f;
     if (!worldcrowd_actor_runtime_enabled()) return;
-    if (!venue_chars_scene_loaded_) return;
+    const bool gh1_venue =
+        quickplay_rig_ && quickplay_rig_->venue.rfind("gh1_", 0) == 0;
+    if (!gh1_venue && !venue_chars_scene_loaded_) return;
 
     std::map<std::string, std::array<float, 16>> mesh_worlds;
-    for (const auto& mesh : venue_chars_scene_.meshes) {
-        if (!mesh.decoded) continue;
-        mesh_worlds[canonical_milo_ref(mesh.name)] =
-            venue_chars_scene_.world_matrix(mesh);
+    if (venue_chars_scene_loaded_) {
+        for (const auto& mesh : venue_chars_scene_.meshes) {
+            if (!mesh.decoded) continue;
+            mesh_worlds[canonical_milo_ref(mesh.name)] =
+                venue_chars_scene_.world_matrix(mesh);
+        }
     }
 
     using CharacterTypeProgramPtr =
@@ -38703,28 +39412,56 @@ void Gameplay::rebuild_worldcrowd_actor_runtime(ghogx::render::Window& win) {
     std::map<std::pair<std::string, std::string>, CharacterTypeProgramPtr>
         character_type_programs;
 
-    auto runtime_for_set =
-        [&](const ghogx::milo_scene::WorldCrowdPlacementSet& set)
+    auto runtime_for_actor =
+        [&](const std::string& actor_name, const std::string& explicit_path,
+            const std::string& explicit_key,
+            const Gh1CrowdActorRecipe* gh1_recipe)
             -> WorldCrowdActorRuntime* {
-        const auto actor_path = worldcrowd_actor_milo_path(set.actor_name);
+        const auto actor_path = explicit_path.empty()
+                                    ? worldcrowd_actor_milo_path(actor_name)
+                                    : std::optional<std::string>{explicit_path};
         if (!actor_path) return nullptr;
-        auto existing = worldcrowd_actor_runtime_.find(*actor_path);
+        const std::string runtime_key =
+            explicit_key.empty() ? *actor_path : explicit_key;
+        auto existing = worldcrowd_actor_runtime_.find(runtime_key);
         if (existing != worldcrowd_actor_runtime_.end()) {
             return &existing->second;
         }
 
         ghogx::character::Character character;
+        std::string resolved_actor_path = *actor_path;
         if (!ghogx::character::load_character(hdr_path_, ark_path_,
-                                              *actor_path, character)) {
+                                              resolved_actor_path,
+                                              character)) {
+            // The preconverted GH1 venue bundle contains its authored crowd
+            // placements and animation set, but not duplicate crowd character
+            // MILOs.  Reuse the matching GH2 actor body rather than falling
+            // back to GH1's flat impostor cards.  Placement, fullness and
+            // camera crowd selection remain owned by the GH1 venue.
+            const auto gh2_actor_path =
+                gh1_recipe ? worldcrowd_actor_milo_path(actor_name)
+                           : std::optional<std::string>{};
+            if (!gh2_actor_path ||
+                !ghogx::character::load_character(
+                    hdr_path_, ark_path_, *gh2_actor_path, character)) {
+                std::fprintf(stderr,
+                             "[world] RELEASE CROWD INVARIANT: close-crowd "
+                             "3-D actor unavailable: %s; selected-region "
+                             "flat card remains suppressed\n",
+                             actor_path->c_str());
+                return nullptr;
+            }
+            resolved_actor_path = *gh2_actor_path;
             std::fprintf(stderr,
-                         "[world] WorldCrowd actor failed: %s\n",
-                         actor_path->c_str());
-            return nullptr;
+                         "[world] GH1 WorldCrowd actor fallback: missing=%s "
+                         "using=%s\n",
+                         actor_path->c_str(), resolved_actor_path.c_str());
         }
+        if (gh1_recipe) configure_gh1_crowd_actor(character, *gh1_recipe);
         auto main_milos =
-            worldcrowd_actor_main_milo_candidates(*actor_path, character);
-        if (quickplay_rig_ &&
-            quickplay_rig_->venue.rfind("gh1_", 0) == 0) {
+            worldcrowd_actor_main_milo_candidates(resolved_actor_path,
+                                                  character);
+        if (gh1_recipe) {
             const std::string gh1_crowd_main =
                 "char/gh1_crowd/anims/gen/crowd_main.milo_ps2";
             main_milos.erase(
@@ -38742,7 +39479,7 @@ void Gameplay::rebuild_worldcrowd_actor_runtime(ghogx::render::Window& win) {
                 load_char_clip_group(hdr_path_, ark_path_, main_milos,
                                      group_name);
             const auto fallback_names =
-                worldcrowd_actor_clip_candidates(set.actor_name, group_name);
+                worldcrowd_actor_clip_candidates(actor_name, group_name);
             for (const auto& name : fallback_names) {
                 if (std::find(clip_names.begin(), clip_names.end(), name) ==
                     clip_names.end()) {
@@ -38773,18 +39510,21 @@ void Gameplay::rebuild_worldcrowd_actor_runtime(ghogx::render::Window& win) {
         } else {
             load_clip_first_from_milos(
                 clip, hdr_path_, ark_path_, main_milos,
-                worldcrowd_actor_clip_candidates(set.actor_name));
+                worldcrowd_actor_clip_candidates(actor_name));
         }
         auto textures = ghogx::asset::load_milo_textures(
-            hdr_path_, ark_path_, *actor_path, character.texture_names());
+            hdr_path_, ark_path_, resolved_actor_path,
+            character.texture_names());
 
         WorldCrowdActorRuntime runtime;
-        runtime.actor_name = set.actor_name;
-        runtime.actor_milo = *actor_path;
+        runtime.actor_name = actor_name;
+        runtime.actor_milo = resolved_actor_path;
         runtime.clip = std::move(clip);
         runtime.clips_by_group = std::move(clips_by_group);
         runtime.active_group = std::move(active_group);
         runtime.animation_ordinal = animation_ordinal;
+        runtime.gh1_promoted = gh1_recipe != nullptr;
+        runtime.gh1_promoted_ordinal = animation_ordinal;
         runtime.fullness_fraction = worldcrowd_fullness_for_event(
             active_venue_event_, worldcrowd_widescreen_);
         runtime.renderer =
@@ -38830,18 +39570,18 @@ void Gameplay::rebuild_worldcrowd_actor_runtime(ghogx::render::Window& win) {
                         stderr,
                         "[world] character type script enter failed: "
                         "actor=%s class=%s type=%s clip=%s error=%s\n",
-                        set.actor_name.c_str(), type_key.first.c_str(),
+                        actor_name.c_str(), type_key.first.c_str(),
                         type_key.second.c_str(), runtime.clip.name.c_str(),
                         script_error.c_str());
                 }
             }
         }
         runtime.world_fxes = load_character_world_fx_runtime(
-            win, hdr_path_, ark_path_, *actor_path, runtime_character,
-            set.actor_name);
+            win, hdr_path_, ark_path_, resolved_actor_path, runtime_character,
+            actor_name);
 
         auto inserted = worldcrowd_actor_runtime_.emplace(
-            *actor_path, std::move(runtime));
+            runtime_key, std::move(runtime));
         if (inserted.first->second.clip.loaded) {
             inserted.first->second.player.play(
                 inserted.first->second.clip,
@@ -38851,7 +39591,7 @@ void Gameplay::rebuild_worldcrowd_actor_runtime(ghogx::render::Window& win) {
         std::fprintf(stderr,
                      "[world] WorldCrowd actor runtime: actor=%s milo=%s "
                      "group=%s clip=%s loaded=%d groups=%zu worldFx=%zu fullness=%.2f textures=%zu\n",
-                     set.actor_name.c_str(), actor_path->c_str(),
+                      actor_name.c_str(), resolved_actor_path.c_str(),
                      inserted.first->second.active_group.c_str(),
                      inserted.first->second.clip.name.c_str(),
                      inserted.first->second.clip.loaded ? 1 : 0,
@@ -38862,6 +39602,32 @@ void Gameplay::rebuild_worldcrowd_actor_runtime(ghogx::render::Window& win) {
         return &inserted.first->second;
     };
 
+    if (gh1_venue) {
+        const auto recipes = gh1_crowd_actor_recipe(quickplay_rig_->venue);
+        size_t loaded = 0;
+        for (size_t ordinal = 0; ordinal < recipes.size(); ++ordinal) {
+            const auto& recipe = recipes[ordinal];
+            char key_buffer[64];
+            std::snprintf(key_buffer, sizeof(key_buffer),
+                          "gh1_promoted_%02zu_%s", ordinal,
+                          recipe.actor_name.c_str());
+            const std::string actor_path =
+                "char/gh1_crowd/og/gen/" + recipe.actor_name +
+                ".milo_ps2";
+            WorldCrowdActorRuntime* runtime = runtime_for_actor(
+                recipe.actor_name, actor_path, key_buffer, &recipe);
+            if (!runtime || !runtime->renderer) continue;
+            runtime->gh1_promoted = true;
+            runtime->gh1_promoted_ordinal = ordinal;
+            ++loaded;
+            ++worldcrowd_actor_runtime_placements_;
+        }
+        std::fprintf(stderr,
+                     "[world] GH1 promoted crowd pool: venue=%s "
+                     "authored=%zu loaded=%zu\n",
+                     quickplay_rig_->venue.c_str(), recipes.size(), loaded);
+    }
+
     for (const auto& crowd : venue_chars_scene_.world_crowds) {
         if (!crowd.decoded || crowd.area_mesh.empty()) continue;
         const auto area_it =
@@ -38871,7 +39637,8 @@ void Gameplay::rebuild_worldcrowd_actor_runtime(ghogx::render::Window& win) {
         const bool use_area_local_basis = worldcrowd_render_area_local_basis();
         size_t crowd_actor_index = 0;
         for (const auto& set : crowd.placement_sets) {
-            WorldCrowdActorRuntime* runtime = runtime_for_set(set);
+            WorldCrowdActorRuntime* runtime = runtime_for_actor(
+                set.actor_name, std::string{}, std::string{}, nullptr);
             if (!runtime || !runtime->renderer) {
                 ++crowd_actor_index;
                 continue;
@@ -39256,11 +40023,47 @@ void Gameplay::draw_worldcrowd_actor_runtime(
     size_t culled_fullness = 0;
     size_t hidden_flat = 0;
     size_t missing_impostor = 0;
+    const auto gh1_promoted_worlds =
+        world_ ? world_->gh1_crowd_promoted_worlds()
+               : std::vector<std::array<float, 16>>{};
     if (world_) world_->apply_environment_lighting_state("crowd.env");
     for (auto& [actor_path, runtime] : worldcrowd_actor_runtime_) {
         (void)actor_path;
         if (!runtime.renderer) continue;
         runtime.renderer->set_min_lod(active_force_char_lod_);
+        if (runtime.gh1_promoted) {
+            if (runtime.gh1_promoted_ordinal >= gh1_promoted_worlds.size())
+                continue;
+            const auto& character_world =
+                gh1_promoted_worlds[runtime.gh1_promoted_ordinal];
+            if (debug_worldcrowd && !runtime.gh1_transform_logged) {
+                runtime.gh1_transform_logged = true;
+                auto row_length = [&](int row) {
+                    const size_t base = static_cast<size_t>(row) * 4;
+                    return std::sqrt(character_world[base + 0] *
+                                         character_world[base + 0] +
+                                     character_world[base + 1] *
+                                         character_world[base + 1] +
+                                     character_world[base + 2] *
+                                         character_world[base + 2]);
+                };
+                std::fprintf(
+                    stderr,
+                    "[world] GH1 promoted crowd transform: ordinal=%zu "
+                    "actor=%s pos=(%.3f %.3f %.3f) "
+                    "scale=(%.4f %.4f %.4f)\n",
+                    runtime.gh1_promoted_ordinal, runtime.actor_name.c_str(),
+                    character_world[12], character_world[13],
+                    character_world[14], row_length(0), row_length(1),
+                    row_length(2));
+            }
+            runtime.renderer->set_world_transform(character_world);
+            draw_world_fx(runtime, character_world, cam, false);
+            runtime.renderer->draw_over_scene(cam);
+            draw_world_fx(runtime, character_world, cam, true);
+            ++drawn_3d;
+            continue;
+        }
         std::vector<uint8_t> selected_3d(runtime.placement_worlds.size(), 0);
         for (size_t i = 0; i < selected_3d.size(); ++i) {
             selected_3d[i] = crowd_selection_draws_3d(runtime, i) ? 1 : 0;
@@ -39532,6 +40335,16 @@ void apply_gameplay_backing_camera(
                     ? (*bounds_min)[2] +
                           std::max(18.0f, span_z * 0.28f)
                     : (*center)[2] + 18.0f;
+            // Proof-only framing controls. Crowd bounds remain the source of
+            // the automatic camera, while explicit offsets let venue-preview
+            // captures place the authored stage rather than the crowd
+            // centroid at screen center. Normal gameplay never reads these.
+            cam.target[0] += env_float(
+                "GHOGX_DIAGNOSTIC_CROWD_PROOF_TARGET_OFFSET_X", 0.0f);
+            cam.target[1] += env_float(
+                "GHOGX_DIAGNOSTIC_CROWD_PROOF_TARGET_OFFSET_Y", 0.0f);
+            cam.target[2] += env_float(
+                "GHOGX_DIAGNOSTIC_CROWD_PROOF_TARGET_OFFSET_Z", 0.0f);
             cam.yaw = env_float("GHOGX_DIAGNOSTIC_CROWD_PROOF_YAW",
                                 candidate.default_yaw);
             cam.pitch =
@@ -40226,16 +41039,88 @@ void Gameplay::tick(float dt, uint32_t fret_mask, float whammy_axis) {
             ? std::clamp(whammy_axis, -1.0f, 1.0f)
             : 0.0f;
 
-    // On the first tick, start the audio. Diagnostic song-start can begin at a
-    // nonzero clock, so this must be explicit instead of keyed to song_time_.
+    // Retail starts the task clock at -selected CamShot duration / 30.
+    // TrackPanel starts at the source track_extend_sec (-2), overlapping the
+    // last two seconds of the camera. Release audio/chart at zero; the 2.5s
+    // button-refresh task is not a sequential pre-song delay.
+    const auto poll_track_intro_feedback = [&]() {
+        const double track_elapsed = track_intro_elapsed();
+        if (track_elapsed >= 0.0 && next_track_intro_sfx_stage_ == 0) {
+            if (!deterministic_clock_) audio_.track_intro_feedback(0);
+            next_track_intro_sfx_stage_ = 1;
+        }
+        while (next_track_intro_sfx_stage_ >= 1 &&
+               next_track_intro_sfx_stage_ <= 6) {
+            const double source_time = next_track_intro_sfx_stage_ == 6 ? 2.05 :
+                1.3 + 0.1 * static_cast<double>(next_track_intro_sfx_stage_ - 1);
+            if (track_elapsed + 0.0001 < source_time) break;
+            if (!deterministic_clock_)
+                audio_.track_intro_feedback(next_track_intro_sfx_stage_);
+            ++next_track_intro_sfx_stage_;
+        }
+    };
+    const auto poll_authored_music_start = [&]() {
+        // GH2's EVENTS reader is polled from the running song/beat clock.
+        // Venue trigger gates suppress ordinary intro-inappropriate routes,
+        // but music_start itself is ungated.  In stock Big this reaches the
+        // fan/gears group (including fan_floorspot.mnm) before intro_end.
+        // Keep the event at its authored MIDI timestamp; never synthesize it
+        // at venue load, and never advance notes/scoring from this intro poll.
+        while (next_music_start_event_idx_ < chart_.text_events.size()) {
+            const auto& ev = chart_.text_events[next_music_start_event_idx_];
+            const double event_sec = chart_.tick_to_sec(ev.tick);
+            if (event_sec > song_time_) break;
+            if (ev.text == "[music_start]" || ev.text == "music_start") {
+                std::fprintf(
+                    stderr,
+                    "[world] authored music_start: tick=%u chart=%.6f clock=%.6f intro=%d\n",
+                    ev.tick, event_sec, song_time_,
+                    track_intro_active_ ? 1 : 0);
+                apply_venue_event("music_start", false);
+            }
+            ++next_music_start_event_idx_;
+        }
+    };
+    if (track_intro_active_) {
+        intro_presentation_time_ += std::max(0.0f, dt);
+        // Existing venue/camera animation code consumes song_time_. During the
+        // pre-song presentation it is a render-only clock; this branch consumes
+        // only the authored music_start world event, then returns before notes,
+        // ordinary section events, scoring, or song audio can consume it.
+        song_time_ = intro_presentation_time_;
+        poll_track_intro_feedback();
+        poll_authored_music_start();
+        poll_venue_presentation_tasks();
+        if (intro_presentation_time_ + 0.0001 < intro_camera_seconds_) return;
+
+        track_intro_active_ = false;
+        // game.dtb::extend_track schedules intro_end at +2 seconds, i.e.
+        // task-clock zero for stock track_extend_sec=-2. Dispatch before the
+        // presentation clock is reset, not another camera duration into play.
+        if (!intro_end_dispatched_) {
+            intro_end_dispatched_ = true;
+            should_resend_excitement_ = true;
+            apply_venue_event("intro_end", false);
+            try_apply_diagnostic_venue_event();
+        }
+        rebase_venue_presentation_tasks(song_time_);
+        song_time_ = 0.0;
+        audio_master_time_ = 0.0;
+        last_anim_time_ = 0.0;
+        std::fprintf(stderr,
+                     "[gameplay] pre-song presentation complete: "
+                     "camera=%.3f track_start=%.3f source_track_extend_sec=%.3f; releasing audio/chart clock\n",
+                     intro_camera_seconds_, intro_camera_seconds_ + track_extend_sec_,
+                     track_extend_sec_);
+    }
+
+    // On the first post-intro tick, start the audio. Diagnostic song-start can
+    // begin at a nonzero clock, so this remains explicit rather than keyed to
+    // song_time_.
     const bool first_tick = (!song_started_ && dt > 0.0f);
     if (first_tick) {
         if (!deterministic_clock_) audio_.play();
         song_started_ = true;
-        if (track_intro_active_ && !deterministic_clock_) {
-            audio_.track_intro_feedback(0);
-            next_track_intro_sfx_stage_ = 1;
-        }
         std::fprintf(stderr, "[gameplay] song started\n");
     }
 
@@ -40243,27 +41128,18 @@ void Gameplay::tick(float dt, uint32_t fret_mask, float whammy_axis) {
     // stays locked to the sound), else wall-clock accumulation.
     const bool live_audio = !deterministic_clock_ && audio_.is_playing();
     if (live_audio)
-        song_time_ = audio_.position_sec();
+        audio_master_time_ = audio_.position_sec();
     else
-        song_time_ += static_cast<double>(dt);
+        audio_master_time_ += static_cast<double>(dt);
+    song_time_ = calibrated_presentation_time(audio_master_time_,
+                                               audio_offset_ms_);
+    // hud_panel's +2.05s meter cue occurs just AFTER source song-clock zero.
+    poll_track_intro_feedback();
     const double input_judgement_time =
         diagnostic_autoplay_
             ? song_time_
             : calibrated_judgement_time(song_time_, sync_offset_ms_);
 
-    if (track_intro_active_ && !deterministic_clock_) {
-        while (next_track_intro_sfx_stage_ >= 1 &&
-               next_track_intro_sfx_stage_ <= 6) {
-            const double source_time =
-                next_track_intro_sfx_stage_ == 6
-                    ? 2.05
-                    : 1.3 + 0.1 *
-                          static_cast<double>(next_track_intro_sfx_stage_ - 1);
-            if (song_time_ + 0.0001 < source_time) break;
-            audio_.track_intro_feedback(next_track_intro_sfx_stage_);
-            ++next_track_intro_sfx_stage_;
-        }
-    }
     if (!deterministic_clock_) {
         auto out = pending_star_phrase_award_sfx_times_.begin();
         for (auto it = pending_star_phrase_award_sfx_times_.begin();
@@ -40283,14 +41159,15 @@ void Gameplay::tick(float dt, uint32_t fret_mask, float whammy_axis) {
         if (!sync_audit_started_) {
             sync_audit_started_ = true;
             sync_audit_wall_start_sec_ = wall_now;
-            sync_audit_audio_start_sec_ = song_time_;
+            sync_audit_audio_start_sec_ = audio_master_time_;
             sync_audit_next_log_sec_ = 1.0;
             sync_audit_frames_ = 0;
         }
         ++sync_audit_frames_;
         const double wall_elapsed = wall_now - sync_audit_wall_start_sec_;
         if (wall_elapsed >= sync_audit_next_log_sec_) {
-            const double audio_elapsed = song_time_ - sync_audit_audio_start_sec_;
+            const double audio_elapsed =
+                audio_master_time_ - sync_audit_audio_start_sec_;
             const double fps = sync_audit_frames_ /
                                std::max(0.001, wall_elapsed);
             std::fprintf(stderr,
@@ -40441,6 +41318,10 @@ void Gameplay::tick(float dt, uint32_t fret_mask, float whammy_axis) {
         ++next_venue_cue_idx_;
     }
 
+    // Diagnostic seeks and short/no-intro modes can reach the authored event
+    // on the normal song clock instead.
+    poll_authored_music_start();
+
     while (next_section_venue_event_idx_ < chart_.text_events.size()) {
         const auto& ev = chart_.text_events[next_section_venue_event_idx_];
         const double ev_sec = chart_.tick_to_sec(ev.tick);
@@ -40494,17 +41375,7 @@ void Gameplay::tick(float dt, uint32_t fret_mask, float whammy_axis) {
                 apply_venue_event("excitement_okay");
             }
         }
-        update_venue_script_tasks();
-        update_active_venue_material_anims();
-        update_active_venue_environment_anims();
-        update_active_venue_light_anims();
-        update_active_venue_particles();
-        update_active_venue_anim_filters();
-        update_active_lighting_material_anims();
-        update_active_lighting_environment_anims();
-        update_active_lighting_light_anims();
-        update_active_lighting_particles();
-        update_active_lighting_anim_filters();
+        poll_venue_presentation_tasks();
     };
 
     auto print_score_summary = [&]() {
@@ -41605,7 +42476,7 @@ void Gameplay::draw_internal(ghogx::render::Window& win,
                         debug_venue_filters_enabled()) {
                         std::fprintf(
                             stderr,
-                            "[world] camera CharWalk objects: scope=venue_chars source_reader=MiloEditor::CharWalk.Read source_body=Hmx::Object_only source=%s entries=%zu source_state=CharWalk::mState body=rb2_dump_unrecovered actually_walking=deferred_false\n",
+                            "[world] camera CharWalk objects: scope=venue_chars source_reader=MiloEditor::CharWalk.Read source=%s entries=%zu source_state=CharWalk::mState native_body=GH2_SLUS_214.47_0x00184FD0 active_walk_clip_bridge=recovered\n",
                             chars_milo.c_str(), venue_charwalk_objects);
                     }
                     const size_t lights_before = venue_scene.lights.size();
@@ -41953,9 +42824,13 @@ void Gameplay::draw_internal(ghogx::render::Window& win,
                 apply_venue_event("single_player", false);
                 apply_venue_event("start", false);
                 apply_venue_event("intro_start", false);
-                apply_venue_event("music_start", false);
+                // world_objects_worldbase.dtb initializes excitement_level to
+                // kExcitementOkay.  This initial persistent event is
+                // presentation state, not a miss: several retail venue
+                // mechanisms (including Big's fan and its animated floor-light
+                // card) use the okay loop throughout the pre-song intro.
                 if (active_venue_event_.empty()) {
-                    apply_venue_event("excitement_bad");
+                    apply_venue_event("excitement_okay");
                 } else {
                     const std::string active = active_venue_event_;
                     active_venue_event_.clear();
@@ -42202,7 +43077,8 @@ void Gameplay::draw_internal(ghogx::render::Window& win,
                                 gh1_intro->fov_in +
                                 (gh1_intro->fov_out - gh1_intro->fov_in) *
                                     framing_t;
-                            key.fov = fov_degrees * 0.01745329251994329577f;
+                            key.fov = convert_fov_like_miloeditor(
+                                fov_degrees * 0.01745329251994329577f, 0.75f);
                             key.has_fov = true;
                             key.near_plane = gh1_intro->near_plane;
                             key.far_plane = gh1_intro->far_plane;
@@ -42280,6 +43156,7 @@ void Gameplay::draw_internal(ghogx::render::Window& win,
                             intro_camera.camera_anim_refs.size(),
                             intro_camera.glow_spot_ref.c_str());
                 }
+                bool raw_gh1_regular_camera_route = false;
                 regular_camera_keys_ = load_regular_camera_keys(
                     hdr_path_, ark_path_, quickplay_rig_->venue,
                     camera_manager_random_seed_,
@@ -42292,9 +43169,65 @@ void Gameplay::draw_internal(ghogx::render::Window& win,
                     }
                     regular_camera_keys_ = load_gh1_regular_camera_keys(
                         hdr_path_, ark_path_, quickplay_rig_->venue);
+                    raw_gh1_regular_camera_route =
+                        !regular_camera_keys_.empty();
                     randomize_camera_category_order(
                         regular_camera_keys_, camera_manager_random_seed_,
                         camera_manager_random_seed_source_.c_str());
+                }
+                gh1_arena_spot_route_active_ =
+                    raw_gh1_regular_camera_route ||
+                    std::any_of(
+                        regular_camera_keys_.begin(),
+                        regular_camera_keys_.end(),
+                        [](const CameraKey& key) {
+                            if (key.has_gh1_helper) return true;
+                            return std::any_of(
+                                key.bad_waypoint_refs.begin(),
+                                key.bad_waypoint_refs.end(),
+                                [](const std::string& ref) {
+                                    return starts_with(
+                                        camera_waypoint_match_key(ref),
+                                        "gh1_walk_spot_");
+                                });
+                        });
+                if (gh1_arena_spot_route_active_) {
+                    // The first geometry pass deliberately registered only
+                    // normal object names. Now that the decoded camera data
+                    // proves this is a GH1 Arena route, publish its numbered
+                    // stage/walk vectors for placement and ShotOk.
+                    merge_venue_camera_target_worlds(
+                        venue_camera_target_worlds_, venue_scene, true);
+                }
+                if (debug_camera_enabled() ||
+                    debug_venue_filters_enabled()) {
+                    std::fprintf(
+                        stderr,
+                        "[world] camera walkspot route: source=%s gh1_arena_spots=%d raw_gh1_fallback=%d regular_shots=%zu\n",
+                        gh1_arena_spot_route_active_
+                            ? "Arena::walk_spots"
+                            : "Waypoint::FindNearest",
+                        gh1_arena_spot_route_active_ ? 1 : 0,
+                        raw_gh1_regular_camera_route ? 1 : 0,
+                        regular_camera_keys_.size());
+                }
+                // The shared loader retains the owning CamShot's keyframes,
+                // targets, parent and base pose alongside its TransAnim pages.
+                // A bare path is not a complete intro camera (nor a shot clock).
+                if (!intro_camera.shot.empty()) {
+                    const auto owning_intro = std::find_if(
+                        regular_camera_keys_.begin(), regular_camera_keys_.end(),
+                        [&](const CameraKey& key) {
+                            return key.name == intro_camera.shot;
+                        });
+                    if (owning_intro != regular_camera_keys_.end()) {
+                        owning_intro->selection_used = true;
+                        camera_keys_ = {*owning_intro};
+                        std::fprintf(stderr,
+                            "[world] intro camera owner: shot=%s source=shared_camshot_loader path=%s source_keyframes=%zu\n",
+                            owning_intro->name.c_str(), owning_intro->path_anim.c_str(),
+                            source_camshot_timing_frames(*owning_intro).size());
+                    }
                 }
                 if (const char* diagnostic_target =
                         std::getenv(
@@ -42330,10 +43263,42 @@ void Gameplay::draw_internal(ghogx::render::Window& win,
                 camera_performer_targets_ =
                     build_camera_performer_target_requests(
                         camera_keys_, regular_camera_keys_);
-                intro_camera_seconds_ = intro_camera_duration_seconds(chart_);
+                track_extend_sec_ = load_track_extend_seconds(hdr_path_, ark_path_);
+                intro_camera_seconds_ = ghogx::camera::intro_camera_seconds(
+                    !intro_camera.shot.empty() ? intro_camera.duration_frames :
+                    (camera_keys_.empty() ? 0.0f :
+                     camera_source_end_frame(camera_keys_.front())));
+                // intro_start_msg immediately picks the selected INTRO shot.
+                // CameraManager keeps that CamShot as mCurrentShot after the
+                // pre-song task clock reaches zero; worldbase's six-bar
+                // counter decides when the first normal shot replaces it.
+                // Retail stores the INTRO start at -mDuration/30 (the trace
+                // records -2.0 for a 60-frame Intro_fast), so song-clock zero
+                // naturally polls the owning CamShot at its duration and then
+                // continues its authored hold/loop behavior until downbeat 6.
+                if (!camera_keys_.empty()) {
+                    const CameraKey* source_intro_current =
+                        find_camera_key_by_name(regular_camera_keys_,
+                                                camera_keys_.front().name);
+                    if (source_intro_current) {
+                        active_regular_camera_ = source_intro_current->name;
+                        previous_regular_camera_.clear();
+                        active_regular_camera_start_ = -intro_camera_seconds_;
+                        if (debug_camera_enabled() ||
+                            debug_venue_filters_enabled()) {
+                            std::fprintf(
+                                stderr,
+                                "[world] intro camera current: source_manager=CameraManager::PrePoll source_field=mCurrentShot shot=%s start_time=%.3f source_start=-CamShot::mDuration/30 bars_left=%d first_regular_gate=world_objects_worldbase.dta::downbeat\n",
+                                active_regular_camera_.c_str(),
+                                active_regular_camera_start_,
+                                camera_bars_left_);
+                        }
+                    }
+                }
                 std::fprintf(stderr,
-                             "[world] intro camera window: %.3fs (6 bars)\n",
-                             intro_camera_seconds_);
+                             "[world] intro camera window: %.3fs source=CamShot::mDuration/30 shot=%s track_extend_sec=%.3f track_start=%.3f\n",
+                             intro_camera_seconds_, camera_keys_.empty() ? "<none>" : camera_keys_.front().name.c_str(),
+                             track_extend_sec_, intro_camera_seconds_ + track_extend_sec_);
                 if (song_time_ > 0.0) {
                     restore_camera_script_state_for_diagnostic_seek_like_source(
                         "venue_load_after_intro_start_msg");
@@ -42545,10 +43510,16 @@ void Gameplay::draw_internal(ghogx::render::Window& win,
                 // the lighting section. Native load_section makes them visible
                 // to Arena before CharSys placement, so merge their transforms
                 // into the same runtime object lookup before moving the scene.
-                merge_venue_camera_target_worlds(venue_camera_target_worlds_,
-                                                 lighting_scene);
+                merge_venue_camera_target_worlds(
+                    venue_camera_target_worlds_, lighting_scene,
+                    gh1_arena_spot_route_active_);
                 lighting_->set_scene(std::move(lighting_scene),
                                      lighting_textures);
+                // GH1 Arena owns a single Crowd. Section assembly already
+                // placed these objects in world_; the lighting pass retains
+                // its animation targets, but must not redraw the identical
+                // population without SwitchCam's region exclusion.
+                if (world_) lighting_->exclude_gh1_crowd_already_owned_by(*world_);
                 lighting_->set_flare_steps(venue_flare_steps_);
                 lighting_->set_additive_blend(true);
                 lighting_runtime_hidden_meshes_ = lighting_base_hidden_meshes_;
@@ -42588,14 +43559,12 @@ void Gameplay::draw_internal(ghogx::render::Window& win,
                     // section-owned objects are now resident. Replay the
                     // latched messages only after that barrier.
                     execute_venue_script_event("intro_start");
-                    execute_venue_script_event("music_start");
                     execute_venue_script_event(
-                        active_venue_event_.empty() ? "excitement_bad"
+                        active_venue_event_.empty() ? "excitement_okay"
                                                     : active_venue_event_);
                 }
                 apply_lighting_event("start");
                 apply_lighting_event("intro_start");
-                apply_lighting_event("music_start");
                 std::fprintf(stderr, "[world] lighting overlay loaded: %s\n",
                               lighting_milo.c_str());
             }
@@ -42617,7 +43586,7 @@ void Gameplay::draw_internal(ghogx::render::Window& win,
                 const size_t before_targets =
                     venue_camera_target_worlds_.size();
                 merge_venue_camera_target_worlds(venue_camera_target_worlds_,
-                                                 venue_chars_scene_);
+                                                 venue_chars_scene_, false);
                 venue_camera_world_crowd_bounds_valid_ = false;
                 venue_camera_world_crowd_placements_ = 0;
                 venue_camera_world_crowd_min_ = {};
@@ -43079,7 +44048,7 @@ void Gameplay::draw_internal(ghogx::render::Window& win,
                         debug_venue_filters_enabled()) {
                         std::fprintf(
                             stderr,
-                            "[world] camera CharWalk objects: scope=guitarist0_character source_reader=MiloEditor::CharWalk.Read source_body=Hmx::Object_only source=%s entries=%zu source_state=CharWalk::mState body=rb2_dump_unrecovered actually_walking=deferred_false\n",
+                            "[world] camera CharWalk objects: scope=guitarist0_character source_reader=MiloEditor::CharWalk.Read source=%s entries=%zu source_state=CharWalk::mState native_body=GH2_SLUS_214.47_0x00184FD0 active_walk_clip_bridge=recovered\n",
                             char_milo.c_str(),
                             guitarist0_charwalk_object_count_);
                     }
@@ -43831,7 +44800,8 @@ void Gameplay::draw_internal(ghogx::render::Window& win,
                             perf.world_transform[13], perf.world_transform[14],
                             perf.world_transform[15]);
                     }
-                } else if (gh1_content_layout) {
+                } else if (gh1_content_layout &&
+                           gh1_arena_spot_route_active_) {
                     // Retail GH1 initializes guitarist walk-spot selection to
                     // zero. Non-guitar roles use the shared authored
                     // charsys/band_spots table: singer=0, bass=1, drummer=2,
@@ -43888,6 +44858,7 @@ void Gameplay::draw_internal(ghogx::render::Window& win,
                 }
 
                 if (gh1_content_layout &&
+                    gh1_arena_spot_route_active_ &&
                     perf.role == "guitarist0") {
                     float nearest_distance2 =
                         std::numeric_limits<float>::max();
@@ -45192,6 +46163,16 @@ void Gameplay::draw_internal(ghogx::render::Window& win,
                 perf.fret_player.set_source_realign(
                     left_hand_driver_realign);
                 size_t authored_driver_order = 0;
+                // Stock GH2 and converted GH1 characters both serialize the
+                // original Character-local CharServoBone ownership graph.  It
+                // is the production path, not an optional camera diagnostic:
+                // camera targets must observe the same root transform that is
+                // rendered.  External retargets still use their dedicated
+                // compatibility stack until they provide that source graph.
+                // Keep a one-way opt-out only for controlled A/B diagnostics.
+                const bool source_servo_requested =
+                    !perf.external_animation_retarget &&
+                    env_value("GHOGX_DISABLE_SOURCE_SERVO_RUNTIME") == nullptr;
                 for (const auto& driver : animation_drivers) {
                     if (driver.name.empty() || driver.clip_milo.empty())
                         continue;
@@ -45199,12 +46180,39 @@ void Gameplay::draw_internal(ghogx::render::Window& win,
                     runtime.hdr_path = animation_hdr_path;
                     runtime.ark_path = animation_ark_path;
                     runtime.source_order = authored_driver_order++;
+                    runtime.target = driver.target;
+                    runtime.weight_owner = driver.weight_owner;
+                    runtime.weight_prop = driver.weight_prop;
+                    runtime.weight = driver.weight;
                     runtime.player.set_source_realign(driver.realign);
                     runtime.milo_paths = driver_milos_for(driver.name);
                     runtime.clip_catalog =
                         ghogx::character::load_clip_catalog(
                             animation_hdr_path, animation_ark_path,
                             runtime.milo_paths);
+                    if (source_servo_requested) {
+                        for (const auto& catalog_entry : runtime.clip_catalog) {
+                            auto binding =
+                                ghogx::character::load_gh2_clip_set_binding(
+                                    animation_hdr_path, animation_ark_path,
+                                    catalog_entry.milo_path);
+                            const bool duplicate = std::any_of(
+                                runtime.clip_bindings.begin(),
+                                runtime.clip_bindings.end(),
+                                [&](const auto& existing) {
+                                    return existing.get() == binding.get();
+                                });
+                            if (!duplicate)
+                                runtime.clip_bindings.push_back(
+                                    std::move(binding));
+                        }
+                        if (!runtime.clip_catalog.empty() &&
+                            runtime.clip_bindings.empty()) {
+                            throw std::runtime_error(
+                                "source CharDriver has clips but no allocation "
+                                "inventory: " + driver.name);
+                        }
+                    }
                     for (auto group :
                          ghogx::character::load_clip_group_catalog(
                              animation_hdr_path, animation_ark_path,
@@ -45285,6 +46293,51 @@ void Gameplay::draw_internal(ghogx::render::Window& win,
                             ghogx::character::kCharPlayNoBlend);
                 }
                 bind_performer_type_script_driver(performers_.size() - 1);
+                if (source_servo_requested) {
+                    auto& source_character = stored.renderer->character();
+                    for (const auto& servo : source_character.servo_bones) {
+                        std::vector<const ghogx::character::Gh2ClipSetBinding*>
+                            inventories;
+                        for (const auto& [driver_name, runtime] :
+                             stored.authored_drivers) {
+                            (void)driver_name;
+                            if (runtime.target != servo.name) continue;
+                            for (const auto& binding : runtime.clip_bindings) {
+                                if (std::find(inventories.begin(), inventories.end(),
+                                              binding.get()) == inventories.end()) {
+                                    inventories.push_back(binding.get());
+                                }
+                            }
+                        }
+                        if (inventories.empty()) continue;
+                        auto source_servo = std::make_unique<
+                            ghogx::character::SourceCharServoCharacter>();
+                        source_servo->rebind(source_character, inventories);
+                        source_servo->enter([] {});
+                        stored.source_servos.emplace(servo.name,
+                                                     std::move(source_servo));
+                    }
+                    for (const auto& [driver_name, runtime] :
+                         stored.authored_drivers) {
+                        if (!runtime.clip_bindings.empty() &&
+                            stored.source_servos.find(runtime.target) ==
+                                stored.source_servos.end()) {
+                            throw std::runtime_error(
+                                "source CharDriver target is not a decoded "
+                                "CharServoBone: " + driver_name + " -> " +
+                                runtime.target);
+                        }
+                    }
+                    stored.source_servo_runtime =
+                        !stored.source_servos.empty();
+                    std::fprintf(
+                        stderr,
+                        "[world] source Character servo ready: role=%s "
+                        "servos=%zu drivers=%zu root_owner=Character.local "
+                        "render_parent=venue_placement\n",
+                        stored.role.c_str(), stored.source_servos.size(),
+                        stored.authored_drivers.size());
+                }
             };
 
             const std::string equipped_guitar_outfit =
@@ -45529,19 +46582,21 @@ void Gameplay::draw_internal(ghogx::render::Window& win,
                               : std::max(0.0, song_time_ - last_anim_time_);
         last_anim_time_ = song_time_;
         const auto& performer_guitar_notes = performer_chart_notes(chart_.notes);
-        const auto& performer_bass_notes =
+        const auto &performer_bass_notes =
             performer_chart_notes(chart_.bass_notes);
-        const auto& performer_guitar_hand_cues =
+        const auto &performer_guitar_hand_cues =
             performer_hand_cues(chart_.fret_hand_cues);
-        const auto& performer_bass_hand_cues =
+        const auto &performer_bass_hand_cues =
             performer_hand_cues(chart_.bass_fret_hand_cues);
         const NoteCue note_cue =
             current_note_cue(song_time_, chart_, performer_guitar_notes);
-        const bool intro_active =
-            intro_camera_seconds_ > 0.0 && song_time_ < intro_camera_seconds_;
+        // The chart clock has not started while TrackPanel is assembling.
+        // Keep performers on their authored intro drivers for the full
+        // pre-song presentation so MIDI state is not consumed and rewound.
+        const bool intro_active = track_intro_active_;
         const auto profile_anim_start = profile_now();
         if (drum_kit_) {
-            drum_kit_->update(static_cast<float>(dt));
+          drum_kit_->update(static_cast<float>(dt));
         }
         const bool debug_hand_map_frame =
             env_value("GHOGX_DEBUG_HAND_MAP") != nullptr;
@@ -45549,1507 +46604,1132 @@ void Gameplay::draw_internal(ghogx::render::Window& win,
             env_value("GHOGX_LEFT_WEIGHT") != nullptr;
         const bool right_weight_override_frame =
             env_value("GHOGX_RIGHT_WEIGHT") != nullptr;
-        const bool debug_performer_sync_frame =
-            debug_performer_sync_enabled();
+        const bool debug_performer_sync_frame = debug_performer_sync_enabled();
         const float performer_sync_stride_frame =
             debug_performer_sync_frame
-                ? std::max(
-                      0.0f,
-                      env_float("GHOGX_DEBUG_PERFORMER_SYNC_STRIDE", 0.25f))
+                ? std::max(0.0f, env_float("GHOGX_DEBUG_PERFORMER_SYNC_STRIDE",
+                                           0.25f))
                 : 0.0f;
         const bool debug_face_frame = debug_face_enabled_game();
         std::vector<uint32_t> band_jump_ticks_this_frame;
         if (!intro_active) {
-            const double band_jump_window_start =
-                song_time_ - std::max(0.001, dt * 1.5);
-            band_jump_ticks_this_frame.reserve(2);
-            for (const auto& ev : chart_.text_events) {
-                const double event_time = chart_.tick_to_sec(ev.tick);
-                if (event_time < band_jump_window_start) continue;
-                if (event_time > song_time_) break;
-                if (ev.text == "[band_jump]") {
-                    band_jump_ticks_this_frame.push_back(ev.tick);
-                }
+          const double band_jump_window_start =
+              song_time_ - std::max(0.001, dt * 1.5);
+          band_jump_ticks_this_frame.reserve(2);
+          for (const auto &ev : chart_.text_events) {
+            const double event_time = chart_.tick_to_sec(ev.tick);
+            if (event_time < band_jump_window_start)
+              continue;
+            if (event_time > song_time_)
+              break;
+            if (ev.text == "[band_jump]") {
+              band_jump_ticks_this_frame.push_back(ev.tick);
             }
+          }
         }
         const float character_task_frame =
             source_character_task_beat_at(chart_, song_time_);
         const float previous_character_task_frame =
-            source_character_task_beat_at(
-                chart_, song_time_ - std::max(0.0, dt));
-        const float character_task_delta =
-            std::max(0.0f, character_task_frame -
-                               previous_character_task_frame);
-        for (auto& perf : performers_) {
-            if (!perf.renderer) continue;
-            auto advance_driver =
-                [&](ghogx::character::CharClipPlayer& player) {
-                    player.advance_source(
-                        character_task_frame, character_task_delta,
-                        static_cast<float>(dt));
-                };
-            PerformerMidiState midi_state =
+            source_character_task_beat_at(chart_,
+                                          song_time_ - std::max(0.0, dt));
+        const float character_task_delta = std::max(
+            0.0f, character_task_frame - previous_character_task_frame);
+        for (auto &perf : performers_) {
+          if (!perf.renderer)
+            continue;
+          auto advance_driver = [&](ghogx::character::CharClipPlayer &player) {
+            player.advance_source(character_task_frame, character_task_delta,
+                                  static_cast<float>(dt));
+          };
+          PerformerMidiState midi_state;
+          if (!intro_active) {
+            midi_state =
                 performer_midi_state_at(chart_, perf.event_track, song_time_);
-            const bool has_performer_track_events =
-                std::any_of(chart_.performer_events.begin(),
-                            chart_.performer_events.end(),
-                            [&](const auto& event) {
-                                return event.track == perf.event_track;
-                            });
-            if ((perf.role == "keyboard" ||
-                 (perf.gh1_character_runtime &&
-                  !has_performer_track_events)) &&
-                midi_state.marker.empty()) {
-                midi_state.playing = true;
-            }
-            const bool performer_marker_changed =
-                perf.last_midi_marker != midi_state.marker ||
-                perf.last_midi_marker_tick != midi_state.marker_tick;
-            if (perf.type_script) {
-                auto dispatch_type_handler =
-                    [&](std::string_view handler) {
-                        if (!perf.type_script->has_handler(handler))
-                            return;
-                        std::string script_error;
-                        if (!perf.type_script->run_handler(
-                                handler, &script_error)) {
-                            std::fprintf(
-                                stderr,
-                                "[world] performer type handler failed: "
-                                "role=%s character=%s handler=%.*s "
-                                "error=%s\n",
-                                perf.role.c_str(),
-                                perf.character_name.c_str(),
-                                static_cast<int>(handler.size()),
-                                handler.data(), script_error.c_str());
-                        }
-                    };
-                const float task_beat = source_character_task_beat_at(
-                    chart_, song_time_);
-                const uint32_t current_tick =
-                    chart_.sec_to_tick(std::max(0.0, song_time_));
-                perf.type_script->set_timeline_beats(
-                    task_beat,
-                    source_character_next_event_beat(
-                        chart_, perf.event_track, current_tick, task_beat));
-                const std::string authored_marker_handler =
-                    source_character_type_handler_for_marker(
-                        chart_.gh1_anim_track, perf.event_track,
-                        midi_state.marker);
-                if (performer_marker_changed &&
-                    !authored_marker_handler.empty()) {
-                    dispatch_type_handler(authored_marker_handler);
-                }
-                if (perf.type_script_solo_active != midi_state.solo) {
-                    perf.type_script_solo_active = midi_state.solo;
-                    const std::string_view solo_handler =
-                        midi_state.solo ? "solo_on" : "solo_off";
-                    if (authored_marker_handler != solo_handler)
-                        dispatch_type_handler(solo_handler);
-                }
-                const bool peak_active =
-                    is_peak_excitement_event(active_venue_event_);
-                if (perf.type_script_peak_active != peak_active) {
-                    perf.type_script_peak_active = peak_active;
-                    dispatch_type_handler(
-                        peak_active ? "peak_on" : "peak_off");
-                }
-                const bool god_effect_active =
-                    source_game_won_message_dispatched_;
-                if (perf.type_script_god_effect_active !=
-                    god_effect_active) {
-                    perf.type_script_god_effect_active =
-                        god_effect_active;
-                    dispatch_type_handler(
-                        god_effect_active ? "god_effect_start"
-                                          : "god_effect_stop");
-                    if (god_effect_active)
-                        dispatch_type_handler("game_won_msg");
-                }
-                const bool game_lost_active =
-                    source_game_lost_camera_dispatched_ || failed_;
-                if (perf.type_script_game_lost_active !=
-                    game_lost_active) {
-                    perf.type_script_game_lost_active =
-                        game_lost_active;
-                    if (game_lost_active)
-                        dispatch_type_handler("game_lost");
-                }
-            }
-            if (debug_performer_sync_frame) {
-                const uint32_t now_tick = chart_.sec_to_tick(song_time_);
-                if (perf.last_traced_performer_event_tick == UINT32_MAX ||
-                    now_tick >= perf.last_traced_performer_event_tick) {
-                    for (const auto& ev : chart_.performer_events) {
-                        if (perf.last_traced_performer_event_tick !=
-                                UINT32_MAX &&
-                            ev.tick <= perf.last_traced_performer_event_tick)
-                            continue;
-                        if (ev.tick > now_tick) break;
-                        if (ev.track != perf.event_track) continue;
-                        std::fprintf(
-                            stderr,
-                            "[performer-event] song=%s role=%s track=%s "
-                            "event=%s event_tick=%u event_t=%.3f t=%.3f\n",
-                            song_shortname_.c_str(), perf.role.c_str(),
-                            perf.event_track.c_str(), ev.text.c_str(), ev.tick,
-                            chart_.tick_to_sec(ev.tick), song_time_);
-                    }
-                } else if (perf.last_traced_performer_event_tick !=
-                               UINT32_MAX &&
-                           now_tick < perf.last_traced_performer_event_tick) {
-                    std::fprintf(
-                        stderr,
-                        "[performer-event] song=%s role=%s track=%s "
-                        "event=[trace_seek_reset] event_tick=%u "
-                        "event_t=%.3f t=%.3f\n",
-                        song_shortname_.c_str(), perf.role.c_str(),
-                        perf.event_track.c_str(), now_tick,
-                        chart_.tick_to_sec(now_tick), song_time_);
-                }
-                perf.last_traced_performer_event_tick = now_tick;
-            }
-            if (performer_marker_changed) {
-                perf.last_midi_marker = midi_state.marker;
-                perf.last_midi_marker_tick = midi_state.marker_tick;
-                perf.midi_playing = midi_state.playing;
+          }
+          const bool has_performer_track_events = std::any_of(
+              chart_.performer_events.begin(), chart_.performer_events.end(),
+              [&](const auto &event) {
+                return event.track == perf.event_track;
+              });
+          if ((perf.role == "keyboard" ||
+               (perf.gh1_character_runtime && !has_performer_track_events)) &&
+              midi_state.marker.empty()) {
+            midi_state.playing = true;
+          }
+          const bool performer_marker_changed =
+              perf.last_midi_marker != midi_state.marker ||
+              perf.last_midi_marker_tick != midi_state.marker_tick;
+          if (perf.type_script) {
+            auto dispatch_type_handler = [&](std::string_view handler) {
+              if (!perf.type_script->has_handler(handler))
+                return;
+              std::string script_error;
+              if (!perf.type_script->run_handler(handler, &script_error)) {
                 std::fprintf(stderr,
-                             "[world] performer midi: song=%s role=%s track=%s marker=%s event_tick=%u event_t=%.3f playing=%d wail=%d solo=%d allbeat=%d double=%d halftime=%d nosnare=%d beat_scale=%.3f handmap=%s t=%.3f\n",
-                             song_shortname_.c_str(), perf.role.c_str(),
-                             perf.event_track.c_str(), midi_state.marker.c_str(),
-                             midi_state.marker_tick, midi_state.marker_time,
-                             midi_state.playing ? 1 : 0,
-                             midi_state.wail ? 1 : 0, midi_state.solo ? 1 : 0,
-                             midi_state.allbeat ? 1 : 0,
-                             midi_state.double_time ? 1 : 0,
-                             midi_state.half_time ? 1 : 0,
-                             midi_state.no_snare ? 1 : 0,
-                             midi_state.main_beat_scale,
-                             midi_state.hand_map.c_str(), song_time_);
+                             "[world] performer type handler failed: "
+                             "role=%s character=%s handler=%.*s "
+                             "error=%s\n",
+                             perf.role.c_str(), perf.character_name.c_str(),
+                             static_cast<int>(handler.size()), handler.data(),
+                             script_error.c_str());
+              }
+            };
+            const float task_beat =
+                source_character_task_beat_at(chart_, song_time_);
+            const uint32_t current_tick =
+                chart_.sec_to_tick(std::max(0.0, song_time_));
+            perf.type_script->set_timeline_beats(
+                task_beat,
+                source_character_next_event_beat(chart_, perf.event_track,
+                                                 current_tick, task_beat));
+            const std::string authored_marker_handler =
+                source_character_type_handler_for_marker(
+                    chart_.gh1_anim_track, perf.event_track, midi_state.marker);
+            if (performer_marker_changed && !authored_marker_handler.empty()) {
+              dispatch_type_handler(authored_marker_handler);
             }
-            const bool performer_playing = midi_state.playing;
-            const bool authored_main_driver_owned =
-                perf.type_script &&
-                perf.authored_drivers.find("main.drv") !=
-                    perf.authored_drivers.end();
-            auto& character = perf.renderer->character();
-            if (perf.charwalk_runtime &&
-                perf.role == "guitarist0") {
-                struct WalkTarget {
-                    std::string name;
-                    std::array<float, 16> world;
-                    size_t source_waypoint_index =
-                        std::numeric_limits<size_t>::max();
-                    float target_radius = 12.0f;
-                };
-                std::vector<WalkTarget> walk_targets;
-                std::unordered_set<std::string> walk_target_names;
-                constexpr uint32_t kWalkSpot = 0x00000040u;
-                const uint32_t request_waypoint_flags =
-                    perf.gh1_character_runtime
-                        ? perf.charwalk_waypoint_flags
-                        : kWalkSpot;
-                if (perf.gh1_character_runtime) {
-                    for (const auto& target :
-                         venue_camera_target_worlds_) {
-                        if (!starts_with(
-                                target.first,
-                                "gh1_walk_spot_") ||
-                            !walk_target_names.insert(
-                                target.first).second) {
-                            continue;
-                        }
-                        walk_targets.push_back(
-                            {target.first, target.second,
-                             std::numeric_limits<size_t>::max()});
-                    }
+            if (perf.type_script_solo_active != midi_state.solo) {
+              perf.type_script_solo_active = midi_state.solo;
+              const std::string_view solo_handler =
+                  midi_state.solo ? "solo_on" : "solo_off";
+              if (authored_marker_handler != solo_handler)
+                dispatch_type_handler(solo_handler);
+            }
+            const bool peak_active =
+                is_peak_excitement_event(active_venue_event_);
+            if (perf.type_script_peak_active != peak_active) {
+              perf.type_script_peak_active = peak_active;
+              dispatch_type_handler(peak_active ? "peak_on" : "peak_off");
+            }
+            const bool god_effect_active = source_game_won_message_dispatched_;
+            if (perf.type_script_god_effect_active != god_effect_active) {
+              perf.type_script_god_effect_active = god_effect_active;
+              dispatch_type_handler(god_effect_active ? "god_effect_start"
+                                                      : "god_effect_stop");
+              if (god_effect_active)
+                dispatch_type_handler("game_won_msg");
+            }
+            const bool game_lost_active =
+                source_game_lost_camera_dispatched_ || failed_;
+            if (perf.type_script_game_lost_active != game_lost_active) {
+              perf.type_script_game_lost_active = game_lost_active;
+              if (game_lost_active)
+                dispatch_type_handler("game_lost");
+            }
+          }
+          if (debug_performer_sync_frame) {
+            const uint32_t now_tick = chart_.sec_to_tick(song_time_);
+            if (perf.last_traced_performer_event_tick == UINT32_MAX ||
+                now_tick >= perf.last_traced_performer_event_tick) {
+              for (const auto &ev : chart_.performer_events) {
+                if (perf.last_traced_performer_event_tick != UINT32_MAX &&
+                    ev.tick <= perf.last_traced_performer_event_tick)
+                  continue;
+                if (ev.tick > now_tick)
+                  break;
+                if (ev.track != perf.event_track)
+                  continue;
+                std::fprintf(stderr,
+                             "[performer-event] song=%s role=%s track=%s "
+                             "event=%s event_tick=%u event_t=%.3f t=%.3f\n",
+                             song_shortname_.c_str(), perf.role.c_str(),
+                             perf.event_track.c_str(), ev.text.c_str(), ev.tick,
+                             chart_.tick_to_sec(ev.tick), song_time_);
+              }
+            } else if (perf.last_traced_performer_event_tick != UINT32_MAX &&
+                       now_tick < perf.last_traced_performer_event_tick) {
+              std::fprintf(stderr,
+                           "[performer-event] song=%s role=%s track=%s "
+                           "event=[trace_seek_reset] event_tick=%u "
+                           "event_t=%.3f t=%.3f\n",
+                           song_shortname_.c_str(), perf.role.c_str(),
+                           perf.event_track.c_str(), now_tick,
+                           chart_.tick_to_sec(now_tick), song_time_);
+            }
+            perf.last_traced_performer_event_tick = now_tick;
+          }
+          if (performer_marker_changed) {
+            perf.last_midi_marker = midi_state.marker;
+            perf.last_midi_marker_tick = midi_state.marker_tick;
+            perf.midi_playing = midi_state.playing;
+            std::fprintf(
+                stderr,
+                "[world] performer midi: song=%s role=%s track=%s marker=%s "
+                "event_tick=%u event_t=%.3f playing=%d wail=%d solo=%d "
+                "allbeat=%d double=%d halftime=%d nosnare=%d beat_scale=%.3f "
+                "handmap=%s t=%.3f\n",
+                song_shortname_.c_str(), perf.role.c_str(),
+                perf.event_track.c_str(), midi_state.marker.c_str(),
+                midi_state.marker_tick, midi_state.marker_time,
+                midi_state.playing ? 1 : 0, midi_state.wail ? 1 : 0,
+                midi_state.solo ? 1 : 0, midi_state.allbeat ? 1 : 0,
+                midi_state.double_time ? 1 : 0, midi_state.half_time ? 1 : 0,
+                midi_state.no_snare ? 1 : 0, midi_state.main_beat_scale,
+                midi_state.hand_map.c_str(), song_time_);
+          }
+          const bool performer_playing = midi_state.playing;
+          const bool authored_main_driver_owned =
+              perf.type_script && perf.authored_drivers.find("main.drv") !=
+                                      perf.authored_drivers.end();
+          auto &character = perf.renderer->character();
+          if (perf.charwalk_runtime && perf.role == "guitarist0") {
+            struct WalkTarget {
+              std::string name;
+              std::array<float, 16> world;
+              size_t source_waypoint_index = std::numeric_limits<size_t>::max();
+              float target_radius = 12.0f;
+            };
+            std::vector<WalkTarget> walk_targets;
+            std::unordered_set<std::string> walk_target_names;
+            constexpr uint32_t kWalkSpot = 0x00000040u;
+            const uint32_t request_waypoint_flags =
+                perf.gh1_character_runtime ? perf.charwalk_waypoint_flags
+                                           : kWalkSpot;
+            if (perf.gh1_character_runtime) {
+              for (const auto &target : venue_camera_target_worlds_) {
+                if (!starts_with(target.first, "gh1_walk_spot_") ||
+                    !walk_target_names.insert(target.first).second) {
+                  continue;
                 }
-                for (size_t waypoint_index = 0;
-                     waypoint_index <
-                     venue_chars_scene_.waypoints.size();
-                     ++waypoint_index) {
-                    const auto& waypoint =
-                        venue_chars_scene_.waypoints[waypoint_index];
-                    if (!waypoint.decoded ||
-                        (!perf.gh1_character_runtime &&
-                         !waypoint.source_order_decoded) ||
-                        (perf.gh1_character_runtime &&
-                         (waypoint.flags &
-                          request_waypoint_flags) == 0) ||
-                        !walk_target_names.insert(waypoint.name).second) {
-                        continue;
-                    }
-                    walk_targets.push_back(
-                        {waypoint.name,
-                         xfm_to_mat4(waypoint.world_stored),
-                         waypoint_index,
-                         std::max(waypoint.radius,
-                                  waypoint.y_radius)});
-                }
-                if (perf.gh1_character_runtime) {
-                    std::sort(
-                        walk_targets.begin(), walk_targets.end(),
-                        [](const WalkTarget& lhs,
-                           const WalkTarget& rhs) {
-                            return lhs.name < rhs.name;
+                walk_targets.push_back({target.first, target.second,
+                                        std::numeric_limits<size_t>::max()});
+              }
+            }
+            for (size_t waypoint_index = 0;
+                 waypoint_index < venue_chars_scene_.waypoints.size();
+                 ++waypoint_index) {
+              const auto &waypoint =
+                  venue_chars_scene_.waypoints[waypoint_index];
+              if (!waypoint.decoded ||
+                  (!perf.gh1_character_runtime &&
+                   !waypoint.source_order_decoded) ||
+                  (perf.gh1_character_runtime &&
+                   (waypoint.flags & request_waypoint_flags) == 0) ||
+                  !walk_target_names.insert(waypoint.name).second) {
+                continue;
+              }
+              walk_targets.push_back(
+                  {waypoint.name, xfm_to_mat4(waypoint.world_stored),
+                   waypoint_index,
+                   std::max(waypoint.radius, waypoint.y_radius)});
+            }
+            if (perf.gh1_character_runtime) {
+              std::sort(walk_targets.begin(), walk_targets.end(),
+                        [](const WalkTarget &lhs, const WalkTarget &rhs) {
+                          return lhs.name < rhs.name;
                         });
-                }
+            }
 
-                auto reset_walk_delay_samples = [&]() {
-                    for (size_t level = 0;
-                         level < perf.gh1_walk_delay_sample.size();
-                         ++level) {
-                        if (!perf.gh1_walk_delay_enabled[level]) {
-                            perf.gh1_walk_delay_sample[level] =
-                                source_charwalk_delay_sample(
-                                    false, 0.0f, 0.0f, 0.0f);
-                            continue;
-                        }
-                        const float unit =
-                            source_random_gh1_walk_unit(
-                                perf.gh1_walk_random_draw_index++);
-                        const float minimum =
-                            perf.gh1_walk_delay_min[level];
-                        const float maximum = std::max(
-                            minimum, perf.gh1_walk_delay_max[level]);
-                        perf.gh1_walk_delay_sample[level] =
-                            source_charwalk_delay_sample(
-                                true, minimum, maximum, unit);
-                    }
-                    perf.gh1_walk_delay_epoch = song_time_;
-                };
-                if (perf.gh1_walk_delay_epoch < 0.0 ||
-                    song_time_ < perf.gh1_walk_delay_epoch) {
-                    reset_walk_delay_samples();
+            auto reset_walk_delay_samples = [&]() {
+              for (size_t level = 0; level < perf.gh1_walk_delay_sample.size();
+                   ++level) {
+                if (!perf.gh1_walk_delay_enabled[level]) {
+                  perf.gh1_walk_delay_sample[level] =
+                      source_charwalk_delay_sample(false, 0.0f, 0.0f, 0.0f);
+                  continue;
                 }
+                const float unit = source_random_gh1_walk_unit(
+                    perf.gh1_walk_random_draw_index++);
+                const float minimum = perf.gh1_walk_delay_min[level];
+                const float maximum =
+                    std::max(minimum, perf.gh1_walk_delay_max[level]);
+                perf.gh1_walk_delay_sample[level] =
+                    source_charwalk_delay_sample(true, minimum, maximum, unit);
+              }
+              perf.gh1_walk_delay_epoch = song_time_;
+            };
+            if (perf.gh1_walk_delay_epoch < 0.0 ||
+                song_time_ < perf.gh1_walk_delay_epoch) {
+              reset_walk_delay_samples();
+            }
 
-                auto current_root_world = [&]() {
-                    return perf.world_transform;
+            auto current_root_world = [&]() { return perf.world_transform; };
+            if (perf.gh1_walk_state != 0) {
+              perf.gh1_walk_root_world = current_root_world();
+              perf.gh1_walk_has_root_world = true;
+            }
+
+            auto flag_present = [](const Performer::Gh1WalkClip &entry,
+                                   uint32_t wanted) {
+              return (entry.clip.flags & wanted) != 0;
+            };
+            auto flags_contain = [](const Performer::Gh1WalkClip &entry,
+                                    uint32_t wanted) {
+              return wanted == 0 || (entry.clip.flags & wanted) == wanted;
+            };
+            auto desired_local_direction =
+                [&](const std::array<float, 16> &target_world) {
+                  const auto local = mat4_basis_delta_game(
+                      perf.world_transform,
+                      {target_world[12], target_world[13], target_world[14]});
+                  const float length =
+                      std::sqrt(local[0] * local[0] + local[1] * local[1]);
+                  if (length <= 1.0e-5f) {
+                    return std::array<float, 3>{0.0f, 1.0f, 0.0f};
+                  }
+                  return std::array<float, 3>{local[0] / length,
+                                              local[1] / length, 0.0f};
                 };
-                if (perf.gh1_walk_state != 0) {
-                    perf.gh1_walk_root_world = current_root_world();
-                    perf.gh1_walk_has_root_world = true;
+            auto direction_flag_for =
+                [](const std::array<float, 3> &direction) {
+                  if (std::fabs(direction[1]) <
+                      std::fabs(2.0f * direction[0])) {
+                    return direction[0] > 0.0f ? 0x00000200u : 0x00000100u;
+                  }
+                  return direction[1] > 0.0f ? 0x00000400u : 0x00000800u;
+                };
+            auto choose_walk_clip =
+                [&](const std::vector<Performer::Gh1WalkClip> &pool,
+                    const std::array<float, 3> &direction, bool apply_style,
+                    bool use_required_flags,
+                    uint32_t required_flags) -> const Performer::Gh1WalkClip * {
+              if (pool.empty())
+                return nullptr;
+              const uint32_t direction_flag = direction_flag_for(direction);
+              const uint32_t style_flag =
+                  venue_excitement_level(active_venue_event_) < 3 ? 0x00001000u
+                                                                  : 0x00002000u;
+              const size_t passes = apply_style ? 2u : 1u;
+              for (size_t pass = 0; pass < passes; ++pass) {
+                const bool require_style = apply_style && pass == 0;
+                const Performer::Gh1WalkClip *best = nullptr;
+                float best_score = -std::numeric_limits<float>::infinity();
+                for (const auto &entry : pool) {
+                  if (use_required_flags &&
+                      !flags_contain(entry, required_flags)) {
+                    continue;
+                  }
+                  if (!use_required_flags &&
+                      !flag_present(entry, direction_flag)) {
+                    continue;
+                  }
+                  if (!use_required_flags && require_style &&
+                      !flag_present(entry, style_flag)) {
+                    continue;
+                  }
+                  const auto motion = gh1_walk_clip_motion(entry.clip);
+                  if (!motion.has_position)
+                    continue;
+                  const float dx = motion.last[0] - motion.first[0];
+                  const float dy = motion.last[1] - motion.first[1];
+                  const float distance = std::sqrt(dx * dx + dy * dy);
+                  if (distance <= 1.0e-5f)
+                    continue;
+                  float score = (dx / distance) * direction[0] +
+                                (dy / distance) * direction[1];
+                  if (motion.has_rotation) {
+                    const float relative =
+                        motion.last_rotation - motion.first_rotation;
+                    const std::array<float, 2> forward = {-std::sin(relative),
+                                                          std::cos(relative)};
+                    score += 1.5f * (forward[0] * direction[0] +
+                                     forward[1] * direction[1]);
+                  }
+                  if (!best || score > best_score) {
+                    best = &entry;
+                    best_score = score;
+                  }
                 }
-
-                auto flag_present =
-                    [](const Performer::Gh1WalkClip& entry,
-                       uint32_t wanted) {
-                        return (entry.clip.flags & wanted) != 0;
-                    };
-                auto flags_contain =
-                    [](const Performer::Gh1WalkClip& entry,
-                       uint32_t wanted) {
-                        return wanted == 0 ||
-                               (entry.clip.flags & wanted) == wanted;
-                    };
-                auto desired_local_direction =
-                    [&](const std::array<float, 16>& target_world) {
-                        const auto local = mat4_basis_delta_game(
-                            perf.world_transform,
-                            {target_world[12], target_world[13],
-                             target_world[14]});
-                        const float length =
-                            std::sqrt(local[0] * local[0] +
-                                      local[1] * local[1]);
-                        if (length <= 1.0e-5f) {
-                            return std::array<float, 3>{
-                                0.0f, 1.0f, 0.0f};
-                        }
-                        return std::array<float, 3>{
-                            local[0] / length, local[1] / length,
-                            0.0f};
-                    };
-                auto direction_flag_for =
-                    [](const std::array<float, 3>& direction) {
-                        if (std::fabs(direction[1]) <
-                            std::fabs(2.0f * direction[0])) {
-                            return direction[0] > 0.0f
-                                       ? 0x00000200u
-                                       : 0x00000100u;
-                        }
-                        return direction[1] > 0.0f
-                                   ? 0x00000400u
-                                   : 0x00000800u;
-                    };
-                auto choose_walk_clip =
-                    [&](const std::vector<Performer::Gh1WalkClip>& pool,
-                        const std::array<float, 3>& direction,
-                        bool apply_style,
-                        bool use_required_flags,
-                        uint32_t required_flags)
-                    -> const Performer::Gh1WalkClip* {
-                        if (pool.empty()) return nullptr;
-                        const uint32_t direction_flag =
-                            direction_flag_for(direction);
-                        const uint32_t style_flag =
-                            venue_excitement_level(
-                                active_venue_event_) < 3
-                                ? 0x00001000u
-                                : 0x00002000u;
-                        const size_t passes = apply_style ? 2u : 1u;
-                        for (size_t pass = 0; pass < passes; ++pass) {
-                            const bool require_style =
-                                apply_style && pass == 0;
-                            const Performer::Gh1WalkClip* best =
-                                nullptr;
-                            float best_score =
-                                -std::numeric_limits<float>::
-                                    infinity();
-                            for (const auto& entry : pool) {
-                                if (use_required_flags &&
-                                    !flags_contain(
-                                        entry, required_flags)) {
-                                    continue;
-                                }
-                                if (!use_required_flags &&
-                                    !flag_present(
-                                        entry, direction_flag)) {
-                                    continue;
-                                }
-                                if (!use_required_flags &&
-                                    require_style &&
-                                    !flag_present(entry,
-                                                  style_flag)) {
-                                    continue;
-                                }
-                                const auto motion =
-                                    gh1_walk_clip_motion(entry.clip);
-                                if (!motion.has_position) continue;
-                                const float dx =
-                                    motion.last[0] -
-                                    motion.first[0];
-                                const float dy =
-                                    motion.last[1] -
-                                    motion.first[1];
-                                const float distance =
-                                    std::sqrt(dx * dx + dy * dy);
-                                if (distance <= 1.0e-5f) continue;
-                                float score =
-                                    (dx / distance) *
-                                        direction[0] +
-                                    (dy / distance) *
-                                        direction[1];
-                                if (motion.has_rotation) {
-                                    const float relative =
-                                        motion.last_rotation -
-                                        motion.first_rotation;
-                                    const std::array<float, 2> forward = {
-                                        -std::sin(relative),
-                                        std::cos(relative)};
-                                    score +=
-                                        1.5f *
-                                        (forward[0] * direction[0] +
-                                         forward[1] * direction[1]);
-                                }
-                                if (!best ||
-                                    score > best_score) {
-                                    best = &entry;
-                                    best_score = score;
-                                }
-                            }
-                            if (best) return best;
-                        }
-                        return nullptr;
-                    };
-                auto select_native_walk_group_clip =
-                    [&]() -> const Performer::Gh1WalkClip* {
-                        auto& pool = perf.gh1_walk_loop_clips;
-                        std::vector<uint32_t> flags;
-                        flags.reserve(pool.size());
-                        for (const auto& entry : pool) {
-                            flags.push_back(entry.clip.flags);
-                        }
-                        const auto selection =
-                            source_char_clip_group_flag_selection(
-                                flags,
-                                perf.charwalk_walk_group_which,
-                                perf.charwalk_request_walk_flags);
-                        if (!selection.selected_index) {
-                            return nullptr;
-                        }
-                        const size_t selected =
-                            *selection.selected_index;
-                        const size_t promoted =
-                            selection.promoted_index;
-                        if (selected > promoted) {
-                            std::rotate(
-                                pool.begin() +
-                                    static_cast<std::ptrdiff_t>(
-                                        promoted),
-                                pool.begin() +
-                                    static_cast<std::ptrdiff_t>(
-                                        selected),
-                                pool.begin() +
-                                    static_cast<std::ptrdiff_t>(
-                                        selected + 1));
-                        } else if (selected < promoted) {
-                            std::rotate(
-                                pool.begin() +
-                                    static_cast<std::ptrdiff_t>(
-                                        selected),
-                                pool.begin() +
-                                    static_cast<std::ptrdiff_t>(
-                                        selected + 1),
-                                pool.begin() +
-                                    static_cast<std::ptrdiff_t>(
-                                        promoted + 1));
-                        }
-                        perf.charwalk_walk_group_which =
-                            static_cast<int32_t>(promoted);
-                        if (debug_gh1_walk_enabled()) {
-                            std::fprintf(
-                                stderr,
-                                "[gh1-walk-group] required=0x%08x "
-                                "selected=%zu promoted=%zu which=%d "
-                                "clip=%s flags=0x%08x\n",
-                                static_cast<unsigned>(
-                                    perf.charwalk_request_walk_flags),
-                                selected, promoted,
-                                perf.charwalk_walk_group_which,
-                                pool[promoted].clip.name.c_str(),
-                                static_cast<unsigned>(
-                                    pool[promoted].clip.flags));
-                        }
-                        return &pool[promoted];
-                    };
-                auto selected_walk_loop_clip =
-                    [&]() -> const Performer::Gh1WalkClip* {
-                        if (perf.charwalk_selected_walk_clip.empty()) {
-                            return nullptr;
-                        }
-                        for (const auto& entry :
-                             perf.gh1_walk_loop_clips) {
-                            if (entry.clip.name ==
-                                perf.charwalk_selected_walk_clip) {
-                                return &entry;
-                            }
-                        }
-                        return nullptr;
-                    };
-                auto clip_seconds_at_beat =
-                    [](const ghogx::character::CharClip& clip,
-                       float beat) {
-                        if (clip.beats_per_second <= 0.0f) {
-                            return 0.0f;
-                        }
-                        return (beat - clip.start_beat) /
-                               clip.beats_per_second;
-                    };
-                struct NativeTurnSelection {
-                    const Performer::Gh1WalkClip* clip = nullptr;
-                    float turn_start_beat = 0.0f;
-                    float turn_end_beat = 0.0f;
-                    float walk_start_beat = 0.0f;
-                    float turn_start_seconds = 0.0f;
-                    float turn_end_seconds = -1.0f;
-                    float walk_start_seconds = 0.0f;
-                    float angular_error =
-                        std::numeric_limits<float>::max();
+                if (best)
+                  return best;
+              }
+              return nullptr;
+            };
+            auto select_native_walk_group_clip =
+                [&]() -> const Performer::Gh1WalkClip * {
+              auto &pool = perf.gh1_walk_loop_clips;
+              std::vector<uint32_t> flags;
+              flags.reserve(pool.size());
+              for (const auto &entry : pool) {
+                flags.push_back(entry.clip.flags);
+              }
+              const auto selection = source_char_clip_group_flag_selection(
+                  flags, perf.charwalk_walk_group_which,
+                  perf.charwalk_request_walk_flags);
+              if (!selection.selected_index) {
+                return nullptr;
+              }
+              const size_t selected = *selection.selected_index;
+              const size_t promoted = selection.promoted_index;
+              if (selected > promoted) {
+                std::rotate(
+                    pool.begin() + static_cast<std::ptrdiff_t>(promoted),
+                    pool.begin() + static_cast<std::ptrdiff_t>(selected),
+                    pool.begin() + static_cast<std::ptrdiff_t>(selected + 1));
+              } else if (selected < promoted) {
+                std::rotate(
+                    pool.begin() + static_cast<std::ptrdiff_t>(selected),
+                    pool.begin() + static_cast<std::ptrdiff_t>(selected + 1),
+                    pool.begin() + static_cast<std::ptrdiff_t>(promoted + 1));
+              }
+              perf.charwalk_walk_group_which = static_cast<int32_t>(promoted);
+              if (debug_gh1_walk_enabled()) {
+                std::fprintf(
+                    stderr,
+                    "[gh1-walk-group] required=0x%08x "
+                    "selected=%zu promoted=%zu which=%d "
+                    "clip=%s flags=0x%08x\n",
+                    static_cast<unsigned>(perf.charwalk_request_walk_flags),
+                    selected, promoted, perf.charwalk_walk_group_which,
+                    pool[promoted].clip.name.c_str(),
+                    static_cast<unsigned>(pool[promoted].clip.flags));
+              }
+              return &pool[promoted];
+            };
+            auto selected_walk_loop_clip =
+                [&]() -> const Performer::Gh1WalkClip * {
+              if (perf.charwalk_selected_walk_clip.empty()) {
+                return nullptr;
+              }
+              for (const auto &entry : perf.gh1_walk_loop_clips) {
+                if (entry.clip.name == perf.charwalk_selected_walk_clip) {
+                  return &entry;
+                }
+              }
+              return nullptr;
+            };
+            auto clip_seconds_at_beat =
+                [](const ghogx::character::CharClip &clip, float beat) {
+                  if (clip.beats_per_second <= 0.0f) {
+                    return 0.0f;
+                  }
+                  return (beat - clip.start_beat) / clip.beats_per_second;
                 };
-                auto select_native_turn =
-                    [&](const Performer::Gh1WalkClip& walk,
-                        const std::array<float, 16>& target_world) {
-                        NativeTurnSelection best;
-                        const ghogx::character::CharClipPlayer*
-                            current_player = nullptr;
-                        if (perf.active_player.active()) {
-                            current_player = &perf.active_player;
-                        } else if (perf.idle_player.active()) {
-                            current_player = &perf.idle_player;
-                        }
-                        const auto* current_clip =
+            struct NativeTurnSelection {
+              const Performer::Gh1WalkClip *clip = nullptr;
+              float turn_start_beat = 0.0f;
+              float turn_end_beat = 0.0f;
+              float walk_start_beat = 0.0f;
+              float turn_start_seconds = 0.0f;
+              float turn_end_seconds = -1.0f;
+              float walk_start_seconds = 0.0f;
+              float angular_error = std::numeric_limits<float>::max();
+            };
+            auto select_native_turn = [&](const Performer::Gh1WalkClip &walk,
+                                          const std::array<float, 16>
+                                              &target_world) {
+              NativeTurnSelection best;
+              const ghogx::character::CharClipPlayer *current_player = nullptr;
+              if (perf.active_player.active()) {
+                current_player = &perf.active_player;
+              } else if (perf.idle_player.active()) {
+                current_player = &perf.idle_player;
+              }
+              const auto *current_clip =
+                  current_player ? current_player->source_first_playing_clip()
+                                 : nullptr;
+              const float current_beat =
+                  current_clip
+                      ? current_clip->start_beat +
                             current_player
-                                ? current_player
-                                      ->source_first_playing_clip()
-                                : nullptr;
-                        const float current_beat =
-                            current_clip
-                                ? current_clip->start_beat +
-                                      current_player
-                                              ->source_first_playing_time_seconds() *
-                                          current_clip
-                                              ->beats_per_second
-                                : 0.0f;
-                        const auto root = current_root_world();
-                        ghogx::character::SourceCharUtlClipPredictState
-                            baseline;
-                        baseline.pos = {
-                            root[12], root[13], root[14]};
-                        baseline.ang =
-                            gh1_walk_world_yaw(
-                                perf.world_transform);
-                        const std::array<float, 3> target_position = {
-                            target_world[12], target_world[13],
-                            target_world[14]};
+                                    ->source_first_playing_time_seconds() *
+                                current_clip->beats_per_second
+                      : 0.0f;
+              const auto root = current_root_world();
+              ghogx::character::SourceCharUtlClipPredictState baseline;
+              baseline.pos = {root[12], root[13], root[14]};
+              baseline.ang = gh1_walk_world_yaw(perf.world_transform);
+              const std::array<float, 3> target_position = {
+                  target_world[12], target_world[13], target_world[14]};
 
-                        for (const auto& turn :
-                             perf.gh1_walk_turn_clips) {
-                            if (!flags_contain(
-                                    turn,
-                                    perf.charwalk_request_turn_flags)) {
-                                continue;
-                            }
-
-                            float current_exit_beat = current_beat;
-                            float turn_start_beat =
-                                turn.clip.start_beat;
-                            if (current_clip) {
-                                const auto current_to_turn =
-                                    ghogx::character::
-                                        source_char_clip_find_transition_node(
-                                            *current_clip, turn.clip,
-                                            current_beat, 3);
-                                if (!current_to_turn) continue;
-                                current_exit_beat =
-                                    current_to_turn->current_beat;
-                                turn_start_beat =
-                                    current_to_turn->next_beat;
-                            }
-                            const auto turn_to_walk =
-                                ghogx::character::
-                                    source_char_clip_find_last_transition_node(
-                                        turn.clip, walk.clip.name,
-                                        turn_start_beat);
-                            if (!turn_to_walk) continue;
-
-                            auto prediction = baseline;
-                            if (current_clip) {
-                                const auto first =
-                                    ghogx::character::
-                                        source_char_clip_facing_sample_at_beat(
-                                            *current_clip,
-                                            current_beat);
-                                const auto second =
-                                    ghogx::character::
-                                        source_char_clip_facing_sample_at_beat(
-                                            *current_clip,
-                                            current_exit_beat);
-                                if (!first || !second) continue;
-                                ghogx::character::
-                                    source_char_utl_clip_predict(
-                                        prediction, *first,
-                                        *second);
-                            }
-                            const auto turn_first =
-                                ghogx::character::
-                                    source_char_clip_facing_sample_at_beat(
-                                        turn.clip,
-                                        turn_start_beat);
-                            const auto turn_second =
-                                ghogx::character::
-                                    source_char_clip_facing_sample_at_beat(
-                                        turn.clip,
-                                        turn_to_walk->current_beat);
-                            if (!turn_first || !turn_second) continue;
-                            ghogx::character::
-                                source_char_utl_clip_predict(
-                                    prediction, *turn_first,
-                                    *turn_second);
-
-                            const auto walk_first =
-                                ghogx::character::
-                                    source_char_clip_facing_sample_at_beat(
-                                        walk.clip,
-                                        turn_to_walk->next_beat);
-                            const auto walk_second =
-                                ghogx::character::
-                                    source_char_clip_facing_sample_at_beat(
-                                        walk.clip,
-                                        turn_to_walk->next_beat +
-                                            1.0f);
-                            if (!walk_first || !walk_second) continue;
-                            ghogx::character::SourceCharUtlClipPredictState
-                                walk_step;
-                            ghogx::character::
-                                source_char_utl_clip_predict(
-                                    walk_step, *walk_first,
-                                    *walk_second);
-                            const auto score =
-                                source_charwalk_turn_candidate_score(
-                                    baseline.pos, prediction.pos,
-                                    target_position, prediction.ang,
-                                    walk_step.pos, walk.clip.range);
-                            if (!score.accepted ||
-                                score.angular_error >=
-                                    best.angular_error) {
-                                continue;
-                            }
-                            best.clip = &turn;
-                            best.turn_start_beat =
-                                turn_start_beat;
-                            best.turn_end_beat =
-                                turn_to_walk->current_beat;
-                            best.walk_start_beat =
-                                turn_to_walk->next_beat;
-                            best.turn_start_seconds =
-                                clip_seconds_at_beat(
-                                    turn.clip,
-                                    turn_start_beat);
-                            best.turn_end_seconds =
-                                clip_seconds_at_beat(
-                                    turn.clip,
-                                    turn_to_walk->current_beat);
-                            best.walk_start_seconds =
-                                clip_seconds_at_beat(
-                                    walk.clip,
-                                    turn_to_walk->next_beat);
-                            best.angular_error =
-                                score.angular_error;
-                        }
-                        return best;
-                    };
-                auto preserve_root_and_play =
-                    [&](const Performer::Gh1WalkClip& entry,
-                        int phase, float start_seconds) {
-                        if (!perf.gh1_walk_has_root_world) {
-                            perf.gh1_walk_root_world =
-                                current_root_world();
-                            perf.gh1_walk_has_root_world = true;
-                        }
-                        perf.gh1_walk_player.play(
-                            entry.clip,
-                            ghogx::character::kCharPlayNoBlend |
-                                ghogx::character::kCharPlayNoLoop,
-                            0.0f);
-                        if (start_seconds > 0.0f) {
-                            perf.gh1_walk_player
-                                .seek_current_time_seconds(
-                                    start_seconds);
-                        }
-                        if (!perf.gh1_walk_predict_initialized) {
-                            perf.gh1_walk_predict.pos = {
-                                perf.gh1_walk_root_world[12],
-                                perf.gh1_walk_root_world[13],
-                                perf.gh1_walk_root_world[14]};
-                            perf.gh1_walk_predict.ang =
-                                gh1_walk_world_yaw(
-                                    perf.world_transform);
-                            perf.gh1_walk_predict.last_pos = {};
-                            perf.gh1_walk_predict.last_ang = 0.0f;
-                            perf.gh1_walk_predict_initialized = true;
-                        }
-                        const auto facing =
-                            ghogx::character::source_char_walk_facing_sample(
-                            perf.gh1_walk_player.sampled_pose());
-                        perf.gh1_walk_has_last_facing =
-                            facing.has_value();
-                        if (facing) {
-                            perf.gh1_walk_last_facing = *facing;
-                            perf.gh1_walk_predict.last_pos =
-                                facing->facing_pos;
-                            perf.gh1_walk_predict.last_ang =
-                                facing->facing_rot;
-                        }
-                        perf.gh1_walk_phase = phase;
-                        perf.gh1_walk_state =
-                            phase == 3 ? 2 : 1;
-                        std::fprintf(
-                            stderr,
-                            "[world] GH1 CharWalk phase: "
-                            "phase=%d state=%d clip=%s source=%s "
-                            "start=%.3f target=%s t=%.3f\n",
-                            phase, perf.gh1_walk_state,
-                            entry.clip.name.c_str(),
-                            clip_source_path(entry.clip),
-                            start_seconds,
-                            perf.gh1_walk_target_waypoint.c_str(),
-                            song_time_);
-                    };
-                auto remaining_walk_distance = [&]() {
-                    const auto root =
-                        perf.gh1_walk_has_root_world
-                            ? perf.gh1_walk_root_world
-                            : current_root_world();
-                    const float dx =
-                        perf.gh1_walk_target_world[12] - root[12];
-                    const float dy =
-                        perf.gh1_walk_target_world[13] - root[13];
-                    const float dz =
-                        perf.gh1_walk_target_world[14] - root[14];
-                    return std::sqrt(dx * dx + dy * dy + dz * dz);
-                };
-                auto clip_finished = [&]() {
-                    const auto* clip =
-                        perf.gh1_walk_player.current_clip();
-                    if (!clip) return false;
-                    float end_seconds = clip->duration_seconds();
-                    if (!perf.gh1_character_runtime &&
-                        perf.charwalk_motion_plan.valid &&
-                        perf.charwalk_schedule_index + 1 <
-                            perf.charwalk_motion_plan
-                                .schedule.size()) {
-                        const auto& next =
-                            perf.charwalk_motion_plan.schedule[
-                                perf.charwalk_schedule_index + 1];
-                        end_seconds = clip_seconds_at_beat(
-                            *clip, next.previous_end_beat);
-                    } else if (
-                        perf.gh1_walk_phase == 1 &&
-                        perf.charwalk_phase_end_seconds >= 0.0f) {
-                        end_seconds =
-                            perf.charwalk_phase_end_seconds;
-                    }
-                    return end_seconds > 0.0f &&
-                           perf.gh1_walk_player
-                                   .current_time_seconds() >=
-                               end_seconds - 1.0e-4f;
-                };
-
-                if (perf.gh1_walk_state != 0 && clip_finished()) {
-                    perf.gh1_walk_root_world = current_root_world();
-                    perf.gh1_walk_has_root_world = true;
-                    if (!perf.gh1_character_runtime &&
-                        perf.charwalk_motion_plan.valid) {
-                        const size_t next_index =
-                            perf.charwalk_schedule_index + 1;
-                        if (next_index <
-                            perf.charwalk_motion_plan
-                                .schedule.size()) {
-                            const auto& next =
-                                perf.charwalk_motion_plan
-                                    .schedule[next_index];
-                            const Performer::Gh1WalkClip*
-                                next_entry = nullptr;
-                            auto resolve_entry =
-                                [&](const std::vector<
-                                        Performer::Gh1WalkClip>&
-                                        pool) {
-                                    for (const auto& entry : pool) {
-                                        if (&entry.clip == next.clip) {
-                                            next_entry = &entry;
-                                            break;
-                                        }
-                                    }
-                                };
-                            resolve_entry(
-                                perf.gh1_walk_turn_clips);
-                            if (!next_entry) {
-                                resolve_entry(
-                                    perf.gh1_walk_loop_clips);
-                            }
-                            if (!next_entry) {
-                                resolve_entry(
-                                    perf.gh1_walk_stop_clips);
-                            }
-                            if (next_entry && next.clip) {
-                                perf.charwalk_schedule_index =
-                                    next_index;
-                                const int phase =
-                                    next_index + 1 ==
-                                            perf
-                                                .charwalk_motion_plan
-                                                .schedule.size()
-                                        ? 3
-                                        : 2;
-                                perf.charwalk_phase_end_seconds =
-                                    -1.0f;
-                                perf.charwalk_next_start_seconds =
-                                    0.0f;
-                                preserve_root_and_play(
-                                    *next_entry, phase,
-                                    clip_seconds_at_beat(
-                                        *next.clip,
-                                        next.start_beat));
-                            }
-                        } else {
-                            perf.gh1_walk_player.clear();
-                            perf.gh1_walk_state = 0;
-                            perf.gh1_walk_phase = 0;
-                            perf.gh1_walk_current_waypoint =
-                                perf.gh1_walk_target_waypoint;
-                            perf.world_transform =
-                                perf.gh1_walk_target_world;
-                            perf.renderer->set_world_transform(
-                                perf.world_transform);
-                            perf.gh1_walk_has_root_world = false;
-                            perf.gh1_walk_predict_initialized =
-                                false;
-                            perf.gh1_walk_has_last_facing = false;
-                            perf.charwalk_selected_walk_clip
-                                .clear();
-                            perf.charwalk_phase_end_seconds =
-                                -1.0f;
-                            perf.charwalk_next_start_seconds =
-                                0.0f;
-                            perf.charwalk_motion_plan = {};
-                            perf.charwalk_schedule_index = 0;
-                            perf.charwalk_plan_point_index = 0;
-                            perf.charwalk_offset_speed = 0.0f;
-                            std::fprintf(
-                                stderr,
-                                "[world] GH1 CharWalk complete: "
-                                "waypoint=%s t=%.3f\n",
-                                perf
-                                    .gh1_walk_current_waypoint
-                                    .c_str(),
-                                song_time_);
-                        }
-                    } else {
-                    const auto direction = desired_local_direction(
-                        perf.gh1_walk_target_world);
-                    if (perf.gh1_walk_phase == 1) {
-                        const auto* next =
-                            perf.gh1_character_runtime
-                                ? choose_walk_clip(
-                                      perf.gh1_walk_loop_clips,
-                                      direction, true, false, 0u)
-                                : selected_walk_loop_clip();
-                        if (next) {
-                            const float start_seconds =
-                                perf.gh1_character_runtime
-                                    ? 0.0f
-                                    : perf.charwalk_next_start_seconds;
-                            preserve_root_and_play(
-                                *next, 2, start_seconds);
-                            perf.charwalk_phase_end_seconds = -1.0f;
-                            perf.charwalk_next_start_seconds = 0.0f;
-                        }
-                    } else if (perf.gh1_walk_phase == 2) {
-                        const auto* stop = choose_walk_clip(
-                            perf.gh1_walk_stop_clips, direction,
-                            false,
-                            !perf.gh1_character_runtime,
-                            perf.charwalk_request_stop_flags);
-                        float stop_distance = 0.0f;
-                        if (stop) {
-                            const auto motion =
-                                gh1_walk_clip_motion(stop->clip);
-                            const float dx =
-                                motion.last[0] - motion.first[0];
-                            const float dy =
-                                motion.last[1] - motion.first[1];
-                            const float dz =
-                                motion.last[2] - motion.first[2];
-                            stop_distance =
-                                std::sqrt(dx * dx + dy * dy +
-                                          dz * dz);
-                        }
-                        const float remaining =
-                            remaining_walk_distance();
-                        if (debug_gh1_walk_enabled()) {
-                            std::fprintf(
-                                stderr,
-                                "[gh1-walk-regulate] remaining=%.3f "
-                                "stop_distance=%.3f slop=%.3f "
-                                "root=(%.3f %.3f %.3f) "
-                                "target=(%.3f %.3f %.3f)\n",
-                                remaining, stop_distance,
-                                perf.gh1_walk_slop,
-                                perf.gh1_walk_root_world[12],
-                                perf.gh1_walk_root_world[13],
-                                perf.gh1_walk_root_world[14],
-                                perf.gh1_walk_target_world[12],
-                                perf.gh1_walk_target_world[13],
-                                perf.gh1_walk_target_world[14]);
-                        }
-                        if (stop &&
-                            remaining <=
-                                stop_distance +
-                                    perf.gh1_walk_slop) {
-                            float stop_start_seconds = 0.0f;
-                            if (!perf.gh1_character_runtime) {
-                                const auto* walk =
-                                    selected_walk_loop_clip();
-                                const float beat_remainder =
-                                    walk
-                                        ? walk->clip.range * 0.5f
-                                        : 0.0f;
-                                const auto stop_start_beat =
-                                    ghogx::character::
-                                        source_charwalk_find_stop_start_beat(
-                                            stop->clip,
-                                            beat_remainder);
-                                if (!stop_start_beat) {
-                                    stop = nullptr;
-                                } else {
-                                    stop_start_seconds =
-                                        clip_seconds_at_beat(
-                                            stop->clip,
-                                            *stop_start_beat);
-                                }
-                            } else {
-                                size_t best_frame = 0;
-                                float best_error =
-                                    std::numeric_limits<float>::max();
-                                const auto end =
-                                    gh1_walk_facing_position_at_frame(
-                                        stop->clip,
-                                        stop->clip.frames.size() - 1);
-                                if (end) {
-                                    for (size_t frame = 0;
-                                         frame <
-                                         stop->clip.frames.size();
-                                         ++frame) {
-                                        const auto at =
-                                            gh1_walk_facing_position_at_frame(
-                                                stop->clip,
-                                                frame);
-                                        if (!at) continue;
-                                        const float dx =
-                                            (*end)[0] - (*at)[0];
-                                        const float dy =
-                                            (*end)[1] - (*at)[1];
-                                        const float dz =
-                                            (*end)[2] - (*at)[2];
-                                        const float distance =
-                                            std::sqrt(dx * dx +
-                                                      dy * dy +
-                                                      dz * dz);
-                                        const float error =
-                                            std::fabs(distance -
-                                                      remaining);
-                                        if (error < best_error) {
-                                            best_error = error;
-                                            best_frame = frame;
-                                        }
-                                    }
-                                }
-                                const float rate =
-                                    stop->clip.fps > 0
-                                        ? static_cast<float>(
-                                              stop->clip.fps)
-                                        : 30.0f;
-                                stop_start_seconds =
-                                    static_cast<float>(best_frame) /
-                                    rate;
-                            }
-                            if (stop) {
-                                preserve_root_and_play(
-                                    *stop, 3,
-                                    stop_start_seconds);
-                            }
-                        } else {
-                            const auto* next =
-                                perf.gh1_character_runtime
-                                    ? choose_walk_clip(
-                                          perf.gh1_walk_loop_clips,
-                                          direction, true, false,
-                                          0u)
-                                    : selected_walk_loop_clip();
-                            if (next) {
-                            preserve_root_and_play(*next, 2, 0.0f);
-                            }
-                        }
-                    } else if (perf.gh1_walk_phase == 3) {
-                        perf.gh1_walk_player.clear();
-                        perf.gh1_walk_state = 0;
-                        perf.gh1_walk_phase = 0;
-                        perf.gh1_walk_current_waypoint =
-                            perf.gh1_walk_target_waypoint;
-                        perf.world_transform =
-                            perf.gh1_walk_target_world;
-                        perf.renderer->set_world_transform(
-                            perf.world_transform);
-                        perf.gh1_walk_has_root_world = false;
-                        perf.gh1_walk_predict_initialized = false;
-                        perf.gh1_walk_has_last_facing = false;
-                        perf.charwalk_selected_walk_clip.clear();
-                        perf.charwalk_phase_end_seconds = -1.0f;
-                        perf.charwalk_next_start_seconds = 0.0f;
-                        if (perf.gh1_character_runtime) {
-                            reset_walk_delay_samples();
-                        }
-                        std::fprintf(
-                            stderr,
-                            "[world] GH1 CharWalk complete: "
-                            "waypoint=%s t=%.3f\n",
-                            perf.gh1_walk_current_waypoint.c_str(),
-                            song_time_);
-                    }
-                    }
+              for (const auto &turn : perf.gh1_walk_turn_clips) {
+                if (!flags_contain(turn, perf.charwalk_request_turn_flags)) {
+                  continue;
                 }
 
-                if (!perf.gh1_character_runtime &&
-                    source_charwalk_request_expired(
-                        perf.charwalk_start_request_active,
-                        perf.charwalk_start_request_deadline,
-                        song_time_)) {
+                float current_exit_beat = current_beat;
+                float turn_start_beat = turn.clip.start_beat;
+                if (current_clip) {
+                  const auto current_to_turn =
+                      ghogx::character::source_char_clip_find_transition_node(
+                          *current_clip, turn.clip, current_beat, 3);
+                  if (!current_to_turn)
+                    continue;
+                  current_exit_beat = current_to_turn->current_beat;
+                  turn_start_beat = current_to_turn->next_beat;
+                }
+                const auto turn_to_walk = ghogx::character::
+                    source_char_clip_find_last_transition_node(
+                        turn.clip, walk.clip.name, turn_start_beat);
+                if (!turn_to_walk)
+                  continue;
+
+                auto prediction = baseline;
+                if (current_clip) {
+                  const auto first =
+                      ghogx::character::source_char_clip_facing_sample_at_beat(
+                          *current_clip, current_beat);
+                  const auto second =
+                      ghogx::character::source_char_clip_facing_sample_at_beat(
+                          *current_clip, current_exit_beat);
+                  if (!first || !second)
+                    continue;
+                  ghogx::character::source_char_utl_clip_predict(
+                      prediction, *first, *second);
+                }
+                const auto turn_first =
+                    ghogx::character::source_char_clip_facing_sample_at_beat(
+                        turn.clip, turn_start_beat);
+                const auto turn_second =
+                    ghogx::character::source_char_clip_facing_sample_at_beat(
+                        turn.clip, turn_to_walk->current_beat);
+                if (!turn_first || !turn_second)
+                  continue;
+                ghogx::character::source_char_utl_clip_predict(
+                    prediction, *turn_first, *turn_second);
+
+                const auto walk_first =
+                    ghogx::character::source_char_clip_facing_sample_at_beat(
+                        walk.clip, turn_to_walk->next_beat);
+                const auto walk_second =
+                    ghogx::character::source_char_clip_facing_sample_at_beat(
+                        walk.clip, turn_to_walk->next_beat + 1.0f);
+                if (!walk_first || !walk_second)
+                  continue;
+                ghogx::character::SourceCharUtlClipPredictState walk_step;
+                ghogx::character::source_char_utl_clip_predict(
+                    walk_step, *walk_first, *walk_second);
+                const auto score = source_charwalk_turn_candidate_score(
+                    baseline.pos, prediction.pos, target_position,
+                    prediction.ang, walk_step.pos, walk.clip.range);
+                if (!score.accepted ||
+                    score.angular_error >= best.angular_error) {
+                  continue;
+                }
+                best.clip = &turn;
+                best.turn_start_beat = turn_start_beat;
+                best.turn_end_beat = turn_to_walk->current_beat;
+                best.walk_start_beat = turn_to_walk->next_beat;
+                best.turn_start_seconds =
+                    clip_seconds_at_beat(turn.clip, turn_start_beat);
+                best.turn_end_seconds =
+                    clip_seconds_at_beat(turn.clip, turn_to_walk->current_beat);
+                best.walk_start_seconds =
+                    clip_seconds_at_beat(walk.clip, turn_to_walk->next_beat);
+                best.angular_error = score.angular_error;
+              }
+              return best;
+            };
+            auto preserve_root_and_play = [&](const Performer::Gh1WalkClip
+                                                  &entry,
+                                              int phase, float start_seconds) {
+              if (!perf.gh1_walk_has_root_world) {
+                perf.gh1_walk_root_world = current_root_world();
+                perf.gh1_walk_has_root_world = true;
+              }
+              perf.gh1_walk_player.play(entry.clip,
+                                        ghogx::character::kCharPlayNoBlend |
+                                            ghogx::character::kCharPlayNoLoop,
+                                        0.0f);
+              if (start_seconds > 0.0f) {
+                perf.gh1_walk_player.seek_current_time_seconds(start_seconds);
+              }
+              if (!perf.gh1_walk_predict_initialized) {
+                perf.gh1_walk_predict.pos = {perf.gh1_walk_root_world[12],
+                                             perf.gh1_walk_root_world[13],
+                                             perf.gh1_walk_root_world[14]};
+                perf.gh1_walk_predict.ang =
+                    gh1_walk_world_yaw(perf.world_transform);
+                perf.gh1_walk_predict.last_pos = {};
+                perf.gh1_walk_predict.last_ang = 0.0f;
+                perf.gh1_walk_predict_initialized = true;
+              }
+              const auto facing =
+                  ghogx::character::source_char_walk_facing_sample(
+                      perf.gh1_walk_player.sampled_pose());
+              perf.gh1_walk_has_last_facing = facing.has_value();
+              if (facing) {
+                perf.gh1_walk_last_facing = *facing;
+                perf.gh1_walk_predict.last_pos = facing->facing_pos;
+                perf.gh1_walk_predict.last_ang = facing->facing_rot;
+              }
+              perf.gh1_walk_phase = phase;
+              perf.gh1_walk_state = phase == 3 ? 2 : 1;
+              std::fprintf(stderr,
+                           "[world] GH1 CharWalk phase: "
+                           "phase=%d state=%d clip=%s source=%s "
+                           "start=%.3f target=%s t=%.3f\n",
+                           phase, perf.gh1_walk_state, entry.clip.name.c_str(),
+                           clip_source_path(entry.clip), start_seconds,
+                           perf.gh1_walk_target_waypoint.c_str(), song_time_);
+            };
+            auto remaining_walk_distance = [&]() {
+              const auto root = perf.gh1_walk_has_root_world
+                                    ? perf.gh1_walk_root_world
+                                    : current_root_world();
+              const float dx = perf.gh1_walk_target_world[12] - root[12];
+              const float dy = perf.gh1_walk_target_world[13] - root[13];
+              const float dz = perf.gh1_walk_target_world[14] - root[14];
+              return std::sqrt(dx * dx + dy * dy + dz * dz);
+            };
+            auto clip_finished = [&]() {
+              const auto *clip = perf.gh1_walk_player.current_clip();
+              if (!clip)
+                return false;
+              float end_seconds = clip->duration_seconds();
+              if (!perf.gh1_character_runtime &&
+                  perf.charwalk_motion_plan.valid &&
+                  perf.charwalk_schedule_index + 1 <
+                      perf.charwalk_motion_plan.schedule.size()) {
+                const auto &next =
+                    perf.charwalk_motion_plan
+                        .schedule[perf.charwalk_schedule_index + 1];
+                end_seconds =
+                    clip_seconds_at_beat(*clip, next.previous_end_beat);
+              } else if (perf.gh1_walk_phase == 1 &&
+                         perf.charwalk_phase_end_seconds >= 0.0f) {
+                end_seconds = perf.charwalk_phase_end_seconds;
+              }
+              return end_seconds > 0.0f &&
+                     perf.gh1_walk_player.current_time_seconds() >=
+                         end_seconds - 1.0e-4f;
+            };
+
+            if (perf.gh1_walk_state != 0 && clip_finished()) {
+              perf.gh1_walk_root_world = current_root_world();
+              perf.gh1_walk_has_root_world = true;
+              if (!perf.gh1_character_runtime &&
+                  perf.charwalk_motion_plan.valid) {
+                const size_t next_index = perf.charwalk_schedule_index + 1;
+                if (next_index < perf.charwalk_motion_plan.schedule.size()) {
+                  const auto &next =
+                      perf.charwalk_motion_plan.schedule[next_index];
+                  const Performer::Gh1WalkClip *next_entry = nullptr;
+                  auto resolve_entry =
+                      [&](const std::vector<Performer::Gh1WalkClip> &pool) {
+                        for (const auto &entry : pool) {
+                          if (&entry.clip == next.clip) {
+                            next_entry = &entry;
+                            break;
+                          }
+                        }
+                      };
+                  resolve_entry(perf.gh1_walk_turn_clips);
+                  if (!next_entry) {
+                    resolve_entry(perf.gh1_walk_loop_clips);
+                  }
+                  if (!next_entry) {
+                    resolve_entry(perf.gh1_walk_stop_clips);
+                  }
+                  if (next_entry && next.clip) {
+                    perf.charwalk_schedule_index = next_index;
+                    const int phase =
+                        next_index + 1 ==
+                                perf.charwalk_motion_plan.schedule.size()
+                            ? 3
+                            : 2;
+                    perf.charwalk_phase_end_seconds = -1.0f;
+                    perf.charwalk_next_start_seconds = 0.0f;
+                    preserve_root_and_play(
+                        *next_entry, phase,
+                        clip_seconds_at_beat(*next.clip, next.start_beat));
+                  }
+                } else {
+                  perf.gh1_walk_player.clear();
+                  perf.gh1_walk_state = 0;
+                  perf.gh1_walk_phase = 0;
+                  perf.gh1_walk_current_waypoint =
+                      perf.gh1_walk_target_waypoint;
+                  perf.world_transform = perf.gh1_walk_target_world;
+                  perf.renderer->set_world_transform(perf.world_transform);
+                  perf.gh1_walk_has_root_world = false;
+                  perf.gh1_walk_predict_initialized = false;
+                  perf.gh1_walk_has_last_facing = false;
+                  perf.charwalk_selected_walk_clip.clear();
+                  perf.charwalk_phase_end_seconds = -1.0f;
+                  perf.charwalk_next_start_seconds = 0.0f;
+                  perf.charwalk_motion_plan = {};
+                  perf.charwalk_schedule_index = 0;
+                  perf.charwalk_plan_point_index = 0;
+                  perf.charwalk_offset_speed = 0.0f;
+                  std::fprintf(stderr,
+                               "[world] GH1 CharWalk complete: "
+                               "waypoint=%s t=%.3f\n",
+                               perf.gh1_walk_current_waypoint.c_str(),
+                               song_time_);
+                }
+              } else {
+                const auto direction =
+                    desired_local_direction(perf.gh1_walk_target_world);
+                if (perf.gh1_walk_phase == 1) {
+                  const auto *next =
+                      perf.gh1_character_runtime
+                          ? choose_walk_clip(perf.gh1_walk_loop_clips,
+                                             direction, true, false, 0u)
+                          : selected_walk_loop_clip();
+                  if (next) {
+                    const float start_seconds =
+                        perf.gh1_character_runtime
+                            ? 0.0f
+                            : perf.charwalk_next_start_seconds;
+                    preserve_root_and_play(*next, 2, start_seconds);
+                    perf.charwalk_phase_end_seconds = -1.0f;
+                    perf.charwalk_next_start_seconds = 0.0f;
+                  }
+                } else if (perf.gh1_walk_phase == 2) {
+                  const auto *stop =
+                      choose_walk_clip(perf.gh1_walk_stop_clips, direction,
+                                       false, !perf.gh1_character_runtime,
+                                       perf.charwalk_request_stop_flags);
+                  float stop_distance = 0.0f;
+                  if (stop) {
+                    const auto motion = gh1_walk_clip_motion(stop->clip);
+                    const float dx = motion.last[0] - motion.first[0];
+                    const float dy = motion.last[1] - motion.first[1];
+                    const float dz = motion.last[2] - motion.first[2];
+                    stop_distance = std::sqrt(dx * dx + dy * dy + dz * dz);
+                  }
+                  const float remaining = remaining_walk_distance();
+                  if (debug_gh1_walk_enabled()) {
+                    std::fprintf(stderr,
+                                 "[gh1-walk-regulate] remaining=%.3f "
+                                 "stop_distance=%.3f slop=%.3f "
+                                 "root=(%.3f %.3f %.3f) "
+                                 "target=(%.3f %.3f %.3f)\n",
+                                 remaining, stop_distance, perf.gh1_walk_slop,
+                                 perf.gh1_walk_root_world[12],
+                                 perf.gh1_walk_root_world[13],
+                                 perf.gh1_walk_root_world[14],
+                                 perf.gh1_walk_target_world[12],
+                                 perf.gh1_walk_target_world[13],
+                                 perf.gh1_walk_target_world[14]);
+                  }
+                  if (stop && remaining <= stop_distance + perf.gh1_walk_slop) {
+                    float stop_start_seconds = 0.0f;
+                    if (!perf.gh1_character_runtime) {
+                      const auto *walk = selected_walk_loop_clip();
+                      const float beat_remainder =
+                          walk ? walk->clip.range * 0.5f : 0.0f;
+                      const auto stop_start_beat = ghogx::character::
+                          source_charwalk_find_stop_start_beat(stop->clip,
+                                                               beat_remainder);
+                      if (!stop_start_beat) {
+                        stop = nullptr;
+                      } else {
+                        stop_start_seconds =
+                            clip_seconds_at_beat(stop->clip, *stop_start_beat);
+                      }
+                    } else {
+                      size_t best_frame = 0;
+                      float best_error = std::numeric_limits<float>::max();
+                      const auto end = gh1_walk_facing_position_at_frame(
+                          stop->clip, stop->clip.frames.size() - 1);
+                      if (end) {
+                        for (size_t frame = 0; frame < stop->clip.frames.size();
+                             ++frame) {
+                          const auto at = gh1_walk_facing_position_at_frame(
+                              stop->clip, frame);
+                          if (!at)
+                            continue;
+                          const float dx = (*end)[0] - (*at)[0];
+                          const float dy = (*end)[1] - (*at)[1];
+                          const float dz = (*end)[2] - (*at)[2];
+                          const float distance =
+                              std::sqrt(dx * dx + dy * dy + dz * dz);
+                          const float error = std::fabs(distance - remaining);
+                          if (error < best_error) {
+                            best_error = error;
+                            best_frame = frame;
+                          }
+                        }
+                      }
+                      const float rate =
+                          stop->clip.fps > 0
+                              ? static_cast<float>(stop->clip.fps)
+                              : 30.0f;
+                      stop_start_seconds =
+                          static_cast<float>(best_frame) / rate;
+                    }
+                    if (stop) {
+                      preserve_root_and_play(*stop, 3, stop_start_seconds);
+                    }
+                  } else {
+                    const auto *next =
+                        perf.gh1_character_runtime
+                            ? choose_walk_clip(perf.gh1_walk_loop_clips,
+                                               direction, true, false, 0u)
+                            : selected_walk_loop_clip();
+                    if (next) {
+                      preserve_root_and_play(*next, 2, 0.0f);
+                    }
+                  }
+                } else if (perf.gh1_walk_phase == 3) {
+                  perf.gh1_walk_player.clear();
+                  perf.gh1_walk_state = 0;
+                  perf.gh1_walk_phase = 0;
+                  perf.gh1_walk_current_waypoint =
+                      perf.gh1_walk_target_waypoint;
+                  perf.world_transform = perf.gh1_walk_target_world;
+                  perf.renderer->set_world_transform(perf.world_transform);
+                  perf.gh1_walk_has_root_world = false;
+                  perf.gh1_walk_predict_initialized = false;
+                  perf.gh1_walk_has_last_facing = false;
+                  perf.charwalk_selected_walk_clip.clear();
+                  perf.charwalk_phase_end_seconds = -1.0f;
+                  perf.charwalk_next_start_seconds = 0.0f;
+                  if (perf.gh1_character_runtime) {
+                    reset_walk_delay_samples();
+                  }
+                  std::fprintf(stderr,
+                               "[world] GH1 CharWalk complete: "
+                               "waypoint=%s t=%.3f\n",
+                               perf.gh1_walk_current_waypoint.c_str(),
+                               song_time_);
+                }
+              }
+            }
+
+            if (!perf.gh1_character_runtime &&
+                source_charwalk_request_expired(
+                    perf.charwalk_start_request_active,
+                    perf.charwalk_start_request_deadline, song_time_)) {
+              perf.charwalk_start_request_active = false;
+              perf.charwalk_start_request_deadline = -1.0;
+              reset_walk_delay_samples();
+              std::fprintf(stderr,
+                           "[world] CharWalk native request expired: "
+                           "role=%s max_wait=%.3f t=%.3f\n",
+                           perf.role.c_str(), perf.charwalk_max_walk_wait,
+                           song_time_);
+            }
+
+            const size_t excitement =
+                std::min<size_t>(4u, static_cast<size_t>(venue_excitement_level(
+                                         active_venue_event_)));
+            const bool walk_due =
+                perf.gh1_walk_delay_enabled[excitement] &&
+                source_charwalk_delay_remaining(
+                    perf.gh1_walk_delay_sample[excitement],
+                    perf.gh1_walk_delay_epoch, song_time_) < 0.0;
+            if (!perf.gh1_character_runtime && perf.gh1_walk_state == 0 &&
+                !perf.charwalk_start_request_active && walk_due &&
+                perf.gh1_walk_global_enabled) {
+              perf.charwalk_start_request_active = true;
+              perf.charwalk_start_request_deadline =
+                  source_charwalk_request_deadline(song_time_,
+                                                   perf.charwalk_max_walk_wait);
+              std::fprintf(stderr,
+                           "[world] CharWalk native request: "
+                           "role=%s flags=0x%08x deadline=%.3f "
+                           "max_wait=%.3f t=%.3f\n",
+                           perf.role.c_str(), static_cast<unsigned>(kWalkSpot),
+                           perf.charwalk_start_request_deadline,
+                           perf.charwalk_max_walk_wait, song_time_);
+            }
+
+            const bool start_request_ready =
+                perf.gh1_character_runtime ? walk_due
+                                           : perf.charwalk_start_request_active;
+            if (perf.gh1_walk_state == 0 && start_request_ready &&
+                !intro_active && performer_playing && !failed_ &&
+                !is_finished() && perf.gh1_walk_global_enabled &&
+                (perf.gh1_character_runtime ? perf.gh1_walk_venue_allowed
+                                            : true) &&
+                walk_targets.size() > 1 && !perf.gh1_walk_turn_clips.empty() &&
+                !perf.gh1_walk_loop_clips.empty() &&
+                !perf.gh1_walk_stop_clips.empty()) {
+              std::vector<SourceCharWalkWaypointGraphNode>
+                  native_waypoint_graph;
+              if (!perf.gh1_character_runtime) {
+                std::unordered_map<std::string, size_t> waypoint_index_by_name;
+                native_waypoint_graph.resize(
+                    venue_chars_scene_.waypoints.size());
+                for (size_t index = 0;
+                     index < venue_chars_scene_.waypoints.size(); ++index) {
+                  const auto &waypoint = venue_chars_scene_.waypoints[index];
+                  if (!waypoint.decoded || !waypoint.source_order_decoded) {
+                    continue;
+                  }
+                  const auto world = xfm_to_mat4(waypoint.world_stored);
+                  native_waypoint_graph[index].flags = waypoint.flags;
+                  native_waypoint_graph[index].position = {world[12], world[13],
+                                                           world[14]};
+                  waypoint_index_by_name.emplace(waypoint.name, index);
+                }
+                for (size_t index = 0;
+                     index < venue_chars_scene_.waypoints.size(); ++index) {
+                  const auto &waypoint = venue_chars_scene_.waypoints[index];
+                  if (!waypoint.decoded || !waypoint.source_order_decoded) {
+                    continue;
+                  }
+                  for (const auto &connection : waypoint.connections) {
+                    const auto connected =
+                        waypoint_index_by_name.find(connection);
+                    if (connected != waypoint_index_by_name.end()) {
+                      native_waypoint_graph[index].connections.push_back(
+                          connected->second);
+                    }
+                  }
+                }
+              }
+              size_t native_source_waypoint =
+                  std::numeric_limits<size_t>::max();
+              if (!perf.gh1_character_runtime) {
+                const auto nearest = source_charwalk_find_nearest_waypoint(
+                    native_waypoint_graph,
+                    venue_charwalk_waypoint_registry_order_,
+                    {perf.world_transform[12], perf.world_transform[13],
+                     perf.world_transform[14]},
+                    request_waypoint_flags);
+                if (nearest) {
+                  native_source_waypoint = *nearest;
+                  perf.gh1_walk_current_waypoint =
+                      venue_chars_scene_.waypoints[*nearest].name;
+                }
+              } else if (perf.gh1_walk_current_waypoint.empty()) {
+                float best_distance = std::numeric_limits<float>::max();
+                for (const auto &target : walk_targets) {
+                  const float dx = target.world[12] - perf.world_transform[12];
+                  const float dy = target.world[13] - perf.world_transform[13];
+                  const float dz = target.world[14] - perf.world_transform[14];
+                  const float distance = dx * dx + dy * dy + dz * dz;
+                  if (distance < best_distance) {
+                    best_distance = distance;
+                    perf.gh1_walk_current_waypoint = target.name;
+                  }
+                }
+              }
+              const WalkTarget *target = nullptr;
+              if (perf.gh1_character_runtime) {
+                std::vector<const WalkTarget *> choices;
+                for (const auto &candidate : walk_targets) {
+                  if (candidate.name != perf.gh1_walk_current_waypoint) {
+                    choices.push_back(&candidate);
+                  }
+                }
+                if (!choices.empty()) {
+                  const size_t selected = source_random_gh1_walk_index(
+                      choices.size(), perf.gh1_walk_random_draw_index++);
+                  target = choices[selected];
+                }
+              } else if (native_source_waypoint !=
+                         std::numeric_limits<size_t>::max()) {
+                const auto route = source_charwalk_find_route(
+                    native_waypoint_graph, native_source_waypoint,
+                    request_waypoint_flags, request_waypoint_flags | kWalkSpot,
+                    venue_charwalk_waypoint_registry_order_);
+                if (route.destination_index) {
+                  for (const auto &candidate : walk_targets) {
+                    if (candidate.source_waypoint_index ==
+                        *route.destination_index) {
+                      target = &candidate;
+                      break;
+                    }
+                  }
+                  perf.charwalk_route_waypoints.clear();
+                  perf.charwalk_route_positions.clear();
+                  perf.charwalk_route_positions.push_back(
+                      {perf.world_transform[12], perf.world_transform[13],
+                       perf.world_transform[14]});
+                  for (const size_t route_index : route.path) {
+                    const auto &waypoint =
+                        venue_chars_scene_.waypoints[route_index];
+                    perf.charwalk_route_waypoints.push_back(waypoint.name);
+                    const auto world = xfm_to_mat4(waypoint.world_stored);
+                    perf.charwalk_route_positions.push_back(
+                        {world[12], world[13], world[14]});
+                  }
+                  perf.charwalk_route_waypoint_index = 1;
+                  if (debug_gh1_walk_enabled()) {
+                    std::ostringstream route_names;
+                    route_names << perf.gh1_walk_current_waypoint;
+                    for (const auto &waypoint_name :
+                         perf.charwalk_route_waypoints) {
+                      route_names << "->" << waypoint_name;
+                    }
+                    std::fprintf(stderr,
+                                 "[charwalk-native-route] "
+                                 "source=%s destination=%s "
+                                 "path=%s mask=0x%08x "
+                                 "blocked=0x%08x\n",
+                                 perf.gh1_walk_current_waypoint.c_str(),
+                                 target ? target->name.c_str() : "(missing)",
+                                 route_names.str().c_str(),
+                                 static_cast<unsigned>(request_waypoint_flags),
+                                 static_cast<unsigned>(request_waypoint_flags |
+                                                       kWalkSpot));
+                  }
+                }
+              }
+              if (target) {
+                if (perf.gh1_character_runtime) {
+                  perf.charwalk_route_waypoints.clear();
+                  perf.charwalk_route_positions.clear();
+                  perf.charwalk_route_waypoint_index = 1;
+                }
+                perf.gh1_walk_target_waypoint = target->name;
+                perf.gh1_walk_target_world = target->world;
+                perf.gh1_walk_root_world = current_root_world();
+                perf.gh1_walk_has_root_world = true;
+                const auto direction = desired_local_direction(target->world);
+                if (!perf.gh1_character_runtime) {
+                  const bool horizontal =
+                      std::fabs(direction[1]) < std::fabs(2.0f * direction[0]);
+                  const float random_unit =
+                      horizontal ? source_random_gh1_walk_unit(
+                                       perf.gh1_walk_random_draw_index++)
+                                 : 1.0f;
+                  const auto request = source_charwalk_direction_request(
+                      direction[0], direction[1], static_cast<int>(excitement),
+                      random_unit);
+                  perf.charwalk_request_walk_flags = request.walk_flags;
+                  perf.charwalk_request_turn_flags = request.turn_flags;
+                  perf.charwalk_request_stop_flags = request.stop_flags;
+                }
+                const auto *native_walk = perf.gh1_character_runtime
+                                              ? nullptr
+                                              : select_native_walk_group_clip();
+                if (native_walk) {
+                  perf.charwalk_selected_walk_clip = native_walk->clip.name;
+                }
+                const Performer::Gh1WalkClip *turn = nullptr;
+                NativeTurnSelection native_turn;
+                if (perf.gh1_character_runtime) {
+                  turn = choose_walk_clip(perf.gh1_walk_turn_clips, direction,
+                                          false, false, 0u);
+                } else if (native_walk) {
+                  native_turn = select_native_turn(*native_walk, target->world);
+                  turn = native_turn.clip;
+                }
+                if (turn) {
+                  bool motion_plan_ready = true;
+                  if (!perf.gh1_character_runtime) {
+                    std::vector<ghogx::character::SourceCharWalkStopCandidate>
+                        stop_candidates;
+                    stop_candidates.reserve(perf.gh1_walk_stop_clips.size());
+                    for (const auto &stop : perf.gh1_walk_stop_clips) {
+                      stop_candidates.push_back({&stop.clip, stop.clip.flags});
+                    }
+                    auto motion_plan =
+                        ghogx::character::source_charwalk_build_motion_plan(
+                            {{&turn->clip, native_turn.turn_start_beat, 0.0f},
+                             {&native_walk->clip, native_turn.walk_start_beat,
+                              native_turn.turn_end_beat}},
+                            perf.charwalk_route_positions,
+                            gh1_walk_world_yaw(target->world),
+                            target->target_radius, stop_candidates,
+                            perf.charwalk_request_stop_flags);
+                    if (!motion_plan.valid) {
+                      motion_plan_ready = false;
+                      if (debug_gh1_walk_enabled()) {
+                        std::fprintf(stderr,
+                                     "[charwalk-native-plan] "
+                                     "rejected route=%s "
+                                     "turn=%s walk=%s "
+                                     "stop_flags=0x%08x\n",
+                                     target->name.c_str(),
+                                     turn->clip.name.c_str(),
+                                     native_walk->clip.name.c_str(),
+                                     static_cast<unsigned>(
+                                         perf.charwalk_request_stop_flags));
+                      }
+                    } else {
+                      perf.charwalk_motion_plan = std::move(motion_plan);
+                      perf.charwalk_schedule_index = 0;
+                      perf.charwalk_plan_point_index = 0;
+                      perf.charwalk_offset_speed = 0.0f;
+                      perf.charwalk_route_positions =
+                          perf.charwalk_motion_plan.path;
+                      perf.gh1_walk_target_world[12] =
+                          perf.charwalk_motion_plan.end_position[0];
+                      perf.gh1_walk_target_world[13] =
+                          perf.charwalk_motion_plan.end_position[1];
+                      perf.gh1_walk_target_world[14] =
+                          perf.charwalk_motion_plan.end_position[2];
+                      if (debug_gh1_walk_enabled()) {
+                        const auto *stop =
+                            perf.charwalk_motion_plan.schedule.back().clip;
+                        std::fprintf(
+                            stderr,
+                            "[charwalk-native-plan] "
+                            "accepted route=%s "
+                            "path_nodes=%zu schedule=%zu "
+                            "points=%zu last_point=%zu "
+                            "stop=%s score=%.6f\n",
+                            target->name.c_str(),
+                            perf.charwalk_motion_plan.path.size(),
+                            perf.charwalk_motion_plan.schedule.size(),
+                            perf.charwalk_motion_plan.points.size(),
+                            perf.charwalk_motion_plan.active_point_count,
+                            stop ? stop->name.c_str() : "<none>",
+                            perf.charwalk_motion_plan.score);
+                      }
+                    }
+                  }
+                  if (!motion_plan_ready) {
+                    continue;
+                  }
+                  const float start_seconds =
+                      perf.gh1_character_runtime
+                          ? 0.0f
+                          : native_turn.turn_start_seconds;
+                  perf.charwalk_phase_end_seconds =
+                      perf.gh1_character_runtime ? -1.0f
+                                                 : native_turn.turn_end_seconds;
+                  perf.charwalk_next_start_seconds =
+                      perf.gh1_character_runtime
+                          ? 0.0f
+                          : native_turn.walk_start_seconds;
+                  preserve_root_and_play(*turn, 1, start_seconds);
+                  if (!perf.gh1_character_runtime && debug_gh1_walk_enabled()) {
+                    std::fprintf(stderr,
+                                 "[charwalk-native-turn] "
+                                 "turn=%s walk=%s "
+                                 "turn_start=%.3f "
+                                 "turn_end=%.3f "
+                                 "walk_start=%.3f "
+                                 "error=%.6f\n",
+                                 turn->clip.name.c_str(),
+                                 native_walk->clip.name.c_str(),
+                                 native_turn.turn_start_seconds,
+                                 native_turn.turn_end_seconds,
+                                 native_turn.walk_start_seconds,
+                                 native_turn.angular_error);
+                  }
+                  if (!perf.gh1_character_runtime) {
                     perf.charwalk_start_request_active = false;
                     perf.charwalk_start_request_deadline = -1.0;
                     reset_walk_delay_samples();
-                    std::fprintf(
-                        stderr,
-                        "[world] CharWalk native request expired: "
-                        "role=%s max_wait=%.3f t=%.3f\n",
-                        perf.role.c_str(),
-                        perf.charwalk_max_walk_wait, song_time_);
+                  }
                 }
-
-                const size_t excitement = std::min<size_t>(
-                    4u, static_cast<size_t>(
-                            venue_excitement_level(
-                                active_venue_event_)));
-                const bool walk_due =
-                    perf.gh1_walk_delay_enabled[excitement] &&
-                    source_charwalk_delay_remaining(
-                        perf.gh1_walk_delay_sample[excitement],
-                        perf.gh1_walk_delay_epoch,
-                        song_time_) < 0.0;
-                if (!perf.gh1_character_runtime &&
-                    perf.gh1_walk_state == 0 &&
-                    !perf.charwalk_start_request_active &&
-                    walk_due &&
-                    perf.gh1_walk_global_enabled) {
-                    perf.charwalk_start_request_active = true;
-                    perf.charwalk_start_request_deadline =
-                        source_charwalk_request_deadline(
-                            song_time_,
-                            perf.charwalk_max_walk_wait);
-                    std::fprintf(
-                        stderr,
-                        "[world] CharWalk native request: "
-                        "role=%s flags=0x%08x deadline=%.3f "
-                        "max_wait=%.3f t=%.3f\n",
-                        perf.role.c_str(),
-                        static_cast<unsigned>(kWalkSpot),
-                        perf.charwalk_start_request_deadline,
-                        perf.charwalk_max_walk_wait, song_time_);
-                }
-
-                const bool start_request_ready =
-                    perf.gh1_character_runtime
-                        ? walk_due
-                        : perf.charwalk_start_request_active;
-                if (perf.gh1_walk_state == 0 &&
-                    start_request_ready &&
-                    !intro_active && performer_playing && !failed_ &&
-                    !is_finished() &&
-                    perf.gh1_walk_global_enabled &&
-                    (perf.gh1_character_runtime
-                         ? perf.gh1_walk_venue_allowed
-                         : true) &&
-                    walk_targets.size() > 1 &&
-                    !perf.gh1_walk_turn_clips.empty() &&
-                    !perf.gh1_walk_loop_clips.empty() &&
-                    !perf.gh1_walk_stop_clips.empty()) {
-                    std::vector<SourceCharWalkWaypointGraphNode>
-                        native_waypoint_graph;
-                    if (!perf.gh1_character_runtime) {
-                        std::unordered_map<std::string, size_t>
-                            waypoint_index_by_name;
-                        native_waypoint_graph.resize(
-                            venue_chars_scene_.waypoints.size());
-                        for (size_t index = 0;
-                             index <
-                             venue_chars_scene_.waypoints.size();
-                             ++index) {
-                            const auto& waypoint =
-                                venue_chars_scene_.waypoints[index];
-                            if (!waypoint.decoded ||
-                                !waypoint.source_order_decoded) {
-                                continue;
-                            }
-                            const auto world =
-                                xfm_to_mat4(waypoint.world_stored);
-                            native_waypoint_graph[index].flags =
-                                waypoint.flags;
-                            native_waypoint_graph[index].position = {
-                                world[12], world[13], world[14]};
-                            waypoint_index_by_name.emplace(
-                                waypoint.name, index);
-                        }
-                        for (size_t index = 0;
-                             index <
-                             venue_chars_scene_.waypoints.size();
-                             ++index) {
-                            const auto& waypoint =
-                                venue_chars_scene_.waypoints[index];
-                            if (!waypoint.decoded ||
-                                !waypoint.source_order_decoded) {
-                                continue;
-                            }
-                            for (const auto& connection :
-                                 waypoint.connections) {
-                                const auto connected =
-                                    waypoint_index_by_name.find(
-                                        connection);
-                                if (connected !=
-                                    waypoint_index_by_name.end()) {
-                                    native_waypoint_graph[index]
-                                        .connections.push_back(
-                                            connected->second);
-                                }
-                            }
-                        }
-                    }
-                    size_t native_source_waypoint =
-                        std::numeric_limits<size_t>::max();
-                    if (!perf.gh1_character_runtime) {
-                        const auto nearest =
-                            source_charwalk_find_nearest_waypoint(
-                                native_waypoint_graph,
-                                venue_charwalk_waypoint_registry_order_,
-                                {perf.world_transform[12],
-                                 perf.world_transform[13],
-                                 perf.world_transform[14]},
-                                request_waypoint_flags);
-                        if (nearest) {
-                            native_source_waypoint = *nearest;
-                            perf.gh1_walk_current_waypoint =
-                                venue_chars_scene_.waypoints[
-                                    *nearest]
-                                    .name;
-                        }
-                    } else if (
-                        perf.gh1_walk_current_waypoint.empty()) {
-                        float best_distance =
-                            std::numeric_limits<float>::max();
-                        for (const auto& target : walk_targets) {
-                            const float dx =
-                                target.world[12] -
-                                perf.world_transform[12];
-                            const float dy =
-                                target.world[13] -
-                                perf.world_transform[13];
-                            const float dz =
-                                target.world[14] -
-                                perf.world_transform[14];
-                            const float distance =
-                                dx * dx + dy * dy + dz * dz;
-                            if (distance < best_distance) {
-                                best_distance = distance;
-                                perf.gh1_walk_current_waypoint =
-                                    target.name;
-                            }
-                        }
-                    }
-                    const WalkTarget* target = nullptr;
-                    if (perf.gh1_character_runtime) {
-                        std::vector<const WalkTarget*> choices;
-                        for (const auto& candidate : walk_targets) {
-                            if (candidate.name !=
-                                perf.gh1_walk_current_waypoint) {
-                                choices.push_back(&candidate);
-                            }
-                        }
-                        if (!choices.empty()) {
-                            const size_t selected =
-                                source_random_gh1_walk_index(
-                                choices.size(),
-                                perf.gh1_walk_random_draw_index++);
-                            target = choices[selected];
-                        }
-                    } else if (
-                        native_source_waypoint !=
-                        std::numeric_limits<size_t>::max()) {
-                        const auto route =
-                            source_charwalk_find_route(
-                                native_waypoint_graph,
-                                native_source_waypoint,
-                                request_waypoint_flags,
-                                request_waypoint_flags |
-                                    kWalkSpot,
-                                venue_charwalk_waypoint_registry_order_);
-                        if (route.destination_index) {
-                            for (const auto& candidate :
-                                 walk_targets) {
-                                if (candidate
-                                        .source_waypoint_index ==
-                                    *route
-                                         .destination_index) {
-                                    target = &candidate;
-                                    break;
-                                }
-                            }
-                            perf.charwalk_route_waypoints.clear();
-                            perf.charwalk_route_positions.clear();
-                            perf.charwalk_route_positions.push_back(
-                                {perf.world_transform[12],
-                                 perf.world_transform[13],
-                                 perf.world_transform[14]});
-                            for (const size_t route_index :
-                                 route.path) {
-                                const auto& waypoint =
-                                    venue_chars_scene_.waypoints[
-                                        route_index];
-                                perf.charwalk_route_waypoints
-                                    .push_back(waypoint.name);
-                                const auto world =
-                                    xfm_to_mat4(
-                                        waypoint.world_stored);
-                                perf.charwalk_route_positions
-                                    .push_back(
-                                        {world[12], world[13],
-                                         world[14]});
-                            }
-                            perf.charwalk_route_waypoint_index =
-                                1;
-                            if (debug_gh1_walk_enabled()) {
-                                std::ostringstream route_names;
-                                route_names
-                                    << perf
-                                           .gh1_walk_current_waypoint;
-                                for (const auto& waypoint_name :
-                                     perf.charwalk_route_waypoints) {
-                                    route_names << "->"
-                                                << waypoint_name;
-                                }
-                                std::fprintf(
-                                    stderr,
-                                    "[charwalk-native-route] "
-                                    "source=%s destination=%s "
-                                    "path=%s mask=0x%08x "
-                                    "blocked=0x%08x\n",
-                                    perf
-                                        .gh1_walk_current_waypoint
-                                        .c_str(),
-                                    target
-                                        ? target->name.c_str()
-                                        : "(missing)",
-                                    route_names.str().c_str(),
-                                    static_cast<unsigned>(
-                                        request_waypoint_flags),
-                                    static_cast<unsigned>(
-                                        request_waypoint_flags |
-                                        kWalkSpot));
-                            }
-                        }
-                    }
-                    if (target) {
-                        if (perf.gh1_character_runtime) {
-                            perf.charwalk_route_waypoints.clear();
-                            perf.charwalk_route_positions.clear();
-                            perf.charwalk_route_waypoint_index =
-                                1;
-                        }
-                        perf.gh1_walk_target_waypoint =
-                            target->name;
-                        perf.gh1_walk_target_world =
-                            target->world;
-                        perf.gh1_walk_root_world =
-                            current_root_world();
-                        perf.gh1_walk_has_root_world = true;
-                        const auto direction =
-                            desired_local_direction(target->world);
-                        if (!perf.gh1_character_runtime) {
-                            const bool horizontal =
-                                std::fabs(direction[1]) <
-                                std::fabs(
-                                    2.0f * direction[0]);
-                            const float random_unit =
-                                horizontal
-                                    ? source_random_gh1_walk_unit(
-                                          perf.gh1_walk_random_draw_index++)
-                                    : 1.0f;
-                            const auto request =
-                                source_charwalk_direction_request(
-                                    direction[0], direction[1],
-                                    static_cast<int>(excitement),
-                                    random_unit);
-                            perf.charwalk_request_walk_flags =
-                                request.walk_flags;
-                            perf.charwalk_request_turn_flags =
-                                request.turn_flags;
-                            perf.charwalk_request_stop_flags =
-                                request.stop_flags;
-                        }
-                        const auto* native_walk =
-                            perf.gh1_character_runtime
-                                ? nullptr
-                                : select_native_walk_group_clip();
-                        if (native_walk) {
-                            perf.charwalk_selected_walk_clip =
-                                native_walk->clip.name;
-                        }
-                        const Performer::Gh1WalkClip* turn = nullptr;
-                        NativeTurnSelection native_turn;
-                        if (perf.gh1_character_runtime) {
-                            turn = choose_walk_clip(
-                                perf.gh1_walk_turn_clips,
-                                direction, false,
-                                false, 0u);
-                        } else if (native_walk) {
-                            native_turn = select_native_turn(
-                                *native_walk, target->world);
-                            turn = native_turn.clip;
-                        }
-                        if (turn) {
-                            bool motion_plan_ready = true;
-                            if (!perf.gh1_character_runtime) {
-                                std::vector<
-                                    ghogx::character::
-                                        SourceCharWalkStopCandidate>
-                                    stop_candidates;
-                                stop_candidates.reserve(
-                                    perf.gh1_walk_stop_clips.size());
-                                for (const auto& stop :
-                                     perf.gh1_walk_stop_clips) {
-                                    stop_candidates.push_back(
-                                        {&stop.clip,
-                                         stop.clip.flags});
-                                }
-                                auto motion_plan =
-                                    ghogx::character::
-                                        source_charwalk_build_motion_plan(
-                                            {{&turn->clip,
-                                              native_turn
-                                                  .turn_start_beat,
-                                              0.0f},
-                                             {&native_walk->clip,
-                                              native_turn
-                                                  .walk_start_beat,
-                                              native_turn
-                                                  .turn_end_beat}},
-                                            perf
-                                                .charwalk_route_positions,
-                                            gh1_walk_world_yaw(
-                                                target->world),
-                                            target->target_radius,
-                                            stop_candidates,
-                                            perf
-                                                .charwalk_request_stop_flags);
-                                if (!motion_plan.valid) {
-                                    motion_plan_ready = false;
-                                    if (debug_gh1_walk_enabled()) {
-                                        std::fprintf(
-                                            stderr,
-                                            "[charwalk-native-plan] "
-                                            "rejected route=%s "
-                                            "turn=%s walk=%s "
-                                            "stop_flags=0x%08x\n",
-                                            target->name.c_str(),
-                                            turn->clip.name.c_str(),
-                                            native_walk->clip.name.c_str(),
-                                            static_cast<unsigned>(
-                                                perf
-                                                    .charwalk_request_stop_flags));
-                                    }
-                                } else {
-                                    perf.charwalk_motion_plan =
-                                        std::move(motion_plan);
-                                    perf.charwalk_schedule_index = 0;
-                                    perf.charwalk_plan_point_index = 0;
-                                    perf.charwalk_offset_speed = 0.0f;
-                                    perf.charwalk_route_positions =
-                                        perf.charwalk_motion_plan.path;
-                                    perf.gh1_walk_target_world[12] =
-                                        perf.charwalk_motion_plan
-                                            .end_position[0];
-                                    perf.gh1_walk_target_world[13] =
-                                        perf.charwalk_motion_plan
-                                            .end_position[1];
-                                    perf.gh1_walk_target_world[14] =
-                                        perf.charwalk_motion_plan
-                                            .end_position[2];
-                                    if (debug_gh1_walk_enabled()) {
-                                        const auto* stop =
-                                            perf.charwalk_motion_plan
-                                                .schedule.back().clip;
-                                        std::fprintf(
-                                            stderr,
-                                            "[charwalk-native-plan] "
-                                            "accepted route=%s "
-                                            "path_nodes=%zu schedule=%zu "
-                                            "points=%zu last_point=%zu "
-                                            "stop=%s score=%.6f\n",
-                                            target->name.c_str(),
-                                            perf.charwalk_motion_plan
-                                                .path.size(),
-                                            perf.charwalk_motion_plan
-                                                .schedule.size(),
-                                            perf.charwalk_motion_plan
-                                                .points.size(),
-                                            perf.charwalk_motion_plan
-                                                .active_point_count,
-                                            stop
-                                                ? stop->name.c_str()
-                                                : "<none>",
-                                            perf.charwalk_motion_plan
-                                                .score);
-                                    }
-                                }
-                            }
-                            if (!motion_plan_ready) {
-                                continue;
-                            }
-                            const float start_seconds =
-                                perf.gh1_character_runtime
-                                    ? 0.0f
-                                    : native_turn
-                                          .turn_start_seconds;
-                            perf.charwalk_phase_end_seconds =
-                                perf.gh1_character_runtime
-                                    ? -1.0f
-                                    : native_turn
-                                          .turn_end_seconds;
-                            perf.charwalk_next_start_seconds =
-                                perf.gh1_character_runtime
-                                    ? 0.0f
-                                    : native_turn
-                                          .walk_start_seconds;
-                            preserve_root_and_play(
-                                *turn, 1, start_seconds);
-                            if (!perf.gh1_character_runtime &&
-                                debug_gh1_walk_enabled()) {
-                                std::fprintf(
-                                    stderr,
-                                    "[charwalk-native-turn] "
-                                    "turn=%s walk=%s "
-                                    "turn_start=%.3f "
-                                    "turn_end=%.3f "
-                                    "walk_start=%.3f "
-                                    "error=%.6f\n",
-                                    turn->clip.name.c_str(),
-                                    native_walk->clip.name.c_str(),
-                                    native_turn
-                                        .turn_start_seconds,
-                                    native_turn
-                                        .turn_end_seconds,
-                                    native_turn
-                                        .walk_start_seconds,
-                                    native_turn.angular_error);
-                            }
-                            if (!perf.gh1_character_runtime) {
-                                perf.charwalk_start_request_active =
-                                    false;
-                                perf.charwalk_start_request_deadline =
-                                    -1.0;
-                                reset_walk_delay_samples();
-                            }
-                        }
-                    }
-                }
-                g_camera_source_guitarist0_charwalk_state =
-                    perf.gh1_walk_state == 1
-                        ? CameraSourceCharWalkState::kStateGoing
-                        : perf.gh1_walk_state == 2
-                              ? CameraSourceCharWalkState::
-                                    kStateStopping
-                              : CameraSourceCharWalkState::
-                                    kStateNone;
-                g_camera_source_guitarist0_charwalk_clip_active =
-                    perf.gh1_walk_state != 0 &&
-                    perf.gh1_walk_player.current_clip() != nullptr;
+              }
             }
-            if (perf.role == "guitarist0" &&
-                perf.last_star_power_activation_serial !=
-                    star_power_activation_serial_) {
-                perf.last_star_power_activation_serial =
-                    star_power_activation_serial_;
-                if (!perf.star_power_group_clips.empty()) {
-                    if (const auto selected =
-                            source_char_clip_group_next_index(
-                                perf.star_power_group_clips,
-                                perf.star_power_group_which, perf.role,
-                                perf.character_name, "star_power",
-                                camera_bar_at(chart_, song_time_))) {
-                        perf.star_power_group_index = *selected;
-                        const auto& clip =
-                            perf.star_power_group_clips[*selected];
-                        perf.star_power_animation_started = song_time_;
-                        perf.star_power_animation_duration =
-                            clip.duration_seconds();
-                        std::fprintf(
-                            stderr,
-                            "[world] performer star_power activation: role=%s clip=%s source=%s serial=%u duration=%.3f t=%.3f\n",
-                            perf.role.c_str(), clip.name.c_str(),
-                            clip_source_path(clip),
-                            perf.last_star_power_activation_serial,
-                            perf.star_power_animation_duration, song_time_);
-                    }
-                }
+            g_camera_source_guitarist0_charwalk_state =
+                perf.gh1_walk_state == 1
+                    ? CameraSourceCharWalkState::kStateGoing
+                : perf.gh1_walk_state == 2
+                    ? CameraSourceCharWalkState::kStateStopping
+                    : CameraSourceCharWalkState::kStateNone;
+            g_camera_source_guitarist0_charwalk_clip_active =
+                perf.gh1_walk_state != 0 &&
+                perf.gh1_walk_player.current_clip() != nullptr;
+          }
+          if (perf.role == "guitarist0" &&
+              perf.last_star_power_activation_serial !=
+                  star_power_activation_serial_) {
+            perf.last_star_power_activation_serial =
+                star_power_activation_serial_;
+            if (!perf.star_power_group_clips.empty()) {
+              if (const auto selected = source_char_clip_group_next_index(
+                      perf.star_power_group_clips, perf.star_power_group_which,
+                      perf.role, perf.character_name, "star_power",
+                      camera_bar_at(chart_, song_time_))) {
+                perf.star_power_group_index = *selected;
+                const auto &clip = perf.star_power_group_clips[*selected];
+                perf.star_power_animation_started = song_time_;
+                perf.star_power_animation_duration = clip.duration_seconds();
+                std::fprintf(
+                    stderr,
+                    "[world] performer star_power activation: role=%s clip=%s "
+                    "source=%s serial=%u duration=%.3f t=%.3f\n",
+                    perf.role.c_str(), clip.name.c_str(),
+                    clip_source_path(clip),
+                    perf.last_star_power_activation_serial,
+                    perf.star_power_animation_duration, song_time_);
+              }
             }
-            if (!authored_main_driver_owned) {
+          }
+          if (!authored_main_driver_owned) {
             const ghogx::character::CharClip* desired_active = &perf.active_clip;
             std::string desired_mode = "normal";
             if (perf.role == "drummer") {
@@ -47789,7 +48469,7 @@ void Gameplay::draw_internal(ghogx::render::Window& win,
             apply_diagnostic_forced_clip_time("post-drivers");
 
             auto active_main_driver_player =
-                [&]() -> const ghogx::character::CharClipPlayer* {
+                [&]() -> ghogx::character::CharClipPlayer* {
                     // CharWalk drives the character root and temporarily owns
                     // main.drv in retail. Selecting the ordinary authored
                     // performance player here advances the walk transform
@@ -47856,10 +48536,64 @@ void Gameplay::draw_internal(ghogx::render::Window& win,
                         current_clip ? current_clip->flags : 0u);
                 }
             }
+            bool source_servo_frame = perf.source_servo_runtime;
+            auto* source_main_player = active_main_driver_player();
+            if (source_servo_frame &&
+                (!source_main_player || !source_main_player->active() ||
+                 !source_main_player->current_clip() ||
+                 !source_main_player->current_clip()->gh2_pose_samples)) {
+                source_servo_frame = false;
+            }
+            if (source_servo_frame) {
+                const auto main_driver =
+                    perf.authored_drivers.find("main.drv");
+                if (main_driver == perf.authored_drivers.end()) {
+                    throw std::runtime_error(
+                        "source servo runtime lacks main.drv metadata");
+                }
+                const auto servo =
+                    perf.source_servos.find(main_driver->second.target);
+                if (servo == perf.source_servos.end()) {
+                    throw std::runtime_error(
+                        "source main driver lacks its authored servo target");
+                }
+                // CharDriver::Poll publishes to its target's one persistent
+                // CharBonesMeshes buffer. Hand-driver publication remains on
+                // the accepted compatibility path for this first gameplay
+                // integration and is applied after the servo's main pose.
+                source_main_player->accumulate_source_pose(
+                    servo->second->output(), main_driver->second.weight);
+                for (auto& [servo_name, source_servo] :
+                     perf.source_servos) {
+                    (void)servo_name;
+                    source_servo->set_move_self(perf.gh1_walk_state == 0);
+                    source_servo->poll([](ghogx::milo_scene::Xfm&) {});
+                }
+                if (!perf.source_servo_runtime_reported) {
+                    perf.source_servo_runtime_reported = true;
+                    std::fprintf(
+                        stderr,
+                        "[source-servo] role=%s enabled=1 main=%s "
+                        "servos=%zu owner=Character.local "
+                        "hand_publish=compatibility-after-servo\n",
+                        perf.role.c_str(),
+                        source_main_player->current_clip()->name.c_str(),
+                        perf.source_servos.size());
+                }
+            }
+            perf.effective_world_transform = source_servo_frame
+                ? mat4_mul_game(
+                      xfm_to_mat4(character.root_transform.local),
+                      perf.world_transform)
+                : perf.world_transform;
+            perf.renderer->set_world_transform(
+                perf.effective_world_transform);
+
             ghogx::character::CharacterPosePlayerLayerBuildSources
                 pose_player_inputs;
             apply_diagnostic_forced_clip_time("pre-pose-stack");
-            pose_player_inputs.main = active_main_driver_player();
+            pose_player_inputs.main =
+                source_servo_frame ? nullptr : active_main_driver_player();
             pose_player_inputs.face_base =
                 perf.facefx_graph && perf.face_visemes_clip.loaded
                     ? nullptr
@@ -48125,6 +48859,84 @@ void Gameplay::draw_internal(ghogx::render::Window& win,
                 controller_midi_fret_target_enabled;
             ghogx::character::apply_character_pose_controller_frame(
                 character, controller_sources);
+            // Read-only audit values. The previous diagnostic probe modified
+            // the composed renderer world instead of Character LOCAL and has
+            // been removed; it cannot be accidentally enabled now.
+            ghogx::character::SourceCharFacingDelta facing_delta;
+            if (const auto* player = active_main_driver_player()) {
+                facing_delta = player->source_facing_delta();
+            }
+            const bool facing_delta_applied = source_servo_frame;
+            // Read-only per-frame evidence: separate stage placement from
+            // skeletal facing and the source clip channels that publish it.
+            // Opt-in and bounded; never changes pose/camera evaluation.
+            const char* facing_audit_role =
+                env_value("GHOGX_DEBUG_PERFORMER_FACING");
+            const double facing_audit_time = track_intro_active_
+                ? song_time_ : intro_camera_seconds_ + song_time_;
+            if (facing_audit_role && perf.role == facing_audit_role &&
+                facing_audit_time >= env_float("GHOGX_FACING_AUDIT_START", 6.0f) &&
+                facing_audit_time <= env_float("GHOGX_FACING_AUDIT_END", 12.1f)) {
+                const auto* player = active_main_driver_player();
+                const auto* clip = player ? player->current_clip() : nullptr;
+                const auto character_root_world =
+                    xfm_to_mat4(character.root_transform.local);
+                std::fprintf(stderr,
+                    "[facing-audit] t=%.6f song=%.6f dt=%.6f intro=%d role=%s "
+                    "clip=%s clip_t=%.6f beat=%.6f walk=%d "
+                    "stage=(%.6f %.6f %.6f) stage_yaw=%.6f "
+                    "root_yaw=%.6f effective_yaw=%.6f "
+                    "servo_probe=%d servo_count=%zu delta=(%.6f %.6f %.6f %.6f)\n",
+                    facing_audit_time, song_time_, dt, intro_active ? 1 : 0,
+                    perf.role.c_str(), clip ? clip->name.c_str() : "-",
+                    player ? player->current_time_seconds() : 0.0f,
+                    player ? player->source_current_beat() : 0.0f,
+                    perf.gh1_walk_state, perf.world_transform[12],
+                    perf.world_transform[13], perf.world_transform[14],
+                    gh1_walk_world_yaw(perf.world_transform),
+                    gh1_walk_world_yaw(character_root_world),
+                    gh1_walk_world_yaw(perf.effective_world_transform),
+                    facing_delta_applied ? 1 : 0, character.servo_bones.size(),
+                    facing_delta.position[0], facing_delta.position[1],
+                    facing_delta.position[2], facing_delta.rotation);
+                for (const char* name : {"bone_facing", "bone_pelvis",
+                                         "bone_spine1", "bone_head"}) {
+                    const auto* bone = find_hand_pose_bone(character, name);
+                    if (!bone) continue;
+                    const auto world = character.bone_world_local_chain(bone->name);
+                    // This is the same final Character-local plus venue-parent
+                    // space consumed by both the renderer and camera-target
+                    // publication.  Logging only perf.world_transform hides
+                    // the source servo's compensating owner motion.
+                    const auto stage_world =
+                        mat4_mul_game(world, perf.effective_world_transform);
+                    std::fprintf(stderr,
+                        "[facing-bone] t=%.6f name=%s parent=%s "
+                        "l0=(%.6f %.6f %.6f) l1=(%.6f %.6f %.6f) "
+                        "w0=(%.6f %.6f %.6f) w1=(%.6f %.6f %.6f) "
+                        "stage_w1=(%.6f %.6f %.6f)\n",
+                        facing_audit_time, bone->name.c_str(), bone->parent.c_str(),
+                        bone->local.rot[0][0], bone->local.rot[0][1], bone->local.rot[0][2],
+                        bone->local.rot[1][0], bone->local.rot[1][1], bone->local.rot[1][2],
+                        world[0], world[1], world[2], world[4], world[5], world[6],
+                        stage_world[4], stage_world[5], stage_world[6]);
+                }
+                for (const auto& layer : pose_stack.layers) {
+                    for (const auto& ch : layer.channels) {
+                        if (ch.bone_name.find("bone_facing") == std::string::npos &&
+                            ch.bone_name.find("bone_pelvis") == std::string::npos)
+                            continue;
+                        std::fprintf(stderr,
+                            "[facing-channel] t=%.6f layer=%s weight=%.6f "
+                            "relative=%d overlay=%d bone=%s type=%d angle=%.6f "
+                            "quat=(%.6f %.6f %.6f %.6f)\n",
+                            facing_audit_time, layer.debug_name.c_str(), layer.weight,
+                            layer.relative ? 1 : 0, layer.overlay_override ? 1 : 0,
+                            ch.bone_name.c_str(), static_cast<int>(ch.type), ch.angle,
+                            ch.quat[0], ch.quat[1], ch.quat[2], ch.quat[3]);
+                    }
+                }
+            }
             if (hand_driver_active) {
                 const uint32_t debug_hand_mask =
                     perf_anim_note_cue.active
@@ -48398,19 +49210,29 @@ void Gameplay::draw_internal(ghogx::render::Window& win,
         std::unordered_map<std::string, CameraTarget> camera_targets;
         camera_targets.reserve(performers_.size() * 16 +
                                camera_performer_targets_.size() * 8 + 32);
-        // GH1 VenueCam resolves authored arena references through the venue
-        // ObjectDir (for example arena::venue.view). Venue scene targets are
-        // otherwise kept in a separate map for GH2 CamShot source probes, so
-        // expose the exact root alias needed by native GH1 no-target shots.
-        if (const auto venue_root =
-                venue_camera_target_worlds_.find("venue.view_transform");
-            venue_root != venue_camera_target_worlds_.end()) {
-            camera_targets[camera_target_id("arena", "venue.view")] =
-                CameraTarget{venue_root->second};
+        // Resolve authored ObjectDir refs, not just venue.view. GH1 shared
+        // cam_paths policy also targets stage helpers from loaded sections.
+        // For Group/View refs use WorldXfm, never the diagnostic member centroid.
+        if (const auto requested = camera_performer_targets_.find("arena");
+            requested != camera_performer_targets_.end()) {
+            for (const auto& subpart : requested->second) {
+                const auto ref = canonical_milo_ref(subpart);
+                auto world = venue_camera_target_worlds_.find(ref + "_transform");
+                if (world == venue_camera_target_worlds_.end())
+                    world = venue_camera_target_worlds_.find(ref);
+                if (world == venue_camera_target_worlds_.end()) continue;
+                camera_targets[camera_target_id("arena", subpart)] = CameraTarget{world->second};
+            }
         }
+        const auto helper_key = [](const CameraKey& key) { return key.has_gh1_helper; };
+        const bool build_gh1_helper_heads =
+            std::any_of(regular_camera_keys_.begin(), regular_camera_keys_.end(), helper_key) ||
+            std::any_of(camera_keys_.begin(), camera_keys_.end(), helper_key);
         for (auto& perf : performers_) {
             if (!perf.renderer) continue;
-            const CameraTarget performer_base_target{perf.world_transform};
+            const bool helper_player = build_gh1_helper_heads && perf.role.rfind("guitarist", 0) == 0;
+            const CameraTarget performer_base_target{
+                perf.effective_world_transform};
             camera_targets[camera_target_id(perf.role, {})] =
                 performer_base_target;
             camera_targets[camera_target_id(perf.role, "base")] =
@@ -48419,23 +49241,25 @@ void Gameplay::draw_internal(ghogx::render::Window& win,
             const std::unordered_set<std::string>* needed_targets =
                 needed_it != camera_performer_targets_.end() ? &needed_it->second
                                                              : nullptr;
-            if (!build_all_performer_targets &&
+            if (!build_all_performer_targets && !helper_player &&
                 (!needed_targets || needed_targets->empty())) {
                 continue;
             }
             auto target_needed = [&](const std::string& subpart) {
                 return build_all_performer_targets ||
+                       (helper_player && (subpart == "bone_head.mesh" || subpart == "bone_head")) ||
                        (needed_targets &&
                         needed_targets->find(subpart) != needed_targets->end());
             };
             auto& character = perf.renderer->character();
             CharacterTransformCache transform_cache(
                 character,
-                build_all_performer_targets ? nullptr : needed_targets);
+                (build_all_performer_targets || helper_player) ? nullptr : needed_targets);
             auto add_target = [&](std::string_view subpart,
                                   const std::array<float, 16>& local_world) {
                 const auto world =
-                    mat4_mul_game(local_world, perf.world_transform);
+                    mat4_mul_game(local_world,
+                                  perf.effective_world_transform);
                 camera_targets[camera_target_id(perf.role, subpart)] =
                     CameraTarget{world};
             };
@@ -48524,19 +49348,21 @@ void Gameplay::draw_internal(ghogx::render::Window& win,
         }
         profile_camera_targets =
             profile_elapsed(profile_camera_subphase_start);
-        const auto& source_record_member_table =
+        const auto &source_record_member_table =
             regular_camera_source_record_member_table_;
 
         if (!intro_end_dispatched_ && intro_camera_seconds_ > 0.0 &&
             song_time_ >= intro_camera_seconds_) {
-            intro_end_dispatched_ = true;
-            should_resend_excitement_ = true;
-            apply_venue_event("intro_end", false);
-            try_apply_diagnostic_venue_event();
+          intro_end_dispatched_ = true;
+          should_resend_excitement_ = true;
+          apply_venue_event("intro_end", false);
+          try_apply_diagnostic_venue_event();
         }
 
+        // Hold the authored intro shot through TrackPanel. The regular camera
+        // director and the song clock are released together after the fly-in.
         const bool in_intro_camera_window =
-            intro_camera_seconds_ > 0.0 && song_time_ < intro_camera_seconds_;
+            track_intro_active_ || (song_started_ && song_time_ < 0.0);
         active_force_char_lod_ = -1;
         profile_camera_subphase_start = profile_now();
         refresh_worldcrowd_actor_source_targets_for_camera();
@@ -48557,202 +49383,213 @@ void Gameplay::draw_internal(ghogx::render::Window& win,
         std::optional<int> forced_camera_bars;
         size_t source_forced_duration_refreshes = 0;
         bool source_final_forced_pick_refreshes_duration = false;
-        camera_beat_state_ = camera_beat_at(chart_, song_time_);
-        while (next_camera_one_bar_to_event_idx_ < chart_.text_events.size()) {
-            const auto& ev =
+        if (!in_intro_camera_window) {
+          camera_beat_state_ = camera_beat_at(chart_, song_time_);
+          while (next_camera_one_bar_to_event_idx_ <
+                 chart_.text_events.size()) {
+            const auto &ev =
                 chart_.text_events[next_camera_one_bar_to_event_idx_];
             const auto upcoming_section = section_venue_event_name(ev.text);
             if (!upcoming_section) {
-                ++next_camera_one_bar_to_event_idx_;
-                continue;
+              ++next_camera_one_bar_to_event_idx_;
+              continue;
             }
             const uint32_t trigger_tick =
                 camera_source_one_bar_to_trigger_tick(chart_, ev);
             if (trigger_tick == 0) {
-                ++next_camera_one_bar_to_event_idx_;
-                continue;
+              ++next_camera_one_bar_to_event_idx_;
+              continue;
             }
             const double trigger_time = chart_.tick_to_sec(trigger_tick);
-            if (trigger_time > song_time_) break;
+            if (trigger_time > song_time_)
+              break;
             ++next_camera_one_bar_to_event_idx_;
             if (!camera_source_one_bar_to_camera_beat_gate_open(
                     camera_beat_state_)) {
-                if (debug_camera_enabled() || debug_venue_filters_enabled()) {
-                    std::fprintf(
-                        stderr,
-                        "[world] camera one_bar_to: source_msg=one_bar_to source_gate=camera_beat>0 camera_beat=%u source_action=skip upcoming=%s event_tick=%u trigger_tick=%u\n",
-                        camera_beat_state_,
-                        std::string(*upcoming_section).c_str(), ev.tick,
-                        trigger_tick);
-                }
-                continue;
+              if (debug_camera_enabled() || debug_venue_filters_enabled()) {
+                std::fprintf(stderr,
+                             "[world] camera one_bar_to: source_msg=one_bar_to source_gate=camera_beat>0 camera_beat=%u source_action=skip upcoming=%s event_tick=%u trigger_tick=%u\n",
+                             camera_beat_state_,
+                             std::string(*upcoming_section).c_str(), ev.tick,
+                             trigger_tick);
+              }
+              continue;
             }
             const bool camera_solo_before = camera_solo_active_;
             camera_solo_active_ =
                 camera_source_one_bar_to_solo_state_after_section(
                     camera_solo_active_, *upcoming_section);
-            const char* camera_solo_switch =
+            const char *camera_solo_switch =
                 camera_source_one_bar_to_solo_switch_label(*upcoming_section);
             const bool cue_forced_camera =
                 authored_gameplay_cameras_active && !in_intro_camera_window;
             if (cue_forced_camera) {
+              force_camera = true;
+              forced_camera_mode.reset();
+              forced_camera_bars.reset();
+              ++source_forced_duration_refreshes;
+              source_final_forced_pick_refreshes_duration = true;
+            }
+            if (debug_camera_enabled() || debug_venue_filters_enabled()) {
+              std::fprintf(
+                  stderr,
+                  "[world] camera one_bar_to: source_msg=one_bar_to source_action=get_shot_duration+pick_new_shot upcoming=%s event_tick=%u trigger_tick=%u camera_solo=%d camera_solo_before=%d camera_solo_after=%d camera_solo_switch=%s force=%d\n",
+                  std::string(*upcoming_section).c_str(), ev.tick, trigger_tick,
+                  camera_solo_active_ ? 1 : 0, camera_solo_before ? 1 : 0,
+                  camera_solo_active_ ? 1 : 0, camera_solo_switch,
+                  cue_forced_camera ? 1 : 0);
+            }
+          }
+        }
+        if (!in_intro_camera_window) {
+          const double forced_camera_event_window = std::max(0.001, dt * 1.5);
+          while (next_forced_camera_event_idx_ < chart_.text_events.size()) {
+            const auto &ev = chart_.text_events[next_forced_camera_event_idx_];
+            const double t = chart_.tick_to_sec(ev.tick);
+            if (t < song_time_ - forced_camera_event_window) {
+              ++next_forced_camera_event_idx_;
+              continue;
+            }
+            if (t > song_time_)
+              break;
+            ++next_forced_camera_event_idx_;
+            if (ev.text != "[band_jump]" && ev.text != "[sync_wag]" &&
+                ev.text != "[sync_head_bang]" &&
+                ev.text != "[crowd_lighters_slow]" &&
+                ev.text != "[crowd_lighters_fast]" &&
+                ev.text != "[crowd_lighters_off]") {
+              continue;
+            }
+
+            bool cue_forced_camera = false;
+            const bool source_multiplayer =
+                camera_source_game_multiplayer(camera_faceoff_active_players_);
+            const uint32_t excitement =
+                venue_excitement_level(active_venue_event_);
+            const bool did_lighter_cam_before = did_lighter_cam_;
+            bool source_pick_lighter_shot = false;
+            int lighter_was_off = -1;
+            if (ev.text == "[band_jump]") {
+              cue_forced_camera =
+                  authored_gameplay_cameras_active &&
+                  camera_source_band_jump_forces_camera(excitement);
+              if (cue_forced_camera) {
+                force_camera = true;
+                forced_camera_mode = CameraShotMode::Jump;
+                forced_camera_bars = kSourceJumpShotDurationBars;
+                source_final_forced_pick_refreshes_duration = false;
+              }
+            } else if (ev.text == "[crowd_lighters_slow]" ||
+                       ev.text == "[crowd_lighters_fast]") {
+              const bool was_off = !crowd_lighter_on_;
+              lighter_was_off = was_off ? 1 : 0;
+              crowd_lighter_on_ = true;
+              active_worldcrowd_lighter_group_ =
+                  ev.text == "[crowd_lighters_slow]" ? "lighter_slow"
+                                                     : "lighter_fast";
+              source_pick_lighter_shot = camera_source_lighter_forces_camera(
+                  source_multiplayer, did_lighter_cam_, was_off);
+              if (source_pick_lighter_shot) {
+                did_lighter_cam_ = true;
+              }
+              cue_forced_camera =
+                  authored_gameplay_cameras_active && source_pick_lighter_shot;
+              if (cue_forced_camera) {
+                force_camera = true;
+                forced_camera_mode = CameraShotMode::Lighter;
+                forced_camera_bars = kSourceLighterShotDurationBars;
+                source_final_forced_pick_refreshes_duration = false;
+              }
+            } else if (ev.text == "[crowd_lighters_off]") {
+              crowd_lighter_on_ = false;
+              active_worldcrowd_lighter_group_.clear();
+              cue_forced_camera = authored_gameplay_cameras_active;
+              if (cue_forced_camera) {
                 force_camera = true;
                 forced_camera_mode.reset();
                 forced_camera_bars.reset();
                 ++source_forced_duration_refreshes;
                 source_final_forced_pick_refreshes_duration = true;
+              }
+            } else {
+              cue_forced_camera =
+                  authored_gameplay_cameras_active &&
+                  camera_source_sync_pose_forces_camera(excitement);
+              if (cue_forced_camera) {
+                force_camera = true;
+                forced_camera_mode.reset();
+                forced_camera_bars = kSourceJumpShotDurationBars;
+                source_final_forced_pick_refreshes_duration = false;
+              }
             }
-            if (debug_camera_enabled() || debug_venue_filters_enabled()) {
-                std::fprintf(
-                    stderr,
-                    "[world] camera one_bar_to: source_msg=one_bar_to source_action=get_shot_duration+pick_new_shot upcoming=%s event_tick=%u trigger_tick=%u camera_solo=%d camera_solo_before=%d camera_solo_after=%d camera_solo_switch=%s force=%d\n",
-                    std::string(*upcoming_section).c_str(), ev.tick,
-                    trigger_tick, camera_solo_active_ ? 1 : 0,
-                    camera_solo_before ? 1 : 0,
-                    camera_solo_active_ ? 1 : 0, camera_solo_switch,
-                    cue_forced_camera ? 1 : 0);
-            }
-        }
-        if (!in_intro_camera_window) {
-            const double forced_camera_event_window =
-                std::max(0.001, dt * 1.5);
-            while (next_forced_camera_event_idx_ < chart_.text_events.size()) {
-                const auto& ev =
-                    chart_.text_events[next_forced_camera_event_idx_];
-                const double t = chart_.tick_to_sec(ev.tick);
-                if (t < song_time_ - forced_camera_event_window) {
-                    ++next_forced_camera_event_idx_;
-                    continue;
-                }
-                if (t > song_time_) break;
-                ++next_forced_camera_event_idx_;
-                if (ev.text != "[band_jump]" && ev.text != "[sync_wag]" &&
-                    ev.text != "[sync_head_bang]" &&
-                    ev.text != "[crowd_lighters_slow]" &&
-                    ev.text != "[crowd_lighters_fast]" &&
-                    ev.text != "[crowd_lighters_off]") {
-                    continue;
-                }
 
-                bool cue_forced_camera = false;
-                const bool source_multiplayer =
-                    camera_source_game_multiplayer(camera_faceoff_active_players_);
-                const uint32_t excitement =
-                    venue_excitement_level(active_venue_event_);
-                const bool did_lighter_cam_before = did_lighter_cam_;
-                bool source_pick_lighter_shot = false;
-                int lighter_was_off = -1;
-                if (ev.text == "[band_jump]") {
-                    cue_forced_camera = authored_gameplay_cameras_active &&
-                                        camera_source_band_jump_forces_camera(
-                                            excitement);
-                    if (cue_forced_camera) {
-                        force_camera = true;
-                        forced_camera_mode = CameraShotMode::Jump;
-                        forced_camera_bars = kSourceJumpShotDurationBars;
-                        source_final_forced_pick_refreshes_duration = false;
-                    }
-                } else if (ev.text == "[crowd_lighters_slow]" ||
-                           ev.text == "[crowd_lighters_fast]") {
-                    const bool was_off = !crowd_lighter_on_;
-                    lighter_was_off = was_off ? 1 : 0;
-                    crowd_lighter_on_ = true;
-                    active_worldcrowd_lighter_group_ =
-                        ev.text == "[crowd_lighters_slow]" ? "lighter_slow"
-                                                            : "lighter_fast";
-                    source_pick_lighter_shot =
-                        camera_source_lighter_forces_camera(
-                            source_multiplayer, did_lighter_cam_, was_off);
-                    if (source_pick_lighter_shot) {
-                        did_lighter_cam_ = true;
-                    }
-                    cue_forced_camera = authored_gameplay_cameras_active &&
-                                        source_pick_lighter_shot;
-                    if (cue_forced_camera) {
-                        force_camera = true;
-                        forced_camera_mode = CameraShotMode::Lighter;
-                        forced_camera_bars = kSourceLighterShotDurationBars;
-                        source_final_forced_pick_refreshes_duration = false;
-                    }
-                } else if (ev.text == "[crowd_lighters_off]") {
-                    crowd_lighter_on_ = false;
-                    active_worldcrowd_lighter_group_.clear();
-                    cue_forced_camera = authored_gameplay_cameras_active;
-                    if (cue_forced_camera) {
-                        force_camera = true;
-                        forced_camera_mode.reset();
-                        forced_camera_bars.reset();
-                        ++source_forced_duration_refreshes;
-                        source_final_forced_pick_refreshes_duration = true;
-                    }
-                } else {
-                    cue_forced_camera = authored_gameplay_cameras_active &&
-                                        camera_source_sync_pose_forces_camera(
-                                            excitement);
-                    if (cue_forced_camera) {
-                        force_camera = true;
-                        forced_camera_mode.reset();
-                        forced_camera_bars = kSourceJumpShotDurationBars;
-                        source_final_forced_pick_refreshes_duration = false;
-                    }
-                }
-
-                std::fprintf(
-                    stderr,
-                    "[world] camera script cue: pipeline_scope=normal_gameplay_camera "
-                    "priority=gameplay_camera source_msg=%s source_action=%s "
-                    "text=%s tick=%u t=%.3f "
-                    "force=%d mode=%s bars=%d excitement=%u "
-                    "source_gate=%s source_multiplayer=%d "
-                    "did_lighter_cam_before=%d did_lighter_cam_after=%d "
-                    "source_pick_lighter_shot=%d "
-                    "was_off=%d crowd_group=%s "
-                    "freecam_priority=deferred_last freecam_affects_gameplay=0\n",
-                    camera_source_script_cue_message(ev.text),
-                    camera_source_script_cue_action(ev.text),
-                    ev.text.c_str(), ev.tick, song_time_,
-                    cue_forced_camera ? 1 : 0,
-                    forced_camera_mode
-                        ? camera_shot_mode_label(*forced_camera_mode)
-                        : "regular",
-                    forced_camera_bars.value_or(0), excitement,
-                    camera_source_script_cue_gate(ev.text),
-                    source_multiplayer ? 1 : 0,
-                    did_lighter_cam_before ? 1 : 0,
-                    did_lighter_cam_ ? 1 : 0,
-                    source_pick_lighter_shot ? 1 : 0, lighter_was_off,
-                    active_worldcrowd_lighter_group_.empty()
-                        ? "-"
-                        : active_worldcrowd_lighter_group_.c_str());
-            }
+            std::fprintf(
+                stderr,
+                "[world] camera script cue: pipeline_scope=normal_gameplay_camera "
+                "priority=gameplay_camera source_msg=%s source_action=%s "
+                "text=%s tick=%u t=%.3f force=%d mode=%s bars=%d excitement=%u "
+                "source_gate=%s source_multiplayer=%d "
+                "did_lighter_cam_before=%d did_lighter_cam_after=%d "
+                "source_pick_lighter_shot=%d "
+                "was_off=%d crowd_group=%s "
+                "freecam_priority=deferred_last freecam_affects_gameplay=0\n",
+                camera_source_script_cue_message(ev.text),
+                camera_source_script_cue_action(ev.text), ev.text.c_str(),
+                ev.tick, song_time_, cue_forced_camera ? 1 : 0,
+                forced_camera_mode ? camera_shot_mode_label(*forced_camera_mode)
+                                   : "regular",
+                forced_camera_bars.value_or(0), excitement,
+                camera_source_script_cue_gate(ev.text),
+                source_multiplayer ? 1 : 0, did_lighter_cam_before ? 1 : 0,
+                did_lighter_cam_ ? 1 : 0, source_pick_lighter_shot ? 1 : 0,
+                lighter_was_off,
+                active_worldcrowd_lighter_group_.empty()
+                    ? "-"
+                    : active_worldcrowd_lighter_group_.c_str());
+          }
         }
         bool source_camera_manager_poll_suppressed = false;
         if (authored_gameplay_cameras_active && !in_intro_camera_window &&
             !regular_camera_keys_.empty()) {
             const uint32_t bar = camera_bar_at(chart_, song_time_);
+            float guitarist_starpower_flag_weight = 0.0f;
+            float guitarist_far_starpower_flag_weight = 0.0f;
+            for (const auto& perf : performers_) {
+                if (perf.role != "guitarist0") continue;
+                guitarist_starpower_flag_weight =
+                    perf.active_player.evaluate_flags(0x00080000u);
+                guitarist_far_starpower_flag_weight =
+                    perf.active_player.evaluate_flags(0x00004000u);
+                break;
+            }
             const bool guitarist_starpower =
                 camera_source_guitarist0_playing_starpower(
-                    star_power_.active);
+                    guitarist_starpower_flag_weight,
+                    guitarist_far_starpower_flag_weight);
             bool camera_check_shot_due = false;
             bool source_check_camera_shot_pick_due = false;
+            bool source_downbeat_delivered = false;
+            uint32_t bars_elapsed = 0;
             if (last_camera_bar_ == UINT32_MAX) {
                 last_camera_bar_ = bar;
-                camera_bars_left_ = 0;
-                camera_check_shot_due = active_regular_camera_.empty();
-                source_check_camera_shot_pick_due =
-                    camera_check_shot_due && camera_bars_left_ <= 0;
+                // The first song-clock bar is still a real `downbeat`
+                // message. intro_start_msg's six-bar hold therefore becomes
+                // five at beat zero and expires on the beat-20 downbeat.
+                bars_elapsed = 1;
+                source_downbeat_delivered = true;
             } else if (bar != last_camera_bar_) {
-                const uint32_t bars_elapsed = bar - last_camera_bar_;
+                bars_elapsed = bar - last_camera_bar_;
                 last_camera_bar_ = bar;
-                if (camera_bars_left_ > 0) {
-                    camera_bars_left_ =
-                        std::max(0, camera_bars_left_ -
-                                        static_cast<int>(bars_elapsed));
-                }
+                source_downbeat_delivered = true;
+            }
+            if (source_downbeat_delivered) {
+                camera_bars_left_ = ghogx::camera::camera_bars_after_downbeats(
+                    camera_bars_left_, bars_elapsed);
                 camera_check_shot_due = !guitarist_starpower;
                 const bool duration_expired = camera_bars_left_ <= 0;
                 source_check_camera_shot_pick_due =
-                    camera_check_shot_due && duration_expired;
+                    ghogx::camera::camera_pick_due_after_downbeat(
+                        camera_bars_left_, guitarist_starpower);
                 if (debug_camera_enabled() || debug_venue_filters_enabled()) {
                     const char* downbeat_source_action =
                         !camera_check_shot_due
@@ -48762,8 +49599,9 @@ void Gameplay::draw_internal(ghogx::render::Window& win,
                             : "check_camera_shot:duration_hold_no_pick";
                     std::fprintf(
                         stderr,
-                        "[world] camera downbeat: pipeline_scope=normal_gameplay_camera priority=gameplay_camera source_msg=downbeat source_script=world_objects_worldbase.dta::downbeat bar=%u bars_elapsed=%u bars_left=%d star_mode=%d source_starpower_gate=%s check_camera_shot=%d duration_gate=camera_bars_left<=0 duration_expired=%d pick_new_shot=%d source_action=%s freecam_priority=deferred_last freecam_affects_gameplay=0\n",
-                        bar, bars_elapsed, camera_bars_left_,
+                        "[world] camera downbeat: pipeline_scope=normal_gameplay_camera priority=gameplay_camera source_msg=downbeat source_script=world_objects_worldbase.dta::downbeat bar=%u beat=%u t=%.3f bars_elapsed=%u bars_left=%d star_mode=%d source_starpower_gate=%s check_camera_shot=%d duration_gate=camera_bars_left<=0 duration_expired=%d pick_new_shot=%d source_action=%s freecam_priority=deferred_last freecam_affects_gameplay=0\n",
+                        bar, camera_beat_state_, song_time_, bars_elapsed,
+                        camera_bars_left_,
                         guitarist_starpower ? 1 : 0,
                         camera_source_guitarist0_playing_starpower_source(),
                         camera_check_shot_due ? 1 : 0,
@@ -48780,6 +49618,7 @@ void Gameplay::draw_internal(ghogx::render::Window& win,
                                                     active_regular_camera_)) {
                         if (!camera_source_check_shot(
                                 *active_key, source_beat,
+                                camera_source_guitarist0_nearest_walkspot(),
                                 "world_objects_worldbase.dta::beat")) {
                             force_camera = true;
                             forced_camera_mode.reset();
@@ -48841,7 +49680,20 @@ void Gameplay::draw_internal(ghogx::render::Window& win,
                             : 0u;
                     if (duration_refreshes_to_burn > 0) {
                         const size_t first_burned_draw = camera_shot_counter_;
-                        camera_shot_counter_ += duration_refreshes_to_burn;
+                        // Each coalesced force_pick_shot already executed
+                        // worldbase::get_shot_duration in retail.  Advancing
+                        // only the diagnostic ordinal leaves the process-wide
+                        // Rand stream behind, changing the following weighted
+                        // camera pick (and every later CamShot shake draw).
+                        // Consume the overwritten duration results exactly as
+                        // the source script did; only the final result remains
+                        // observable in camera_bars_left_.
+                        for (size_t i = 0; i < duration_refreshes_to_burn; ++i) {
+                            const size_t burned_draw = camera_shot_counter_++;
+                            (void)source_random_int_camera_duration_bars(
+                                duration.second.first, duration.second.second,
+                                burned_draw);
+                        }
                         if (debug_camera_enabled() ||
                             debug_venue_filters_enabled()) {
                             std::fprintf(
@@ -48958,13 +49810,43 @@ void Gameplay::draw_internal(ghogx::render::Window& win,
                             active_regular_camera_ == key->name;
                     }
                 }
-                if (!key) {
-                    key = choose_regular_camera_key_scripted(
-                        regular_camera_keys_, active_regular_camera_,
-                        source_previous_fallback, low_excitement, kGuitaristWalking,
-                        guitarist_starpower, camera_mode,
-                        source_faceoff_players, source_current_walkspot,
-                        camera_normal_category_cursor_);
+                auto accept_camera_asset_dependencies =
+                    [&](const CameraKey* candidate, const char* route) {
+                        if (!candidate) return false;
+                        std::string unresolved_parent;
+                        if (camera_authored_parent_dependencies_resolved(
+                                *candidate, camera_targets,
+                                &unresolved_parent)) {
+                            return true;
+                        }
+                        std::fprintf(
+                            stderr,
+                            "[world] camera asset dependency rejected: shot=%s route=%s unresolved_parent=%s source_invariant=retail_CamShot_ObjPtr_resolves_from_loaded_world_character_package action=skip_candidate no_collision_or_shot_specific_fix=1\n",
+                            candidate->name.c_str(), route,
+                            unresolved_parent.c_str());
+                        return false;
+                    };
+                if (key && !accept_camera_asset_dependencies(
+                               key, "diagnostic_camera_shot")) {
+                    key = nullptr;
+                    diagnostic_camera_shot_matched = false;
+                    diagnostic_camera_shot_continuous_hold = false;
+                }
+                for (size_t dependency_attempt = 0;
+                     !key && dependency_attempt < regular_camera_keys_.size();
+                     ++dependency_attempt) {
+                    const CameraKey* candidate =
+                        choose_regular_camera_key_scripted(
+                            regular_camera_keys_, active_regular_camera_,
+                            source_previous_fallback, low_excitement,
+                            kGuitaristWalking, guitarist_starpower, camera_mode,
+                            source_faceoff_players, source_current_walkspot,
+                            camera_normal_category_cursor_);
+                    if (!candidate) break;
+                    if (accept_camera_asset_dependencies(
+                            candidate, "normal_gameplay_selection")) {
+                        key = candidate;
+                    }
                 }
                 if (key) {
                     const bool shot_changed =
@@ -49012,11 +49894,9 @@ void Gameplay::draw_internal(ghogx::render::Window& win,
                                 : "");
                     }
                     const std::string active_gameplay_blockers =
-                        camera_hidden_gameplay_blockers(
-                            true, true, true, kGuitaristWalking);
+                        camera_hidden_gameplay_blockers();
                     const std::string deferred_gameplay_blockers =
-                        camera_deferred_gameplay_blockers(
-                            true, true, kGuitaristWalking);
+                        camera_deferred_gameplay_blockers();
                     std::fprintf(
                         stderr,
                         "[world] regular camera sweep: pipeline_scope=normal_gameplay_camera priority=gameplay_camera %s -> %s category=%s bars_left=%d duration=%s[%d,%d] duration_source=%s duration_draw=%s%zu mode=%s gamecfg_mode=%s faceoff_active_players=%d filter_source=ShotMatches source_category=%s source_filters=\"%s\" source_previous=%s source_previous_context=%s source_current=%s source_next_before=%s source_next_after=%s source_current_handle=HANDLE_EXPR source_current_return=%s source_next_handle=HANDLE_EXPR source_next_before_return=%s source_next_after_return=%s source_walking=%d source_walking_gate=%s source_starpower=%d source_starpower_gate=%s flags=0x%08x forced=%d changed=%d source_next=%d diagnostic_hold=%d force_char_lod=%d bar=%u t=%.3f hidden_gameplay_blockers=%s deferred_gameplay_blockers=%s freecam_priority=deferred_last freecam_affects_gameplay=0\n",
@@ -49071,13 +49951,13 @@ void Gameplay::draw_internal(ghogx::render::Window& win,
                             camera_count_csv_tokens(kCameraRecoveredRuntimeList);
                         std::fprintf(
                             stderr,
-                            "[world] camera implementation status: pipeline_scope=normal_gameplay_camera priority=gameplay_camera source_truth=ihatecompvir recovered_runtime=%s active_hidden_gameplay_blockers=%s deferred_gameplay_blockers=%s pose_boundary=BuildTransform/SetPos rndcam_updatelocal_source=GH2_PS2_SLUS_214.47_0x001b1f50 hidden_bodies_deferred=cam_shot_ok_rest,cam_check_shot_native,CharWalk,SetPos,BuildTransform postprocess_render_effect=deferred freecam_priority=deferred_last freecam_affects_gameplay=0 under_venue_concern=open no_dependency_change=1 og_xbox_portability_preserved=1\n",
+                            "[world] camera implementation status: pipeline_scope=normal_gameplay_camera priority=gameplay_camera source_truth=ihatecompvir recovered_runtime=%s active_hidden_gameplay_blockers=%s deferred_gameplay_blockers=%s pose_boundary=CamShotFrame::BuildTransform/CamShot::SetFrame rndcam_updatelocal_source=GH2_PS2_SLUS_214.47_0x001b1f50 hidden_bodies_deferred=none ps2_postprocess=not_applicable_HX_XBOX_only editor_debug_only=CamShot::OnSetPos,FreeCamera under_venue_concern=diagnostic_only no_venue_specific_camera_patches=1 no_dependency_change=1 og_xbox_portability_preserved=1\n",
                             kCameraRecoveredRuntimeList,
                             active_gameplay_blockers.c_str(),
                             deferred_gameplay_blockers.c_str());
                         std::fprintf(
                             stderr,
-                            "[world] camera source-backed status: pipeline_scope=normal_gameplay_camera priority=gameplay_camera source_truth=ihatecompvir recovered_runtime_count=%zu open_gameplay_blockers=%zu active_hidden_gameplay_blockers=%s deferred_gameplay_blockers=%s freecam_priority=deferred_last freecam_affects_gameplay=0 under_venue_concern=open no_dependency_change=1 og_xbox_portability_preserved=1\n",
+                            "[world] camera source-backed status: pipeline_scope=normal_gameplay_camera priority=gameplay_camera source_truth=ihatecompvir recovered_runtime_count=%zu open_gameplay_blockers=%zu active_hidden_gameplay_blockers=%s deferred_gameplay_blockers=%s ps2_postprocess=not_applicable_HX_XBOX_only freecam_affects_gameplay=0 under_venue_concern=diagnostic_only no_venue_specific_camera_patches=1 no_dependency_change=1 og_xbox_portability_preserved=1\n",
                             recovered_camera_runtime_count,
                             kCameraOpenGameplayBlockers,
                             active_gameplay_blockers.c_str(),
@@ -49146,6 +50026,8 @@ void Gameplay::draw_internal(ghogx::render::Window& win,
                                                  active_regular_camera_start_,
                                                  &chart_,
                                                  camera_targets);
+                    source_frame_key_route = !selected_camera.empty() &&
+                        selected_camera.front().has_source_frame_mapping;
                 } else {
                     source_frame_key_route = true;
                     selected_camera = regular_camera_source_frame_keys(
@@ -49281,7 +50163,7 @@ void Gameplay::draw_internal(ghogx::render::Window& win,
                     if (source_shot_started) {
                         std::fprintf(
                             stderr,
-                            "[world] camera shot_started dispatch: source_msg=shot_started source_script=world/camshot.dta source_action=handle(world post_switch_cam) native_handler=apply_venue_event(post_switch_cam) pose_body=not_synthesized\n");
+                            "[world] camera shot_started dispatch: source_msg=shot_started source_script=world/camshot.dta source_action=handle(world post_switch_cam) native_handler=apply_venue_event(post_switch_cam) pose_owner=active_CamShot_SetFrame\n");
                         std::fprintf(
                             stderr,
                             "[world] camera SetFrame: source_msg=shot_started source_check=CamShot::CheckShotStarted runtime_flag=unk120p4 serialized_flag=none source_manager=Poll shot=%s local_frame=%.3f source_calc=CameraManager::CalcFrame duration_frames=%.3f duration_seconds=%.3f duration_source=%s anim_rate=%d task_units=%s fpu=%.1f source_frame_keys=%zu source_camshot_keyframes=%zu source_prep=CameraManager::PrePoll->CamShot::SetPreFrame base_noop=1 source_setpreframe_calls=%zu source_setframe_blend=%.3f\n",
@@ -49809,15 +50691,25 @@ void Gameplay::draw_internal(ghogx::render::Window& win,
                     venue_camera_world_crowd_min_,
                     venue_camera_world_crowd_max_};
                 profile_camera_subphase_start = profile_now();
-                apply_camera_keys(world_->camera(), selected_camera, song_time_,
-                                  camera_targets,
-                                  &camera_result_builder_state_,
-                                  &venue_camera_target_worlds_,
-                                  &source_record_member_table,
-                                  &regular_camera_keys_, source_setframe_blend,
-                                  &venue_crowd_bounds,
-                                  &active_camera_interp_debug_reported_);
-                apply_active_camera_fov_anims(world_->camera(), *key);
+                std::string unresolved_submit_parent;
+                if (camera_authored_parent_dependencies_resolved(
+                        *key, camera_targets, &unresolved_submit_parent)) {
+                    apply_camera_keys(world_->camera(), selected_camera,
+                                      song_time_, camera_targets,
+                                      &camera_result_builder_state_,
+                                      &venue_camera_target_worlds_,
+                                      &source_record_member_table,
+                                      &regular_camera_keys_,
+                                      source_setframe_blend,
+                                      &venue_crowd_bounds,
+                                      &active_camera_interp_debug_reported_, &gh1_camera_helper_);
+                    apply_active_camera_fov_anims(world_->camera(), *key);
+                } else {
+                    std::fprintf(
+                        stderr,
+                        "[world] camera submission blocked: shot=%s unresolved_parent=%s source_invariant=retail_CamShot_ObjPtr_resolves_from_loaded_world_character_package action=retain_last_valid_camera no_collision_or_shot_specific_fix=1\n",
+                        key->name.c_str(), unresolved_submit_parent.c_str());
+                }
                 profile_camera_apply +=
                     profile_elapsed(profile_camera_subphase_start);
                 if (diagnostic_camera_shot_.empty()) {
@@ -49901,43 +50793,99 @@ void Gameplay::draw_internal(ghogx::render::Window& win,
                                     duration.second.second,
                                     duration_random_draw);
                                 force_camera_shot_like_source(
-                                    *next_key,
-                                    "world_objects_worldbase.dta::do_force_shot");
+                                    *next_key, "world_objects_worldbase.dta::do_force_shot");
                             }
                         }
                         active_camera_shots_over_.insert(key->name);
                     }
                 }
             }
-        } else if (authored_gameplay_cameras_active &&
-                   in_intro_camera_window && !camera_keys_.empty()) {
-            active_force_char_lod_ = camera_keys_.front().force_char_lod;
-            start_camera_shot_runtime(camera_keys_.front());
-            std::vector<CameraKey> selected_intro_camera =
-                regular_camera_source_frame_keys(
-                    camera_keys_.front(), song_time_, 0.0, &chart_);
-            if (selected_intro_camera.empty())
-                selected_intro_camera = camera_keys_;
-            const CameraVenueCrowdBoundsProof venue_crowd_bounds{
-                venue_camera_world_crowd_bounds_valid_,
-                venue_camera_world_crowd_placements_,
-                venue_camera_world_crowd_min_,
-                venue_camera_world_crowd_max_};
-            profile_camera_subphase_start = profile_now();
-            apply_camera_keys(world_->camera(), selected_intro_camera,
-                              song_time_,
-                              camera_targets,
-                              &camera_result_builder_state_,
-                              &venue_camera_target_worlds_,
-                              &source_record_member_table,
-                              &regular_camera_keys_, 1.0f,
-                              &venue_crowd_bounds);
-            apply_active_camera_fov_anims(world_->camera(),
-                                          camera_keys_.front());
-            profile_camera_apply +=
-                profile_elapsed(profile_camera_subphase_start);
+        } else if (authored_gameplay_cameras_active && in_intro_camera_window &&
+                   !camera_keys_.empty()) {
+          active_force_char_lod_ = camera_keys_.front().force_char_lod;
+          start_camera_shot_runtime(camera_keys_.front());
+          // Latch the last valid frame while TrackPanel finishes. Sampling
+          // past the CamShot duration can follow its next-shot reference and
+          // visibly snap underneath the assembling highway.
+          const double intro_camera_end_time =
+              std::max(0.0, intro_camera_seconds_ - 1.0 / 60.0);
+          const double intro_camera_sample_time =
+              track_intro_active_
+                  ? std::min(std::max(0.0, song_time_), intro_camera_end_time)
+                  : intro_camera_end_time;
+          const CameraKey& intro_shot = camera_keys_.front();
+          const bool intro_has_external_path_pages =
+              !intro_shot.path_source_translation_page.empty() ||
+              !intro_shot.path_source_rotation_page.empty() ||
+              !intro_shot.path_source_scale_page.empty();
+          std::vector<CameraKey> selected_intro_camera;
+          const char* intro_camera_route = "flat_position_keys";
+          if (intro_has_external_path_pages) {
+            // Preserve the loader's flat external-RndTransAnim representation,
+            // but evaluate its source pages at the live CameraManager frame
+            // instead of asking the CamShot keyframe timer to interpret the
+            // first path pose as a whole shot.
+            selected_intro_camera = regular_camera_path_keys(
+                intro_shot, intro_camera_sample_time, 0.0, &chart_,
+                camera_targets, &camera_keys_);
+            intro_camera_route = "external_transanim";
+          } else if (intro_shot.has_path_anim) {
+            selected_intro_camera = regular_camera_path_keys(
+                intro_shot, intro_camera_sample_time, 0.0, &chart_,
+                camera_targets);
+            intro_camera_route = "embedded_path_anim";
+          } else if (camera_keys_.size() == 1) {
+            selected_intro_camera = regular_camera_source_frame_keys(
+                intro_shot, intro_camera_sample_time, 0.0, &chart_);
+            intro_camera_route = "camshot_keyframes";
+          } else {
+            // GH1 VenueCam compatibility paths are already re-timed into the
+            // live presentation-frame domain during venue load.
+            selected_intro_camera = camera_keys_;
+          }
+          if (selected_intro_camera.empty()) selected_intro_camera = camera_keys_;
+          const CameraVenueCrowdBoundsProof venue_crowd_bounds{
+              venue_camera_world_crowd_bounds_valid_,
+              venue_camera_world_crowd_placements_,
+              venue_camera_world_crowd_min_, venue_camera_world_crowd_max_};
+          profile_camera_subphase_start = profile_now();
+          apply_camera_keys(
+              world_->camera(), selected_intro_camera, intro_camera_sample_time,
+              camera_targets, &camera_result_builder_state_,
+              &venue_camera_target_worlds_, &source_record_member_table,
+              &regular_camera_keys_, 1.0f, &venue_crowd_bounds, nullptr, &gh1_camera_helper_);
+          if (env_value("GHOGX_DEBUG_CAMERA_MOTION")) {
+            const int bucket =
+                static_cast<int>(std::floor(intro_camera_sample_time));
+            static std::string last_intro_motion_sample;
+            const std::string report_key =
+                intro_shot.name + ":" + std::to_string(bucket);
+            if (last_intro_motion_sample != report_key) {
+              last_intro_motion_sample = report_key;
+              const auto& sampled = selected_intro_camera.front();
+              const auto& result = world_->camera().result_frame;
+              std::fprintf(
+                  stderr,
+                  "[camera-motion] intro shot=%s route=%s presentation=%.3f "
+                  "sample=%.3f source_frame=%s%.3f "
+                  "key_eye=(%.3f %.3f %.3f) "
+                  "result_eye=%s(%.3f %.3f %.3f)\n",
+                  intro_shot.name.c_str(), intro_camera_route, song_time_,
+                  intro_camera_sample_time,
+                  sampled.has_source_path_frame_mapping ? "" : "none/",
+                  sampled.has_source_path_frame_mapping
+                      ? sampled.source_path_authored_frame
+                      : sampled.frame,
+                  sampled.eye[0], sampled.eye[1], sampled.eye[2],
+                  result.valid ? "" : "invalid/", result.position[0],
+                  result.position[1], result.position[2]);
+            }
+          }
+          apply_active_camera_fov_anims(world_->camera(), camera_keys_.front());
+          profile_camera_apply +=
+              profile_elapsed(profile_camera_subphase_start);
         } else {
-            end_camera_shot_runtime();
+          end_camera_shot_runtime();
         }
         if (!source_camera_manager_poll_suppressed) {
             camera_manager_poll_free_cam_like_source("CameraManager::Poll");
@@ -49995,7 +50943,8 @@ void Gameplay::draw_internal(ghogx::render::Window& win,
                 });
             if (performer != performers_.end()) {
                 std::array<float, 3> target_pos =
-                    mat4_position_game(performer->world_transform);
+                    mat4_position_game(
+                        performer->effective_world_transform);
                 for (const std::string target_name : {
                          diagnostic_front_camera_role_ +
                              ":bone_spine1.mesh",
@@ -50010,7 +50959,7 @@ void Gameplay::draw_internal(ghogx::render::Window& win,
                 }
                 const float local_forward[3] = {0.0f, 1.0f, 0.0f};
                 const auto facing = transform_vector_game(
-                    performer->world_transform, local_forward);
+                    performer->effective_world_transform, local_forward);
                 const float facing_length =
                     std::hypot(facing[0], facing[1]);
                 auto& cam = world_->camera();
@@ -50108,7 +51057,7 @@ void Gameplay::draw_internal(ghogx::render::Window& win,
                 return;
             }
             const auto profile_highway_start = profile_now();
-            highway_->draw_over_scene(song_time_, chart_, difficulty_,
+            highway_->draw_over_scene(highway_song_time(), chart_, difficulty_,
                                       prev_fret_mask_ & 0x1F, lane_flash_,
                                       1.5f,
                                       &note_consumed_[
@@ -50140,471 +51089,473 @@ void Gameplay::draw_internal(ghogx::render::Window& win,
         const auto profile_lighting_start = profile_phase_start;
         bool worldcrowd_drawn = false;
         if (lighting_) {
-            LightingRequest lighting_request =
-                lighting_request_at(chart_, song_time_, intro_camera_seconds_);
-            if (source_game_lost_camera_dispatched_ || failed_) {
-                lighting_request.category = "LOSE";
-                lighting_request.adjective.clear();
-            } else if (source_game_won_message_dispatched_) {
-                const bool encore_win =
-                    std::find(source_game_won_camera_categories_.begin(),
-                              source_game_won_camera_categories_.end(),
-                              "WIN_ENCORE") !=
-                        source_game_won_camera_categories_.end() ||
-                    std::find(source_game_won_camera_categories_.begin(),
-                              source_game_won_camera_categories_.end(),
-                              "WIN_ENCORE_SONG") !=
-                        source_game_won_camera_categories_.end();
-                lighting_request.category =
-                    encore_win ? "WIN_ENCORE" : "WIN";
-                lighting_request.adjective.clear();
-            } else if (song_time_ < intro_camera_seconds_ &&
-                       intro_camera_category_ == "INTRO_ENCORE") {
-                lighting_request.category = "INTRO_ENCORE";
-                lighting_request.adjective.clear();
+          LightingRequest lighting_request =
+              lighting_request_at(chart_, song_time_, intro_camera_seconds_);
+          if (track_intro_active_) {
+            lighting_request.category = intro_camera_category_ == "INTRO_ENCORE"
+                                            ? "INTRO_ENCORE"
+                                            : "INTRO";
+            lighting_request.adjective.clear();
+          } else if (lighting_request.category == "INTRO") {
+            // The presentation clock is separate from song time. After it
+            // is released, verse is the default until a chart section
+            // event requests a more specific authored category.
+            lighting_request.category = "VERSE";
+          }
+          if (source_game_lost_camera_dispatched_ || failed_) {
+            lighting_request.category = "LOSE";
+            lighting_request.adjective.clear();
+          } else if (source_game_won_message_dispatched_) {
+            const bool encore_win =
+                std::find(source_game_won_camera_categories_.begin(),
+                          source_game_won_camera_categories_.end(),
+                          "WIN_ENCORE") !=
+                    source_game_won_camera_categories_.end() ||
+                std::find(source_game_won_camera_categories_.begin(),
+                          source_game_won_camera_categories_.end(),
+                          "WIN_ENCORE_SONG") !=
+                    source_game_won_camera_categories_.end();
+            lighting_request.category = encore_win ? "WIN_ENCORE" : "WIN";
+            lighting_request.adjective.clear();
+          } else if (track_intro_active_ &&
+                     intro_camera_category_ == "INTRO_ENCORE") {
+            lighting_request.category = "INTRO_ENCORE";
+            lighting_request.adjective.clear();
+          }
+          const uint32_t lighting_excitement =
+              venue_excitement_level(active_venue_event_);
+          if (diagnostic_venue_event_.empty()) {
+            std::string message;
+            if (lighting_excitement <= 1) {
+              message = "set_lights_bad";
+            } else {
+              message = lighting_excitement >= 3 ? "set_lights_great_"
+                                                 : "set_lights_okay_";
+              if (lighting_request.category == "SOLO")
+                message += "solo";
+              else if (lighting_request.category == "CHORUS")
+                message += "chorus";
+              else
+                message += "verse";
             }
-            const uint32_t lighting_excitement =
-                venue_excitement_level(active_venue_event_);
-            if (diagnostic_venue_event_.empty()) {
-                std::string message;
-                if (lighting_excitement <= 1) {
-                    message = "set_lights_bad";
-                } else {
-                    message = lighting_excitement >= 3
-                                  ? "set_lights_great_"
-                                  : "set_lights_okay_";
-                    if (lighting_request.category == "SOLO")
-                        message += "solo";
-                    else if (lighting_request.category == "CHORUS")
-                        message += "chorus";
-                    else
-                        message += "verse";
-                }
-                if (venue_script_handlers_.find(message) !=
-                        venue_script_handlers_.end() &&
-                    message != legacy_gh1_lighting_message_) {
-                    legacy_gh1_lighting_message_ = message;
-                    execute_venue_script_event(message);
-                    if (debug_venue_filters_enabled()) {
-                        std::fprintf(
-                            stderr,
-                            "[world] GH1 lighting message %s request=%s excitement=%u\n",
-                            message.c_str(), lighting_request.category.c_str(),
-                            lighting_excitement);
-                    }
-                }
+            if (venue_script_handlers_.find(message) !=
+                    venue_script_handlers_.end() &&
+                message != legacy_gh1_lighting_message_) {
+              legacy_gh1_lighting_message_ = message;
+              execute_venue_script_event(message);
+              if (debug_venue_filters_enabled()) {
+                std::fprintf(stderr,
+                             "[world] GH1 lighting message %s request=%s "
+                             "excitement=%u\n",
+                             message.c_str(), lighting_request.category.c_str(),
+                             lighting_excitement);
+              }
             }
-            if (const auto* preset =
-                    choose_lighting_preset(lighting_presets_, lighting_request,
-                                           lighting_excitement,
-                                           active_lighting_preset_,
-                                           venue_script_rng_state_)) {
-                const bool preset_changed =
-                    active_lighting_preset_ != preset->name;
-                if (preset_changed) {
-                    // PickRandomPreset consumes one random selection when a
-                    // category changes. Keep an already-eligible preset stable
-                    // across the per-frame manager poll.
-                    venue_script_rng_state_ =
-                        venue_script_rng_state_ * 1664525u + 1013904223u;
-                    active_lighting_preset_ = preset->name;
-                    active_lighting_keyframe_.clear();
-                    active_lighting_keyframe_index_ = SIZE_MAX;
-                    active_lighting_preset_start_ = song_time_;
+          }
+          if (const auto *preset = choose_lighting_preset(
+                  lighting_presets_, lighting_request, lighting_excitement,
+                  active_lighting_preset_, venue_script_rng_state_)) {
+            const bool preset_changed = active_lighting_preset_ != preset->name;
+            if (preset_changed) {
+              // PickRandomPreset consumes one random selection when a
+              // category changes. Keep an already-eligible preset stable
+              // across the per-frame manager poll.
+              venue_script_rng_state_ =
+                  venue_script_rng_state_ * 1664525u + 1013904223u;
+              active_lighting_preset_ = preset->name;
+              active_lighting_keyframe_.clear();
+              active_lighting_keyframe_index_ = SIZE_MAX;
+              active_lighting_preset_start_ = song_time_;
+              std::fprintf(
+                  stderr,
+                  "[world] lighting preset active: %s category=%s adjective=%s "
+                  "request=%s/%s excitement=%u keyframes=%u t=%.3f\n",
+                  preset->name.c_str(), preset->category.c_str(),
+                  preset->adjective.c_str(), lighting_request.category.c_str(),
+                  lighting_request.adjective.c_str(), lighting_excitement,
+                  preset->keyframe_count, song_time_);
+            }
+            if (!preset->keyframes.empty()) {
+              if (preset_changed ||
+                  active_lighting_keyframe_index_ == SIZE_MAX ||
+                  active_lighting_keyframe_index_ >= preset->keyframes.size()) {
+                active_lighting_keyframe_index_ = 0;
+              }
+              const size_t previous_lighting_keyframe_index =
+                  active_lighting_keyframe_index_;
+              while (!track_intro_active_ &&
+                     next_lighting_cue_idx_ < chart_.lighting_cues.size()) {
+                const auto &cue = chart_.lighting_cues[next_lighting_cue_idx_];
+                const double cue_sec = chart_.tick_to_sec(cue.tick);
+                if (cue_sec > song_time_)
+                  break;
+                const bool high_excitement =
+                    venue_excitement_is_high(active_venue_event_);
+                const bool apply_keyframe =
+                    high_excitement || ignored_last_light_change_;
+                std::fprintf(
+                    stderr,
+                    "[world] lighting cue: %s pitch=%d tick=%u apply=%d "
+                    "ignored_last=%d excitement=%s t=%.3f preset=%s\n",
+                    cue.event.c_str(), cue.pitch, cue.tick,
+                    apply_keyframe ? 1 : 0, ignored_last_light_change_ ? 1 : 0,
+                    active_venue_event_.c_str(), song_time_,
+                    preset->name.c_str());
+                if (apply_keyframe) {
+                  ignored_last_light_change_ = false;
+                  const double apply_time =
+                      song_time_ + kLightingAdvanceDelaySeconds;
+                  pending_lighting_advances_.push_back(
+                      {cue.event, cue.pitch, cue.tick, apply_time});
+                  if (debug_venue_filters_enabled()) {
                     std::fprintf(stderr,
-                                 "[world] lighting preset active: %s category=%s adjective=%s request=%s/%s excitement=%u keyframes=%u t=%.3f\n",
-                                 preset->name.c_str(),
-                                 preset->category.c_str(),
-                                 preset->adjective.c_str(),
-                                 lighting_request.category.c_str(),
-                                 lighting_request.adjective.c_str(),
-                                 lighting_excitement, preset->keyframe_count,
-                                 song_time_);
+                                 "[world] lighting cue queued: %s pitch=%d "
+                                 "tick=%u apply_t=%.3f delay=%.3f preset=%s\n",
+                                 cue.event.c_str(), cue.pitch, cue.tick,
+                                 apply_time, kLightingAdvanceDelaySeconds,
+                                 preset->name.c_str());
+                  }
+                } else {
+                  ignored_last_light_change_ = true;
                 }
-                if (!preset->keyframes.empty()) {
-                    if (preset_changed ||
-                        active_lighting_keyframe_index_ == SIZE_MAX ||
-                        active_lighting_keyframe_index_ >=
-                            preset->keyframes.size()) {
-                        active_lighting_keyframe_index_ = 0;
+                ++next_lighting_cue_idx_;
+              }
+              while (!track_intro_active_ &&
+                     !pending_lighting_advances_.empty() &&
+                     pending_lighting_advances_.front().apply_time <=
+                         song_time_ + 0.0001) {
+                const PendingLightingAdvance pending =
+                    pending_lighting_advances_.front();
+                pending_lighting_advances_.erase(
+                    pending_lighting_advances_.begin());
+                const size_t previous_index = active_lighting_keyframe_index_;
+                active_lighting_keyframe_index_ =
+                    lighting_keyframe_index_after_event(
+                        pending.event, active_lighting_keyframe_index_,
+                        preset->keyframes.size(), preset->looping);
+                active_lighting_keyframe_.clear();
+                std::fprintf(
+                    stderr,
+                    "[world] lighting cue apply: %s pitch=%d cue_tick=%u "
+                    "previous=%llu next=%llu scheduled_t=%.3f t=%.3f "
+                    "preset=%s\n",
+                    pending.event.c_str(), pending.pitch, pending.cue_tick,
+                    static_cast<unsigned long long>(previous_index),
+                    static_cast<unsigned long long>(
+                        active_lighting_keyframe_index_),
+                    pending.apply_time, song_time_, preset->name.c_str());
+              }
+              const size_t keyframe_index =
+                  chart_.lighting_cues.empty()
+                      ? lighting_keyframe_index_at(
+                            *preset, chart_, song_time_,
+                            active_lighting_preset_start_)
+                      : active_lighting_keyframe_index_;
+              const auto &keyframe = preset->keyframes[std::min(
+                  keyframe_index, preset->keyframes.size() - 1)];
+              if (active_lighting_keyframe_ != keyframe.name ||
+                  active_lighting_keyframe_index_ != keyframe_index ||
+                  preset_changed) {
+                float transition_fade_frames = keyframe.fade_out;
+                if (!preset_changed &&
+                    previous_lighting_keyframe_index != SIZE_MAX &&
+                    previous_lighting_keyframe_index <
+                        preset->keyframes.size() &&
+                    previous_lighting_keyframe_index != keyframe_index) {
+                  const float previous_fade =
+                      preset->keyframes[previous_lighting_keyframe_index]
+                          .fade_out;
+                  if (std::isfinite(previous_fade) && previous_fade > 0.0f) {
+                    transition_fade_frames = previous_fade;
+                  }
+                }
+                active_lighting_keyframe_ = keyframe.name;
+                active_lighting_keyframe_index_ = keyframe_index;
+                std::map<std::string, const LightingPreset::TargetState *>
+                    states_by_target;
+                for (const auto &state : keyframe.target_states) {
+                  states_by_target[state.target] = &state;
+                }
+                auto preset_has_spot = [&](const std::string &name) {
+                  return preset->spot_refs.empty() ||
+                         std::find(preset->spot_refs.begin(),
+                                   preset->spot_refs.end(),
+                                   name) != preset->spot_refs.end();
+                };
+                size_t inferred_spots = 0;
+                std::vector<ghogx::render::MiloSceneRenderer::SpotlightState>
+                    active_spots;
+                auto push_spot = [&](const LightingSpotlight &spot,
+                                     const LightingPreset::TargetState *state) {
+                  ghogx::render::MiloSceneRenderer::SpotlightState out;
+                  out.name = spot.name;
+                  out.target_mesh = spot.target;
+                  if (spot.has_default_state) {
+                    out.r = spot.default_color[0];
+                    out.g = spot.default_color[1];
+                    out.b = spot.default_color[2];
+                    out.intensity = spot.default_intensity;
+                  }
+                  if (state) {
+                    if (spot.animate_orientation_from_preset) {
+                      out.target_mesh = state->target;
+                      out.has_target_override = true;
+                      out.has_rotation = state->has_rotation;
+                      for (int c = 0; c < 4; ++c) {
+                        out.rotation_xyzw[c] = state->rotation_xyzw[c];
+                      }
                     }
-                    const size_t previous_lighting_keyframe_index =
-                        active_lighting_keyframe_index_;
-                    while (next_lighting_cue_idx_ < chart_.lighting_cues.size()) {
-                        const auto& cue =
-                            chart_.lighting_cues[next_lighting_cue_idx_];
-                        const double cue_sec = chart_.tick_to_sec(cue.tick);
-                        if (cue_sec > song_time_) break;
-                        const bool high_excitement =
-                            venue_excitement_is_high(active_venue_event_);
-                        const bool apply_keyframe =
-                            high_excitement || ignored_last_light_change_;
-                        std::fprintf(
-                            stderr,
-                            "[world] lighting cue: %s pitch=%d tick=%u apply=%d ignored_last=%d excitement=%s t=%.3f preset=%s\n",
-                            cue.event.c_str(), cue.pitch, cue.tick,
-                            apply_keyframe ? 1 : 0,
-                            ignored_last_light_change_ ? 1 : 0,
-                            active_venue_event_.c_str(), song_time_,
-                            preset->name.c_str());
-                        if (apply_keyframe) {
-                            ignored_last_light_change_ = false;
-                            const double apply_time =
-                                song_time_ + kLightingAdvanceDelaySeconds;
-                            pending_lighting_advances_.push_back(
-                                {cue.event, cue.pitch, cue.tick,
-                                 apply_time});
-                            if (debug_venue_filters_enabled()) {
-                                std::fprintf(
-                                    stderr,
-                                    "[world] lighting cue queued: %s pitch=%d tick=%u apply_t=%.3f delay=%.3f preset=%s\n",
-                                    cue.event.c_str(), cue.pitch, cue.tick,
-                                    apply_time,
-                                    kLightingAdvanceDelaySeconds,
-                                    preset->name.c_str());
-                            }
-                        } else {
-                            ignored_last_light_change_ = true;
-                        }
-                        ++next_lighting_cue_idx_;
+                    if (spot.animate_color_from_preset) {
+                      out.r = state->color[0];
+                      out.g = state->color[1];
+                      out.b = state->color[2];
+                      out.intensity = state->intensity;
                     }
-                    while (!pending_lighting_advances_.empty() &&
-                           pending_lighting_advances_.front().apply_time <=
-                               song_time_ + 0.0001) {
-                        const PendingLightingAdvance pending =
-                            pending_lighting_advances_.front();
-                        pending_lighting_advances_.erase(
-                            pending_lighting_advances_.begin());
-                        const size_t previous_index =
-                            active_lighting_keyframe_index_;
-                        active_lighting_keyframe_index_ =
-                            lighting_keyframe_index_after_event(
-                                pending.event, active_lighting_keyframe_index_,
-                                preset->keyframes.size(), preset->looping);
-                        active_lighting_keyframe_.clear();
-                        std::fprintf(
-                            stderr,
-                            "[world] lighting cue apply: %s pitch=%d cue_tick=%u previous=%llu next=%llu scheduled_t=%.3f t=%.3f preset=%s\n",
-                            pending.event.c_str(), pending.pitch,
-                            pending.cue_tick,
-                            static_cast<unsigned long long>(previous_index),
-                            static_cast<unsigned long long>(
-                                active_lighting_keyframe_index_),
-                            pending.apply_time, song_time_,
-                            preset->name.c_str());
+                    if (spot.animate_color_from_preset ||
+                        spot.animate_orientation_from_preset) {
+                      out.flare_enabled = state->flare_enabled;
+                      out.has_flare_enabled = state->has_flare_enabled;
                     }
-                    const size_t keyframe_index =
-                        chart_.lighting_cues.empty()
-                            ? lighting_keyframe_index_at(
-                                  *preset, chart_, song_time_,
-                                  active_lighting_preset_start_)
-                            : active_lighting_keyframe_index_;
-                    const auto& keyframe =
-                        preset->keyframes[std::min(keyframe_index,
-                                                   preset->keyframes.size() - 1)];
-                    if (active_lighting_keyframe_ != keyframe.name ||
-                        active_lighting_keyframe_index_ != keyframe_index ||
-                        preset_changed) {
-                        float transition_fade_frames = keyframe.fade_out;
-                        if (!preset_changed &&
-                            previous_lighting_keyframe_index != SIZE_MAX &&
-                            previous_lighting_keyframe_index <
-                                preset->keyframes.size() &&
-                            previous_lighting_keyframe_index != keyframe_index) {
-                            const float previous_fade =
-                                preset->keyframes[previous_lighting_keyframe_index]
-                                    .fade_out;
-                            if (std::isfinite(previous_fade) &&
-                                previous_fade > 0.0f) {
-                                transition_fade_frames = previous_fade;
-                            }
-                        }
-                        active_lighting_keyframe_ = keyframe.name;
-                        active_lighting_keyframe_index_ = keyframe_index;
-                        std::map<std::string,
-                                 const LightingPreset::TargetState*> states_by_target;
-                        for (const auto& state : keyframe.target_states) {
-                            states_by_target[state.target] = &state;
-                        }
-                        auto preset_has_spot = [&](const std::string& name) {
-                            return preset->spot_refs.empty() ||
-                                   std::find(preset->spot_refs.begin(),
-                                             preset->spot_refs.end(), name) !=
-                                       preset->spot_refs.end();
-                        };
-                        size_t inferred_spots = 0;
-                        std::vector<ghogx::render::MiloSceneRenderer::SpotlightState>
-                            active_spots;
-                        auto push_spot = [&](const LightingSpotlight& spot,
-                                             const LightingPreset::TargetState* state) {
-                            ghogx::render::MiloSceneRenderer::SpotlightState out;
-                            out.name = spot.name;
-                            out.target_mesh = spot.target;
-                            if (spot.has_default_state) {
-                                out.r = spot.default_color[0];
-                                out.g = spot.default_color[1];
-                                out.b = spot.default_color[2];
-                                out.intensity = spot.default_intensity;
-                            }
-                            if (state) {
-                                if (spot.animate_orientation_from_preset) {
-                                    out.target_mesh = state->target;
-                                    out.has_target_override = true;
-                                    out.has_rotation = state->has_rotation;
-                                    for (int c = 0; c < 4; ++c) {
-                                        out.rotation_xyzw[c] =
-                                            state->rotation_xyzw[c];
-                                    }
-                                }
-                                if (spot.animate_color_from_preset) {
-                                    out.r = state->color[0];
-                                    out.g = state->color[1];
-                                    out.b = state->color[2];
-                                    out.intensity = state->intensity;
-                                }
-                                if (spot.animate_color_from_preset ||
-                                    spot.animate_orientation_from_preset) {
-                                    out.flare_enabled = state->flare_enabled;
-                                    out.has_flare_enabled =
-                                        state->has_flare_enabled;
-                                }
-                            }
-                            active_spots.push_back(std::move(out));
-                        };
-                        size_t mesh_target_spots = 0;
-                        size_t direct_spots = 0;
-                        size_t source_paired_spots = 0;
-                        const bool has_source_spot_pairs =
-                            preset->source_order_decoded &&
-                            std::any_of(
-                                keyframe.target_states.begin(),
+                  }
+                  active_spots.push_back(std::move(out));
+                };
+                size_t mesh_target_spots = 0;
+                size_t direct_spots = 0;
+                size_t source_paired_spots = 0;
+                const bool has_source_spot_pairs =
+                    preset->source_order_decoded &&
+                    std::any_of(keyframe.target_states.begin(),
                                 keyframe.target_states.end(),
-                                [](const LightingPreset::TargetState& state) {
-                                    return !state.spotlight.empty();
+                                [](const LightingPreset::TargetState &state) {
+                                  return !state.spotlight.empty();
                                 });
-                        if (has_source_spot_pairs) {
-                            for (const auto& state : keyframe.target_states) {
-                                const auto spot_it =
-                                    lighting_spots_by_name_.find(state.spotlight);
-                                if (spot_it == lighting_spots_by_name_.end())
-                                    continue;
-                                if (!preset_has_spot(spot_it->second->name))
-                                    continue;
-                                ++source_paired_spots;
-                                push_spot(*spot_it->second, &state);
-                            }
-                        } else {
-                            for (const auto& target : keyframe.mesh_targets) {
-                                const auto target_it =
-                                    lighting_spots_by_target_.find(target);
-                                if (target_it == lighting_spots_by_target_.end())
-                                    continue;
-                                const auto state_it = states_by_target.find(target);
-                                for (const LightingSpotlight* spot : target_it->second) {
-                                    if (!spot) continue;
-                                    if (!preset_has_spot(spot->name)) continue;
-                                    ++mesh_target_spots;
-                                    push_spot(*spot,
-                                              state_it == states_by_target.end()
-                                                  ? nullptr
-                                                  : state_it->second);
-                                }
-                            }
-                            for (const auto& spot_ref : keyframe.spot_refs) {
-                                const auto spot_it =
-                                    lighting_spots_by_name_.find(spot_ref);
-                                if (spot_it == lighting_spots_by_name_.end())
-                                    continue;
-                                if (!preset_has_spot(spot_it->second->name))
-                                    continue;
-                                ++direct_spots;
-                                const auto state_it = states_by_target.find(
-                                    spot_it->second->target);
-                                push_spot(*spot_it->second,
-                                          state_it == states_by_target.end()
-                                              ? nullptr
-                                              : state_it->second);
-                            }
-                            for (const auto& state : keyframe.target_states) {
-                                if (const auto target_it =
-                                        lighting_spots_by_target_.find(state.target);
-                                    target_it != lighting_spots_by_target_.end()) {
-                                    for (const LightingSpotlight* spot : target_it->second) {
-                                        if (!spot) continue;
-                                        if (!preset_has_spot(spot->name)) continue;
-                                        ++inferred_spots;
-                                        push_spot(*spot, &state);
-                                    }
-                                    continue;
-                                }
-                                for (const auto& spot_name :
-                                     infer_spotlight_names_from_target(
-                                         state.target)) {
-                                    const auto spot_it =
-                                        lighting_spots_by_name_.find(spot_name);
-                                    if (spot_it == lighting_spots_by_name_.end())
-                                        continue;
-                                    if (!preset_has_spot(spot_it->second->name))
-                                        continue;
-                                    ++inferred_spots;
-                                    push_spot(*spot_it->second, &state);
-                                    break;
-                                }
-                            }
-                        }
-                        active_spots =
-                            sorted_unique_spotlight_states(std::move(active_spots));
-                        const size_t active_spot_count = active_spots.size();
-                        const double transition_fade_seconds =
-                            lighting_frames_to_seconds(
-                                transition_fade_frames, preset->anim_rate,
-                                chart_, song_time_);
-                        set_lighting_spot_targets(std::move(active_spots),
-                                                  transition_fade_seconds);
-                        LightPresetEnvLightStateSnapshot env_light_targets;
-                        const auto env_light_counts =
-                            apply_lighting_preset_environment_light_state(
-                                keyframe, lighting_environs_, venue_environs_,
-                                lighting_lights_, venue_lights_,
-                                env_light_targets.lighting_environment_colors,
-                                env_light_targets
-                                    .lighting_environment_fog_colors,
-                                env_light_targets
-                                    .lighting_environment_fog_ranges,
-                                env_light_targets
-                                    .lighting_environment_fog_enabled,
-                                env_light_targets.lighting_light_colors,
-                                env_light_targets
-                                    .lighting_light_state_overrides,
-                                env_light_targets.lighting_light_transforms,
-                                env_light_targets.venue_environment_colors,
-                                env_light_targets.venue_environment_fog_colors,
-                                env_light_targets.venue_environment_fog_ranges,
-                                env_light_targets.venue_environment_fog_enabled,
-                                env_light_targets.venue_light_colors,
-                                env_light_targets.venue_light_state_overrides,
-                                env_light_targets.venue_light_transforms);
-                        if (env_value("GHOGX_LOG_LIGHT_PRESET_VALUES")) {
-                            for (const auto& state : keyframe.environment_states) {
-                                std::fprintf(
-                                    stderr,
-                                    "[world] LightPreset env value: preset=%s keyframe=%s target=%s ambient=(%.3f %.3f %.3f %.3f) fog=%d range=(%.3f %.3f) fog_color=(%.3f %.3f %.3f %.3f)\n",
-                                    preset->name.c_str(), keyframe.name.c_str(),
-                                    state.target.c_str(), state.color[0],
-                                    state.color[1], state.color[2],
-                                    state.color[3], state.fog_enabled ? 1 : 0,
-                                    state.fog_start, state.fog_end,
-                                    state.fog_color[0], state.fog_color[1],
-                                    state.fog_color[2], state.fog_color[3]);
-                            }
-                            for (const auto& state : keyframe.light_states) {
-                                std::fprintf(
-                                    stderr,
-                                    "[world] LightPreset light value: preset=%s keyframe=%s target=%s type=%d color=(%.3f %.3f %.3f %.3f) pos=(%.3f %.3f %.3f) rot=(%.3f %.3f %.3f %.3f) range=%.3f\n",
-                                    preset->name.c_str(), keyframe.name.c_str(),
-                                    state.target.c_str(), state.type,
-                                    state.color[0], state.color[1],
-                                    state.color[2], state.color[3],
-                                    state.position[0], state.position[1],
-                                    state.position[2], state.rotation_xyzw[0],
-                                    state.rotation_xyzw[1],
-                                    state.rotation_xyzw[2],
-                                    state.rotation_xyzw[3], state.range);
-                            }
-                        }
-                        set_lighting_preset_env_light_targets(
-                            std::move(env_light_targets),
-                            transition_fade_seconds);
-                        std::fprintf(
-                            stderr,
-                            "[world] lighting keyframe active: %s[%llu] '%s' span=0x%llx..0x%llx targets=%llu target_states=%llu source_paired_spots=%llu static_targeted_spots=%llu direct_spots=%llu inferred_spots=%llu active_spots=%llu duration_frames=%.3f fade_frames=%.3f fade_seconds=%.3f t=%.3f\n",
-                            preset->name.c_str(),
-                            static_cast<unsigned long long>(keyframe_index),
-                            keyframe.name.c_str(),
-                            static_cast<unsigned long long>(
-                                keyframe.record_start),
-                            static_cast<unsigned long long>(
-                                keyframe.record_end),
-                            static_cast<unsigned long long>(
-                                keyframe.mesh_targets.size()),
-                            static_cast<unsigned long long>(
-                                keyframe.target_states.size()),
-                            static_cast<unsigned long long>(source_paired_spots),
-                            static_cast<unsigned long long>(mesh_target_spots),
-                            static_cast<unsigned long long>(direct_spots),
-                            static_cast<unsigned long long>(inferred_spots),
-                            static_cast<unsigned long long>(active_spot_count),
-                            keyframe.duration, transition_fade_frames,
-                            transition_fade_seconds, song_time_);
-                        if (env_light_counts.environment_states > 0 ||
-                            env_light_counts.light_states > 0) {
-                            std::fprintf(
-                                stderr,
-                                "[world] LightPreset state applied: preset=%s keyframe=%s env_states=%llu light_states=%llu lighting_env=%llu venue_env=%llu lighting_light=%llu venue_light=%llu lighting_light_state=%llu venue_light_state=%llu lighting_xfm=%llu venue_xfm=%llu\n",
-                                preset->name.c_str(), keyframe.name.c_str(),
-                                static_cast<unsigned long long>(
-                                    env_light_counts.environment_states),
-                                static_cast<unsigned long long>(
-                                    env_light_counts.light_states),
-                                static_cast<unsigned long long>(
-                                    env_light_counts.lighting_environments),
-                                static_cast<unsigned long long>(
-                                    env_light_counts.venue_environments),
-                                static_cast<unsigned long long>(
-                                    env_light_counts.lighting_lights),
-                                static_cast<unsigned long long>(
-                                    env_light_counts.venue_lights),
-                                static_cast<unsigned long long>(
-                                    env_light_counts.lighting_light_states),
-                                static_cast<unsigned long long>(
-                                    env_light_counts.venue_light_states),
-                                static_cast<unsigned long long>(
-                                    env_light_counts
-                                        .lighting_light_transforms),
-                                static_cast<unsigned long long>(
-                                    env_light_counts.venue_light_transforms));
-                        }
+                if (has_source_spot_pairs) {
+                  for (const auto &state : keyframe.target_states) {
+                    const auto spot_it =
+                        lighting_spots_by_name_.find(state.spotlight);
+                    if (spot_it == lighting_spots_by_name_.end())
+                      continue;
+                    if (!preset_has_spot(spot_it->second->name))
+                      continue;
+                    ++source_paired_spots;
+                    push_spot(*spot_it->second, &state);
+                  }
+                } else {
+                  for (const auto &target : keyframe.mesh_targets) {
+                    const auto target_it =
+                        lighting_spots_by_target_.find(target);
+                    if (target_it == lighting_spots_by_target_.end())
+                      continue;
+                    const auto state_it = states_by_target.find(target);
+                    for (const LightingSpotlight *spot : target_it->second) {
+                      if (!spot)
+                        continue;
+                      if (!preset_has_spot(spot->name))
+                        continue;
+                      ++mesh_target_spots;
+                      push_spot(*spot, state_it == states_by_target.end()
+                                           ? nullptr
+                                           : state_it->second);
                     }
+                  }
+                  for (const auto &spot_ref : keyframe.spot_refs) {
+                    const auto spot_it = lighting_spots_by_name_.find(spot_ref);
+                    if (spot_it == lighting_spots_by_name_.end())
+                      continue;
+                    if (!preset_has_spot(spot_it->second->name))
+                      continue;
+                    ++direct_spots;
+                    const auto state_it =
+                        states_by_target.find(spot_it->second->target);
+                    push_spot(*spot_it->second,
+                              state_it == states_by_target.end()
+                                  ? nullptr
+                                  : state_it->second);
+                  }
+                  for (const auto &state : keyframe.target_states) {
+                    if (const auto target_it =
+                            lighting_spots_by_target_.find(state.target);
+                        target_it != lighting_spots_by_target_.end()) {
+                      for (const LightingSpotlight *spot : target_it->second) {
+                        if (!spot)
+                          continue;
+                        if (!preset_has_spot(spot->name))
+                          continue;
+                        ++inferred_spots;
+                        push_spot(*spot, &state);
+                      }
+                      continue;
+                    }
+                    for (const auto &spot_name :
+                         infer_spotlight_names_from_target(state.target)) {
+                      const auto spot_it =
+                          lighting_spots_by_name_.find(spot_name);
+                      if (spot_it == lighting_spots_by_name_.end())
+                        continue;
+                      if (!preset_has_spot(spot_it->second->name))
+                        continue;
+                      ++inferred_spots;
+                      push_spot(*spot_it->second, &state);
+                      break;
+                    }
+                  }
                 }
-            }
-            const bool late_lighting_overlay = late_lighting_overlay_enabled();
-            update_lighting_preset_env_light_state();
-            update_lighting_spotlight_renderer();
-            if (debug_camera_enabled() || debug_venue_filters_enabled()) {
-                static bool logged_worlddir_lightpreset_order = false;
-                if (!logged_worlddir_lightpreset_order) {
-                    logged_worlddir_lightpreset_order = true;
+                active_spots =
+                    sorted_unique_spotlight_states(std::move(active_spots));
+                const size_t active_spot_count = active_spots.size();
+                const double transition_fade_seconds =
+                    lighting_frames_to_seconds(transition_fade_frames,
+                                               preset->anim_rate, chart_,
+                                               song_time_);
+                set_lighting_spot_targets(std::move(active_spots),
+                                          transition_fade_seconds);
+                LightPresetEnvLightStateSnapshot env_light_targets;
+                const auto env_light_counts =
+                    apply_lighting_preset_environment_light_state(
+                        keyframe, lighting_environs_, venue_environs_,
+                        lighting_lights_, venue_lights_,
+                        env_light_targets.lighting_environment_colors,
+                        env_light_targets.lighting_environment_fog_colors,
+                        env_light_targets.lighting_environment_fog_ranges,
+                        env_light_targets.lighting_environment_fog_enabled,
+                        env_light_targets.lighting_light_colors,
+                        env_light_targets.lighting_light_state_overrides,
+                        env_light_targets.lighting_light_transforms,
+                        env_light_targets.venue_environment_colors,
+                        env_light_targets.venue_environment_fog_colors,
+                        env_light_targets.venue_environment_fog_ranges,
+                        env_light_targets.venue_environment_fog_enabled,
+                        env_light_targets.venue_light_colors,
+                        env_light_targets.venue_light_state_overrides,
+                        env_light_targets.venue_light_transforms);
+                if (env_value("GHOGX_LOG_LIGHT_PRESET_VALUES")) {
+                  for (const auto &state : keyframe.environment_states) {
                     std::fprintf(
                         stderr,
-                        "[world] camera LightPreset/RndDir order: bridge=camera_worlddir_lightpreset_rnddir_order_bridge source_owner=WorldDir::Poll source_order=CameraManager::PrePoll->LightPresetManager::Poll->RndDir::Poll->CameraManager::Poll native_bridge=LightPreset_poll_before_venue_proxy_update_before_scene_draw camera_poll_split=regular_SetFrame_before_native_proxy_update;FreeCamera_deferred_last result=lighting_state_visible_to_RndDir_proxy_update pipeline_scope=normal_gameplay_camera priority=gameplay_camera freecam_priority=deferred_last freecam_affects_gameplay=0 no_dependency_change=1 og_xbox_portability_preserved=1\n");
+                        "[world] LightPreset env value: preset=%s keyframe=%s "
+                        "target=%s ambient=(%.3f %.3f %.3f %.3f) fog=%d "
+                        "range=(%.3f %.3f) fog_color=(%.3f %.3f %.3f %.3f)\n",
+                        preset->name.c_str(), keyframe.name.c_str(),
+                        state.target.c_str(), state.color[0], state.color[1],
+                        state.color[2], state.color[3],
+                        state.fog_enabled ? 1 : 0, state.fog_start,
+                        state.fog_end, state.fog_color[0], state.fog_color[1],
+                        state.fog_color[2], state.fog_color[3]);
+                  }
+                  for (const auto &state : keyframe.light_states) {
+                    std::fprintf(stderr,
+                                 "[world] LightPreset light value: preset=%s "
+                                 "keyframe=%s target=%s type=%d color=(%.3f "
+                                 "%.3f %.3f %.3f) pos=(%.3f %.3f %.3f) "
+                                 "rot=(%.3f %.3f %.3f %.3f) range=%.3f\n",
+                                 preset->name.c_str(), keyframe.name.c_str(),
+                                 state.target.c_str(), state.type,
+                                 state.color[0], state.color[1], state.color[2],
+                                 state.color[3], state.position[0],
+                                 state.position[1], state.position[2],
+                                 state.rotation_xyzw[0], state.rotation_xyzw[1],
+                                 state.rotation_xyzw[2], state.rotation_xyzw[3],
+                                 state.range);
+                  }
                 }
-            }
-            update_venue_proxy_objects();
-            update_worldcrowd_actor_lighting();
-            profile_phase_start = profile_now();
-            world_->draw();
-            if (profile_draw)
-                profile_world += profile_elapsed(profile_phase_start);
-            scene_drawn = true;
-            profile_phase_start = profile_now();
-            draw_venue_proxy_objects(world_->camera());
-            if (profile_draw)
-                profile_proxy += profile_elapsed(profile_phase_start);
-            profile_phase_start = profile_now();
-            draw_worldcrowd_actor_runtime(world_->camera());
-            if (profile_draw)
-                profile_crowd += profile_elapsed(profile_phase_start);
-            worldcrowd_drawn = true;
-            if (!late_lighting_overlay) {
-                lighting_->draw_over_scene(world_->camera());
-                if (debug_venue_filters_enabled()) {
-                    std::fprintf(
-                        stderr,
-                        "[world] lighting overlay composite: order=before_band "
-                        "t=%.3f\n",
-                        song_time_);
+                set_lighting_preset_env_light_targets(
+                    std::move(env_light_targets), transition_fade_seconds);
+                std::fprintf(
+                    stderr,
+                    "[world] lighting keyframe active: %s[%llu] '%s' "
+                    "span=0x%llx..0x%llx targets=%llu target_states=%llu "
+                    "source_paired_spots=%llu static_targeted_spots=%llu "
+                    "direct_spots=%llu inferred_spots=%llu active_spots=%llu "
+                    "duration_frames=%.3f fade_frames=%.3f fade_seconds=%.3f "
+                    "t=%.3f\n",
+                    preset->name.c_str(),
+                    static_cast<unsigned long long>(keyframe_index),
+                    keyframe.name.c_str(),
+                    static_cast<unsigned long long>(keyframe.record_start),
+                    static_cast<unsigned long long>(keyframe.record_end),
+                    static_cast<unsigned long long>(
+                        keyframe.mesh_targets.size()),
+                    static_cast<unsigned long long>(
+                        keyframe.target_states.size()),
+                    static_cast<unsigned long long>(source_paired_spots),
+                    static_cast<unsigned long long>(mesh_target_spots),
+                    static_cast<unsigned long long>(direct_spots),
+                    static_cast<unsigned long long>(inferred_spots),
+                    static_cast<unsigned long long>(active_spot_count),
+                    keyframe.duration, transition_fade_frames,
+                    transition_fade_seconds, song_time_);
+                if (env_light_counts.environment_states > 0 ||
+                    env_light_counts.light_states > 0) {
+                  std::fprintf(
+                      stderr,
+                      "[world] LightPreset state applied: preset=%s keyframe=%s env_states=%llu light_states=%llu "
+                      "lighting_env=%llu venue_env=%llu lighting_light=%llu "
+                      "venue_light=%llu lighting_light_state=%llu "
+                      "venue_light_state=%llu lighting_xfm=%llu "
+                      "venue_xfm=%llu\n",
+                      preset->name.c_str(), keyframe.name.c_str(),
+                      static_cast<unsigned long long>(
+                          env_light_counts.environment_states),
+                      static_cast<unsigned long long>(
+                          env_light_counts.light_states),
+                      static_cast<unsigned long long>(
+                          env_light_counts.lighting_environments),
+                      static_cast<unsigned long long>(
+                          env_light_counts.venue_environments),
+                      static_cast<unsigned long long>(
+                          env_light_counts.lighting_lights),
+                      static_cast<unsigned long long>(
+                          env_light_counts.venue_lights),
+                      static_cast<unsigned long long>(
+                          env_light_counts.lighting_light_states),
+                      static_cast<unsigned long long>(
+                          env_light_counts.venue_light_states),
+                      static_cast<unsigned long long>(
+                          env_light_counts.lighting_light_transforms),
+                      static_cast<unsigned long long>(
+                          env_light_counts.venue_light_transforms));
                 }
+              }
             }
+          }
+          const bool late_lighting_overlay = late_lighting_overlay_enabled();
+          update_lighting_preset_env_light_state();
+          update_lighting_spotlight_renderer();
+          if (debug_camera_enabled() || debug_venue_filters_enabled()) {
+            static bool logged_worlddir_lightpreset_order = false;
+            if (!logged_worlddir_lightpreset_order) {
+              logged_worlddir_lightpreset_order = true;
+              std::fprintf(
+                  stderr,
+                  "[world] camera LightPreset/RndDir order: bridge=camera_worlddir_lightpreset_rnddir_order_bridge source_owner=WorldDir::Poll source_order=CameraManager::PrePoll->LightPresetManager::Poll->RndDir::Poll->CameraManager::Poll native_bridge=LightPreset_poll_before_venue_proxy_update_before_scene_draw camera_poll_split=regular_SetFrame_before_native_proxy_update;FreeCamera_deferred_last result=lighting_state_visible_to_RndDir_proxy_update pipeline_scope=normal_gameplay_camera priority=gameplay_camera freecam_priority=deferred_last freecam_affects_gameplay=0 no_dependency_change=1 og_xbox_portability_preserved=1\n");
+            }
+          }
+          update_venue_proxy_objects();
+          update_worldcrowd_actor_lighting();
+          profile_phase_start = profile_now();
+          world_->draw();
+          if (profile_draw)
+            profile_world += profile_elapsed(profile_phase_start);
+          scene_drawn = true;
+          profile_phase_start = profile_now();
+          draw_venue_proxy_objects(world_->camera());
+          if (profile_draw)
+            profile_proxy += profile_elapsed(profile_phase_start);
+          profile_phase_start = profile_now();
+          draw_worldcrowd_actor_runtime(world_->camera());
+          if (profile_draw)
+            profile_crowd += profile_elapsed(profile_phase_start);
+          worldcrowd_drawn = true;
+          if (!late_lighting_overlay) {
+            lighting_->draw_over_scene(world_->camera());
+            if (debug_venue_filters_enabled()) {
+              std::fprintf(
+                  stderr,
+                  "[world] lighting overlay composite: order=before_band "
+                  "t=%.3f\n",
+                  song_time_);
+            }
+          }
         }
         if (!scene_drawn) {
             update_venue_proxy_objects();
@@ -50730,7 +51681,7 @@ void Gameplay::draw_internal(ghogx::render::Window& win,
             return;
         }
         profile_phase_start = profile_now();
-        highway_->draw_over_scene(song_time_, chart_, difficulty_,
+        highway_->draw_over_scene(highway_song_time(), chart_, difficulty_,
                                   prev_fret_mask_ & 0x1F, lane_flash_, 1.5f,
                                   &note_consumed_[std::clamp(difficulty_, 0, 3)],
                                   &active_session_sustains_,
@@ -50774,7 +51725,7 @@ void Gameplay::draw_internal(ghogx::render::Window& win,
         return;
     }
     // song_time_ is the audio-synced master clock (set in tick()).
-    highway_->draw(song_time_, chart_, difficulty_,
+    highway_->draw(highway_song_time(), chart_, difficulty_,
                    prev_fret_mask_ & 0x1F /* held frets */, lane_flash_, 1.5f,
                    &note_consumed_[std::clamp(difficulty_, 0, 3)],
                    &active_session_sustains_,

@@ -3,7 +3,9 @@
 #include "ui/meta_objects.h"
 
 #include "ui/config_db.h"
+#include "ui/manage_band_panel.h"
 #include "ui/screen_manager.h"
+#include "ui/soundcheck_panel.h"
 
 #include <algorithm>
 #include <array>
@@ -40,6 +42,10 @@ struct PersistentProfileRecord {
   std::array<int, 2> player_paint_secondary = {-1, -1};
   std::set<std::string> unlocked;
   std::map<std::string, int> values;
+  // Stable catalog identifiers used by the expanded Manage Band screen.
+  // Unknown add-on ids intentionally survive a missing DLC mount so the
+  // preference becomes active again when that package returns.
+  std::map<std::string, std::string> manage_preferences;
 };
 
 struct PersistentProfileState : PersistentProfileRecord {
@@ -112,6 +118,8 @@ void parse_profile_field(PersistentProfileRecord& profile,
     profile.unlocked.insert(value);
   else if (key.rfind("value.", 0) == 0 && key.size() > 6)
     profile.values[key.substr(6)] = persisted_int(value, 0);
+  else if (key.rfind("manage.", 0) == 0 && key.size() > 7)
+    profile.manage_preferences[key.substr(7)] = value;
 }
 
 PersistentProfileState load_persistent_profile_state() {
@@ -220,6 +228,8 @@ bool save_persistent_profile_state() {
       stream << prefix << "unlock=" << item << "\n";
     for (const auto& [key, value] : profile.values)
       stream << prefix << "value." << key << "=" << value << "\n";
+    for (const auto& [key, value] : profile.manage_preferences)
+      stream << prefix << "manage." << key << "=" << value << "\n";
   };
   {
     std::ofstream stream(temp, std::ios::trunc);
@@ -1250,9 +1260,14 @@ class CharacterProvider : public MetaObject {
       if (characters.empty()) {
         out = DataNode();
       } else if (std::strcmp(m, "get_text") == 0) {
-        const std::string label = db_->character_label(characters[index]);
-        out = label.empty() ? DataNode::Sym(characters[index])
-                            : DataNode::Str(label);
+        const Symbol character = characters[index];
+        const std::string localized =
+            mgr_ ? mgr_->localize(character) : std::string(character.c_str());
+        const std::string catalog = db_->character_label(character);
+        out = localized != character.c_str()
+                  ? DataNode::Str(localized)
+              : !catalog.empty() ? DataNode::Str(catalog)
+                                 : DataNode::Sym(character);
       } else {
         out = DataNode::Sym(characters[index]);
       }
@@ -2100,7 +2115,7 @@ void Campaign::capture_persistent_profile() {
   profile.values.clear();
   static constexpr const char* kScalarKeys[] = {
       "status", "career_score", "won_campaign", "tutorials_done",
-      "sync_offset"};
+      "sync_offset", "audio_offset_ms", "video_input_offset_ms"};
   for (const char* key : kScalarKeys) {
     const int value = get_property(Symbol(key)).as_int().value_or(0);
     if (value != 0) profile.values[key] = value;
@@ -2158,7 +2173,7 @@ void Campaign::apply_persistent_profile() {
                                  : Symbol(profile.last_difficulty)));
   static constexpr const char* kScalarKeys[] = {
       "status", "career_score", "won_campaign", "tutorials_done",
-      "sync_offset"};
+      "sync_offset", "audio_offset_ms", "video_input_offset_ms"};
   for (const char* key : kScalarKeys) set_property(Symbol(key), DataNode::Int(0));
   static constexpr const char* kDifficulties[] = {
       "kDifficultyEasy", "kDifficultyMedium", "kDifficultyHard",
@@ -2176,6 +2191,20 @@ void Campaign::apply_persistent_profile() {
     set_property(campaign_pending_guitar_award_key(award), DataNode::Int(0));
   for (const auto& [key, value] : profile.values)
     set_property(Symbol(key), DataNode::Int(value));
+  // Profiles written before Soundcheck own only GH2's combined sync_offset.
+  // Its runtime meaning was judgement correction, so migrate it to
+  // Video/Input and leave Audio at zero. Keep the legacy key mirrored for
+  // stock script compatibility.
+  const auto legacy_sync = profile.values.find("sync_offset");
+  const auto video_input = profile.values.find("video_input_offset_ms");
+  const int migrated_video =
+      video_input != profile.values.end()
+          ? video_input->second
+          : (legacy_sync != profile.values.end() ? legacy_sync->second : 0);
+  set_property(Symbol("video_input_offset_ms"),
+               DataNode::Int(std::clamp(migrated_video, -500, 500)));
+  set_property(Symbol("sync_offset"),
+               DataNode::Int(std::clamp(migrated_video, -500, 500)));
 
   static constexpr const char* kStoreCategories[] = {
       "guitar", "skin", "song", "character", "outfit", "video"};
@@ -2254,14 +2283,71 @@ void Campaign::activate_profile_slot(int slot) {
 
 bool Campaign::handle_meta(Symbol msg, const DataArray& args, DataNode& out) {
   const char* m = msg.c_str();
+  if (std::strcmp(m, "get_manage_preference") == 0) {
+    const Symbol key = arg_symbol(args, 0);
+    const auto& preferences = persistent_profile_state().manage_preferences;
+    const auto found = preferences.find(key.c_str());
+    out = found == preferences.end() ? DataNode()
+                                     : DataNode::Sym(Symbol(found->second));
+    return true;
+  }
+  if (std::strcmp(m, "set_manage_preference") == 0) {
+    const Symbol key = arg_symbol(args, 0);
+    const Symbol value = arg_symbol(args, 1);
+    if (key.valid()) {
+      auto& preferences = persistent_profile_state().manage_preferences;
+      if (value.valid()) preferences[key.c_str()] = value.c_str();
+      else preferences.erase(key.c_str());
+      save_persistent_profile_state();
+      std::fprintf(stderr, "[manage-band] persist %s=%s\n", key.c_str(),
+                   value.valid() ? value.c_str() : "<default>");
+    }
+    return true;
+  }
   if (std::strcmp(m, "get_sync_offset") == 0) {
     out = DataNode::Int(std::clamp(
-        get_property(Symbol("sync_offset")).as_int().value_or(0),
+        get_property(Symbol("video_input_offset_ms"))
+            .as_int()
+            .value_or(get_property(Symbol("sync_offset"))
+                          .as_int()
+                          .value_or(0)),
         -500, 500));
     return true;
   }
   if (std::strcmp(m, "set_sync_offset") == 0) {
     const int offset = std::clamp(arg_int(args, 0, 0), -500, 500);
+    set_property(Symbol("sync_offset"), DataNode::Int(offset));
+    set_property(Symbol("video_input_offset_ms"), DataNode::Int(offset));
+    capture_persistent_profile();
+    save_persistent_profile_state();
+    return true;
+  }
+  if (std::strcmp(m, "get_audio_offset") == 0) {
+    out = DataNode::Int(std::clamp(
+        get_property(Symbol("audio_offset_ms")).as_int().value_or(0),
+        -500, 500));
+    return true;
+  }
+  if (std::strcmp(m, "set_audio_offset") == 0) {
+    const int offset = std::clamp(arg_int(args, 0, 0), -500, 500);
+    set_property(Symbol("audio_offset_ms"), DataNode::Int(offset));
+    capture_persistent_profile();
+    save_persistent_profile_state();
+    return true;
+  }
+  if (std::strcmp(m, "get_video_input_offset") == 0) {
+    out = DataNode::Int(std::clamp(
+        get_property(Symbol("video_input_offset_ms"))
+            .as_int()
+            .value_or(get_property(Symbol("sync_offset"))
+                          .as_int()
+                          .value_or(0)),
+        -500, 500));
+    return true;
+  }
+  if (std::strcmp(m, "set_video_input_offset") == 0) {
+    const int offset = std::clamp(arg_int(args, 0, 0), -500, 500);
+    set_property(Symbol("video_input_offset_ms"), DataNode::Int(offset));
     set_property(Symbol("sync_offset"), DataNode::Int(offset));
     capture_persistent_profile();
     save_persistent_profile_state();
@@ -2722,6 +2808,8 @@ void install_meta_singletons(ScreenManager& mgr, ConfigDb& db) {
   }
 
   mgr.add_singleton(Symbol("campaign"), std::make_unique<Campaign>(&mgr, &db));
+  install_manage_band_screen(mgr, db);
+  install_soundcheck_screen(mgr);
   mgr.add_singleton(Symbol("band"), std::make_unique<BandStats>(&mgr, &db));
   mgr.add_singleton(Symbol("highscores"),
                     std::make_unique<Highscores>(&mgr, &db));

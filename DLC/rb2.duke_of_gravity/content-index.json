@@ -1,0 +1,16 @@
+{
+  "schema_version": 1,
+  "package_id": "rb2.duke_of_gravity",
+  "files": [
+    {
+      "path": "char/rb2_duke_of_gravity/og/gen/rb2_duke_of_gravity.milo_ps2",
+      "size": 1650239,
+      "sha256": "7cc3416584e3c8d0de57895ca05f44462c257e5886e13c6e721d36acddb0f02b"
+    },
+    {
+      "path": "ui/image/dlc/rb2_duke_of_gravity/portrait.bmp_ps2",
+      "size": 32800,
+      "sha256": "1b8f13ef9e49f99b55f6749f9aeb9c83f5507d972d6516d0fab4c4d181641cdf"
+    }
+  ]
+}

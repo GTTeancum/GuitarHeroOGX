@@ -3,15 +3,34 @@
   "id": "rb2.duke_of_gravity",
   "display_name": "The Duke of Gravity",
   "package_name": "classic",
+  "asset_prefix": "rb2_duke_of_gravity",
   "material_prefix": "duke_",
   "source_prefab": "guitar32",
   "source_skeleton": "male_guitar",
+  "preferred_guitar": {
+    "id": "stratocaster02",
+    "finish": "stratocaster02_paint",
+    "paint_primary": 0,
+    "paint_secondary": 4
+  },
   "target_required_transforms": [
     "bone_pos_guitar.mesh"
   ],
   "body_shape": {
     "height": 0.75,
     "weight": 0.5
+  },
+  "texture_atlas": {
+    "enabled": true,
+    "size": 512,
+    "padding": 4
+  },
+  "ambient_occlusion": {
+    "enabled": true,
+    "samples": 8,
+    "max_distance": 5.0,
+    "bias": 0.06,
+    "strength": 0.15
   },
   "components": [
     {
@@ -87,7 +106,6 @@
     },
     "eyes.mat": {
       "texture": "head_2/head_eye",
-      "mask": "head_2/eye_comp",
       "palette": "eyes",
       "primary": 2
     },

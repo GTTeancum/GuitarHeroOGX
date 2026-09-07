@@ -94,6 +94,22 @@ bool appears_before_after(const std::string& haystack,
   return false;
 }
 
+bool absent_between(const std::string& haystack, const std::string& begin,
+                    const std::string& end, const std::string& needle,
+                    const char* label) {
+  const size_t a = haystack.find(begin);
+  const size_t b = a == std::string::npos
+                       ? std::string::npos
+                       : haystack.find(end, a + begin.size());
+  if (a != std::string::npos && b != std::string::npos &&
+      haystack.find(needle, a + begin.size()) >= b) {
+    return true;
+  }
+  std::cerr << "Forbidden venue/band contract in bounded section: " << label
+            << "\n";
+  return false;
+}
+
 std::string function_body(const std::string& source,
                           const std::string& function_name) {
   const size_t name_pos = source.find(function_name);
@@ -159,6 +175,8 @@ int main() {
   const std::string window_d3d9 =
       read_file(render_dir / "window_d3d9.cpp");
   const std::string gameplay_c = compact(gameplay);
+  const std::string camera_random_c = compact(read_file(game_dir / "camera_source_random.h"));
+  const std::string weighted_selection_c = compact(read_file(game_dir / "camera_weighted_selection.h"));
   const std::string gameplay_h_c = compact(gameplay_h);
   const std::string audio_player_c = compact(audio_player);
   const std::string gameplay_session_c = compact(gameplay_session);
@@ -286,6 +304,14 @@ int main() {
                  "std::optional<Gh1VenueCameraRecord>gh1_intro;"
                  "if(camera_keys_.empty()){if(require_native_assets_enabled())",
                  "native CamShot keys are authoritative over the legacy GH1 camera DTB fallback");
+  ok &= contains(gameplay_c,
+                 "pos.fov=convert_fov_like_miloeditor("
+                 "fov_degrees*0.01745329251994329577f,0.75f);",
+                 "legacy GH1 regular cameras convert horizontal FOV to GH2 vertical");
+  ok &= contains(gameplay_c,
+                 "key.fov=convert_fov_like_miloeditor("
+                 "fov_degrees*0.01745329251994329577f,0.75f);",
+                 "legacy GH1 intro cameras use the same source 4:3 FOV conversion");
   ok &= contains(camshot_entity_c,
                  "if(name.find(\"key\")!=std::string_view::npos)"
                  "return\"keyboard\";",
@@ -4762,7 +4788,7 @@ int main() {
                         "if(venue_intro_active()){"
                         "log_profile();return;}"
                         "profile_phase_start=profile_now();"
-                        "highway_->draw_over_scene(song_time_,chart_,difficulty_,",
+                        "highway_->draw_over_scene(highway_song_time(),chart_,difficulty_,",
                        "3D venue path composites the playable highway before returning");
   ok &= contains(gameplay_c,
                  "&note_consumed_[std::clamp(difficulty_,0,3)]",
@@ -4847,8 +4873,9 @@ int main() {
                  "constboolfirst_tick=(!song_started_&&dt>0.0f);",
                  "diagnostic song starts can begin audio from a nonzero clock");
   ok &= contains(gameplay_c,
-                 "if(!deterministic_clock_&&audio_.seek(song_time_))",
-                 "diagnostic song seek also seeks the audible VGS stream");
+                 "if(!deterministic_clock_&&audio_.seek(audio_master_time_))",
+                 "diagnostic song seek applies Audio calibration when seeking "
+                 "the audible VGS stream");
   ok &= contains(audio_player_c,
                  "boolAudioPlayer::seek(doubleseconds)",
                  "audio player exposes source-backed VGS seeking");
@@ -4958,7 +4985,7 @@ int main() {
                  "gameplay marks the source TrackPanel presentation ready only from the draw path");
   ok &= appears_before(gameplay_c,
                        "mark_song_presentation_ready();",
-                       "highway_->draw_over_scene(song_time_,chart_,difficulty_,",
+                       "highway_->draw_over_scene(highway_song_time(),chart_,difficulty_,",
                        "the prewarmed highway is marked ready before its first frame is presented");
   ok &= contains(gameplay_c,
                  "1.3+0.1*static_cast<double>(next_track_intro_sfx_stage_-1)",
@@ -5627,9 +5654,11 @@ int main() {
       "execute_venue_script_event(event_name);",
       "persistent duplicate suppression precedes venue script dispatch");
   ok &= appears_before(
-      apply_venue_event_body, "active_venue_anim_filters_.erase(",
+      apply_venue_event_body, "active_venue_material_anims_.erase(",
       "execute_venue_script_event(event_name);",
-      "persistent state cleanup precedes replacement venue script dispatch");
+      "persistent material cleanup precedes replacement venue script dispatch");
+  ok &= absent(apply_venue_event_body, "active_venue_anim_filters_.erase(",
+               "excitement dispatch must not delete unrelated transform tasks");
   ok &= contains(gameplay_c,
                  "apply_venue_event(active,true,true);",
                  "resending the active excitement event does not fabricate a peak transition");
@@ -5651,7 +5680,7 @@ int main() {
                  "apply_venue_event(diagnostic_venue_event_,true);",
                  "diagnostic venue event exercises the persistent event path");
   ok &= appears_before(gameplay_c,
-                       "quickplay_rig_=resolve_quickplay_rig(",
+                       "quickplay_rig_=authored_song_rig_?",
                        "if(!diagnostic_venue_override_.empty()){",
                        "diagnostic venue override only runs after songs.dtb rig resolution");
   ok &= contains(gameplay_c,
@@ -5756,17 +5785,20 @@ int main() {
                        "if(!venue_poll_anim_filters_.empty()){",
                        "apply_venue_event(\"start\",false);",
                        "always-running venue PollAnim filters start before the initial start EventTrigger");
-  ok &= appears_before(gameplay_c,
-                       "apply_venue_event(\"start\",false);",
-                       "if(active_venue_event_.empty()){"
-                       "apply_venue_event(\"excitement_bad\");}",
-                       "initial venue start EventTrigger runs before persistent excitement");
-  ok &= appears_before(gameplay_c,
-                       "apply_venue_event(\"start\",false);"
-                       "apply_venue_event(\"intro_start\",false);",
-                       "if(active_venue_event_.empty()){"
-                       "apply_venue_event(\"excitement_bad\");}",
-                       "initial venue intro_start EventTrigger runs before persistent excitement");
+  ok &= appears_before_after(
+      gameplay_c, "world_=std::make_unique<ghogx::render::MiloSceneRenderer>",
+      "apply_venue_event(\"start\",false);",
+      "apply_venue_event(\"excitement_okay\");",
+      "initial venue start EventTrigger runs before persistent excitement");
+  ok &= appears_before_after(
+      gameplay_c, "world_=std::make_unique<ghogx::render::MiloSceneRenderer>",
+      "apply_venue_event(\"intro_start\",false);",
+      "apply_venue_event(\"excitement_okay\");",
+      "initial venue intro_start EventTrigger runs before persistent excitement");
+  ok &= contains(gameplay_c,
+                 "active_venue_event_.empty()?\"excitement_okay\""
+                 ":active_venue_event_",
+                 "section-ready replay preserves the source kExcitementOkay default");
   ok &= contains(gameplay_c,
                  "venue_runtime_hidden_meshes_=venue_base_hidden_meshes_;"
                  "apply_venue_event_visibility(\"start\",false);",
@@ -6427,6 +6459,11 @@ int main() {
   ok &= contains(gameplay_c,
                  "\"[world]venueMatAnimsample%s->%sframe=%.2falpha=%.3f",
                  "venue MatAnim sampler emits debug rows for native validation");
+  ok &= contains(gameplay_c,
+                 "tex_has_trans=%dtex_u=%.6ftex_v=%.6f"
+                 "tex_has_scale=%dtex_scale_u=%.6ftex_scale_v=%.6f"
+                 "tex_has_rot=%dtex_rot_rad=%.6f",
+                 "venue MatAnim diagnostics expose the applied UV transform, not only key counts");
   ok &= contains(gameplay_c,
                  "autovenue_anim_it=venue_mat_anims_.find(route.anim);",
                  "lighting EventTriggers can resolve venue-geometry MatAnim routes");
@@ -7620,37 +7657,30 @@ int main() {
   ok &= contains(gameplay_c,
                  "voidGameplay::update_active_lighting_anim_filters()",
                  "lighting overlay AnimFilters sample on the song clock");
-  ok &= contains(gameplay_c,
-                 "constdoublefilter_start_time="
-                 "it->start_time+static_cast<double>(filter.event_delay_seconds);"
-                 "constdoublesource_duration="
-                 "static_cast<double>(filter.event_delay_seconds)+"
-                 "venue_filter_duration_seconds(filter,&chart_,filter_start_time);",
-                 "lighting overlay AnimFilter duration starts after the source delay");
-  ok &= contains(gameplay_c,
-                 "constdoubleblend_duration="
-                 "static_cast<double>(filter.event_delay_seconds)+"
-                 "static_cast<double>(std::max(0.0f,filter.event_blend_seconds));",
-                 "lighting overlay AnimFilter lifetime includes source blend duration");
-  ok &= contains(gameplay_c,
-                 "duration=std::max(duration,std::max(source_duration,blend_duration));"
-                 "}if(!it->persistent&&!venue_filter_set_loops(it->filters)&&"
-                 "duration>0.0&&elapsed>=duration){"
-                 "it=active_lighting_anim_filters_.erase(it);continue;}",
-                 "lighting overlay non-loop one-shot AnimFilters include source delay before expiry");
-  ok &= contains(gameplay_c,
-                 "constdoublefilter_elapsed="
-                 "elapsed-static_cast<double>(filter.event_delay_seconds);"
-                 "constdoublefilter_start_time="
-                 "it->start_time+static_cast<double>(filter.event_delay_seconds);"
+  const std::string lighting_filter_update = compact(function_body(
+      gameplay, "void Gameplay::update_active_lighting_anim_filters("));
+  ok &= contains(lighting_filter_update,
+                 "poll_source_venue_filter_tasks(*it,song_time_,chart_)",
+                 "lighting filters use the same delayed task lifecycle as venue filters");
+  ok &= contains(lighting_filter_update,
+                 "if(source_venue_filter_tasks_finished(*it))"
+                 "it=active_lighting_anim_filters_.erase(it);",
+                 "lighting filters expire only after the task has finished its source blend and bounds");
+  ok &= appears_before(lighting_filter_update,
+                 "lighting_mesh_transform_offsets_[target.mesh]=published;",
+                 "source_venue_filter_tasks_finished(*it)",
+                 "lighting one-shot endpoint is published before task removal");
+  ok &= contains(lighting_filter_update,
+                 "constdoublefilter_elapsed=publication.elapsed;"
+                 "constdoublefilter_start_time=publication.start_time;"
                  "if(filter_elapsed<0.0)",
                  "lighting overlay EventTrigger Anim delay does not sample the first frame early");
-  ok &= contains(gameplay_c,
-                 "venue_filter_frame_at(filter,filter_elapsed,false,&chart_,"
+  ok &= contains(lighting_filter_update,
+                 "venue_filter_frame_at(filter,filter_elapsed,publication.polled,&chart_,"
                  "filter_start_time)",
                  "lighting overlay AnimFilters sample after the source delay");
-  ok &= contains(gameplay_c,
-                 "venue_filter_source_blend_at(filter,filter_elapsed)",
+  ok &= contains(lighting_filter_update,
+                 "constfloatsource_blend=publication.blend;",
                  "lighting overlay AnimFilter blend begins after the source delay");
   ok &= contains(gameplay_c,
                  "\"[world]lightingevent%s:AnimFilter%starget=%ssource=%s"
@@ -7979,8 +8009,8 @@ int main() {
                  "source_lifecycle_recovered=RndPostProc::Select/Reset"
                  "shot=%spostprocess=%ssource_call=%saction=%sresult=%s"
                  "active_postprocess=%spostproc_overrides=%zu"
-                 "render_effect=postprocessor_pipeline_deferred\\n\"",
-                 "camera StartAnim mirrors the Xbox postprocess select/reset lifecycle while leaving renderer effects deferred");
+                 "ps2_runtime_effect=not_applicable_HX_XBOX_only\\n\"",
+                 "camera StartAnim mirrors the Xbox-only postprocess lifecycle without applying it to PS2");
   ok &= contains(gameplay_h_c,
                  "std::map<std::string,std::string>"
                  "venue_camera_postprocess_summaries_;",
@@ -8091,6 +8121,7 @@ int main() {
                  "constboolskip_script_crowd_update="
                  "active_camera_skip_next_crowd_update_;"
                  "end_camera_shot_runtime(skip_script_crowd_update,false);"
+                 "if(key.has_gh1_helper)gh1_camera_helper_.begin_shot(key.name);"
                  "active_camera_runtime_shot_=runtime_name;",
                  "camera StartAnim ends the previous CamShot without no-current manager teardown before source payload");
   ok &= appears_before(
@@ -8368,15 +8399,88 @@ int main() {
                  "regular gameplay cameras use CamShot::SetFrame nullFrame fallback instead of a native previous-shot sweep");
   ok &= appears_before(gameplay_c,
                        "start_camera_shot_runtime(camera_keys_.front());",
-                       "std::vector<CameraKey>selected_intro_camera=",
+                       "constCameraKey&intro_shot=camera_keys_.front();",
                        "intro cameras enter StartAnim before evaluating source-shaped camera rows");
+  ok &= contains(
+      gameplay_c,
+      "constboolin_intro_camera_window="
+      "track_intro_active_||(song_started_&&song_time_<0.0);",
+      "the authored intro camera remains active through the complete TrackPanel fly-in");
+  ok &= contains(
+      gameplay_c,
+      "if(authored_gameplay_cameras_active&&!in_intro_camera_window&&"
+      "!regular_camera_keys_.empty())",
+      "the regular camera director cannot snap underneath the TrackPanel fly-in");
+  ok &= contains(
+      gameplay_c,
+      "constdoubleintro_camera_sample_time=track_intro_active_?"
+      "std::min(std::max(0.0,song_time_),intro_camera_end_time):"
+      "intro_camera_end_time;",
+      "TrackPanel latches the final authored intro pose rather than advancing into a regular shot");
+  ok &= contains(
+      gameplay_c,
+      "selected_intro_camera=regular_camera_path_keys("
+      "intro_shot,intro_camera_sample_time,0.0,&chart_,"
+      "camera_targets,&camera_keys_);",
+      "GH2 intro cameras evaluate the complete external TransAnim path instead of freezing its first pose");
+  ok &= contains(
+      gameplay_c,
+      "selected_intro_camera=regular_camera_source_frame_keys("
+      "intro_shot,intro_camera_sample_time,0.0,&chart_);",
+      "direct intro CamShots retain source keyframe timing");
+  ok &= contains(gameplay_c,
+                 "ghogx::camera::intro_camera_seconds(!intro_camera.shot.empty()?intro_camera.duration_frames:",
+                 "source intro uses owning CamShot duration for both direct and path shots");
+  ok &= contains(gameplay_c,
+                 "for(constauto&frame:decoded_shot->frames)c.duration_frames+=source_camshot_frame_span(frame.first);",
+                 "selected intro duration follows CamShot CacheFrames, not TransAnim samples");
+  ok &= contains(gameplay_c,
+                 "selected.duration_frames=candidates.front().duration_frames;",
+                 "intro selection preserves cached owning-shot duration");
+  ok &= contains(gameplay_c,
+                 "camera_keys_={*owning_intro};",
+                 "intro retains the shared owning CamShot, not only raw path samples");
+  ok &= contains(
+      gameplay_c,
+      "active_regular_camera_=source_intro_current->name;"
+      "previous_regular_camera_.clear();"
+      "active_regular_camera_start_=-intro_camera_seconds_;",
+      "selected intro remains CameraManager current after song-clock zero");
+  ok &= contains(gameplay_c,
+                 "constautoowning_intro=std::find_if(regular_camera_keys_.begin(),regular_camera_keys_.end(),",
+                 "intro and regular cameras share the decoded shot registry");
+  ok &= absent(gameplay_c, "intro_camera_duration_seconds(chart_)",
+               "six MIDI bars must not determine pre-song presentation length");
+  ok &= contains(gameplay_c,
+                 "track_extend_sec_=load_track_extend_seconds(hdr_path_,ark_path_);",
+                 "track overlap reads source game.dtb configuration");
+  ok &= contains(gameplay_c,
+                 "if(intro_presentation_time_+0.0001<intro_camera_seconds_)return;",
+                 "audio/chart release uses source task-clock zero, not trailing refresh task");
+  ok &= contains(gameplay_h_c,
+                 "ghogx::camera::intro_track_elapsed(track_intro_active_?intro_presentation_time_:"
+                 "intro_camera_seconds_+std::max(0.0,audio_master_time_),intro_camera_seconds_,track_extend_sec_)",
+                 "highway and feedback consume the same signed scheduled elapsed time");
+  ok &= absent(gameplay_c, "highway_->draw_over_scene(song_time_,",
+               "highway must not show future notes during the camera presentation");
+  ok &= absent(gameplay_c, "highway_->draw(song_time_,",
+               "standalone highway also uses the negative pre-song clock");
+  ok &= contains(gameplay_h_c,
+                 "calibrated_presentation_time(ghogx::camera::intro_song_seconds("
+                 "intro_presentation_time_,intro_camera_seconds_),audio_offset_ms_):song_time_",
+                 "highway preroll joins the calibrated song clock at zero");
+  ok &= contains(gameplay_c,
+                 "intro_camera_route=\"external_transanim\";",
+                 "intro camera motion logs identify the external source TransAnim route");
   ok &= absent(gameplay_c,
                "apply_camera_crowd_visibility(visibility_key);",
                "camera visibility must not be driven from the interpolated per-frame pose");
 
-  ok &= contains(gameplay_c,
-                 "while(next_lighting_cue_idx_<chart_.lighting_cues.size())",
-                 "lighting keyframes are driven by parsed MIDI cue stream");
+  ok &= contains(
+      gameplay_c,
+      "while(!track_intro_active_&&"
+      "next_lighting_cue_idx_<chart_.lighting_cues.size())",
+      "lighting cues wait for the pre-song presentation to finish");
   ok &= contains(gameplay_c,
                  "std::optional<std::string_view>section_venue_event_name("
                  "std::string_viewtext_event)",
@@ -9876,10 +9980,19 @@ int main() {
                "trans_count==0||trans_count>2048",
                "rotation-only venue TransAnims must not be rejected");
   ok &= contains(gameplay_c,
-                 "venue_mesh_transform_offsets_[target.mesh]=sample;",
-                 "venue AnimFilter runtime stores full transform samples");
+                 "venue_mesh_transform_offsets_[target.mesh]=published;",
+                 "venue AnimFilter runtime stores composed current-transform samples");
   ok &= contains(gameplay_c,
-                 "venue_filter_source_blend_at(filter,filter_elapsed)",
+                 "world_->compose_transform_animation_sample(target.mesh,",
+                 "venue SetFrame blends against the target's current local transform");
+  ok &= contains(gameplay_c,
+                 "lighting_->compose_transform_animation_sample(target.mesh,",
+                 "lighting geometry shares the same current-transform publication");
+  ok &= contains(renderer_c,
+                 "if(sample.has_local_transform){world=sample.local_transform;return;}",
+                 "drawing a resolved SetFrame snapshot never reblends or advances it");
+  ok &= contains(gameplay_c,
+                 "constfloatsource_blend=publication.blend;",
                  "venue AnimFilter runtime computes ihatecompvir AnimTask SetFrame blend");
   ok &= contains(gameplay_c,
                  "sample.blend=source_blend;",
@@ -9967,23 +10080,21 @@ int main() {
                "std::fabs(filter.scale)",
                "venue AnimFilter must not discard authored negative scale values");
   ok &= contains(gameplay_c,
-                 "venue_filter_frame_at(filter,filter_elapsed,it->polled,"
+                 "venue_filter_frame_at(filter,filter_elapsed,publication.polled,"
                  "&chart_,filter_start_time)",
                  "venue PollAnim routes use direct SetFrame-style offset phase");
   ok &= contains(gameplay_c,
-                 "elapsed-static_cast<double>(filter.event_delay_seconds)",
+                 "active.start_time+filter.event_delay_seconds",
                  "venue EventTrigger Anim delay offsets task playback time");
   ok &= contains(gameplay_c,
                  "if(filter_elapsed<0.0)",
                  "venue EventTrigger Anim delay does not sample the first frame early");
   ok &= contains(gameplay_c,
-                 "venue_filter_frame_at(filter,filter_elapsed,it->polled,"
+                 "venue_filter_frame_at(filter,filter_elapsed,publication.polled,"
                  "&chart_,filter_start_time)",
                  "venue EventTrigger AnimFilter playback samples after source delay");
   ok &= contains(gameplay_c,
-                 "static_cast<double>(filter.event_delay_seconds)+"
-                 "venue_filter_duration_seconds(filter,&chart_,"
-                 "filter_start_time)",
+                 "elapsed>venue_filter_duration_seconds(payload->filter,&chart,start)",
                  "venue EventTrigger AnimFilter lifetime includes source delay");
   ok &= contains(gameplay_c,
                  "floatvenue_filter_task_start_frame(constGameplay::VenueAnimFilter&filter)",
@@ -10013,7 +10124,7 @@ int main() {
                  "returnfilter.type>=1;",
                  "venue AnimFilter loop and shuttle routes stay task-looped");
   ok &= contains(gameplay_c,
-                 "!venue_filter_set_loops(it->filters)",
+                 "constboolpassed_end=!venue_filter_loops(payload->filter)&&",
                  "nonpersistent loop AnimFilters do not expire after one cycle");
   ok &= contains(gameplay_c,
                  "de.type==\"PollAnim\"",
@@ -10052,11 +10163,23 @@ int main() {
                  "poll_filter.polled=true;",
                  "venue PollAnim filters are marked as polled runtime animation");
   ok &= contains(gameplay_c,
-                 "active.persistent&&!active.polled",
+                 "if(active.polled||active.shot_scoped)return;",
                  "venue PollAnim filters survive persistent excitement changes");
   ok &= contains(gameplay_c,
-                 "!it->persistent&&!it->shot_scoped&&!it->polled",
+                 "if(active.polled||active.shot_scoped)returnfalse;",
                  "venue PollAnim filters do not expire after one authored cycle");
+  ok &= contains(gameplay_c,
+                 "filter.event_blend_seconds,std::move(outgoing))",
+                 "new AnimTask retains outgoing task through its authored blend");
+  ok &= contains(gameplay_c,
+                 "if(!venue_filters_share_authored_target(*it,filter))",
+                 "AnimTask ownership replacement follows actual source AnimTarget");
+  ok &= contains(gameplay_c,
+                 "task->poll_once(",
+                 "event reentry cannot repoll a venue task at the same presentation clock");
+  ok &= contains(gameplay_c,
+                 "constfloatsource_blend=publication.blend;",
+                 "transform publication uses the task's source blend branch");
   ok &= contains(gameplay_c,
                  "transanim_rates[name]=anim.anim_rate;",
                  "direct venue TransAnim routes retain their source RndAnimatable rate");
@@ -10111,8 +10234,7 @@ int main() {
                  "rand.seed(0x29Au);",
                  "camera duration random_int uses ihatecompvir global gRand seed");
   ok &= contains(gameplay_c,
-                 "for(size_ti=0;i<=draw_index;++i){"
-                 "bucket=rand.int_range(span);}",
+                 "constsize_tbucket=camera_selection_random().int_range(span);",
                  "camera duration random_int advances one source draw per scripted duration pick");
   ok &= contains(gameplay_c,
                  "duration_random_draw=camera_shot_counter_++;",
@@ -10147,17 +10269,15 @@ int main() {
                  "constexprconstchar*kDirectIntroCamShotPrefix=\"CamShot:\";",
                  "intro camera fallback uses an explicit direct CamShot route");
   ok &= contains(gameplay_c,
-                 "if(shot_lower.rfind(\"intro\",0)==0)is_intro=true;",
-                 "intro camera selector accepts Intro-prefixed CamShot names");
+                 "if(decoded_shot->category!=category)continue;",
+                 "GH2 intro uses the requested authored category, not name heuristics");
   ok &= contains(gameplay_c,
                  "c.anim=std::string(kDirectIntroCamShotPrefix)+de.name;",
                  "intro CamShots without TransAnim refs can route by embedded pose");
-  ok &= contains(gameplay_c,
-                 "constboolhas_transanim_candidate=std::any_of(",
-                 "direct intro CamShot route is only a fallback when no TransAnim candidate exists");
-  ok &= contains(gameplay_c,
-                 "returnc.direct_camshot_pose;",
-                 "direct intro CamShot candidates are removed when TransAnim candidates exist");
+  ok &= absent(gameplay_c, "has_transanim_candidate",
+                "GH2 does not prefer paths over direct intro candidates");
+  ok &= contains(gameplay_c, "c.selection_weight=decoded_shot->selection_weight;",
+                 "intro retains the authored GH2 selection weight");
   ok &= contains(gameplay_c,
                  "anim_name.compare(0,kDirectIntroCamShotPrefixLen,"
                  "kDirectIntroCamShotPrefix)==0",
@@ -10244,6 +10364,9 @@ int main() {
                  "if(camshot_revision<0x2b)(void)r.i32();",
                  "CamShot ref decoder consumes the legacy SubPart dummy field");
   ok &= contains(gameplay_c,
+                 "if(ref.entity.empty())ref.subpart.clear();",
+                 "GH2 null SubPart owners discard leftover member names instead of inventing performer targets");
+  ok &= contains(gameplay_c,
                  "constint32_ttarget_count=r.i32();",
                  "CamShot ref decoder treats an empty target array as an authored empty target");
   ok &= contains(gameplay_h_c,
@@ -10258,7 +10381,7 @@ int main() {
   ok &= contains(gameplay_c,
                  "key.target_refs.push_back("
                  "read_camshot_subpart_like_miloeditor(r,camshot_revision));",
-                 "CamShot ref decoder preserves every target member ref");
+                 "CamShot ref decoder consumes every authored target member ref before null-owner filtering");
   ok &= contains(gameplay_c,
                  "conststd::stringsource_object=r.symbol();"
                  "key.target_refs.push_back({\"\",source_object,source_object});",
@@ -10275,7 +10398,7 @@ int main() {
                  "sync_primary_camshot_target(key);",
                  "CamShot ref decoder keeps the legacy primary target synced");
   ok &= contains(gameplay_c,
-                 "key.target_source_object=key.target_refs.front().source_object;",
+                 "key.target_source_object=primary->source_object;",
                  "CamShot primary target sync preserves the direct ObjPtr source id");
   ok &= contains(gameplay_c,
                  "std::stringcamshot_target_refs_load_debug_string("
@@ -10337,9 +10460,33 @@ int main() {
   ok &= contains(gameplay_c,
                  "std::unordered_map<std::string,CameraTarget>camera_targets;",
                  "camera target map stores transforms instead of points");
+  ok &= contains(
+      gameplay_c,
+      "constCameraTargetperformer_base_target{perf.effective_world_transform};",
+      "broad performer CamShot refs use Character local composed with the venue placement");
+  ok &= contains(
+      gameplay_c,
+      "source_main_player->accumulate_source_pose(servo->second->output(),"
+      "main_driver->second.weight);",
+      "main CharDriver publishes through the original persistent servo buffer");
   ok &= contains(gameplay_c,
-                 "constCameraTargetperformer_base_target{perf.world_transform};",
-                 "broad performer CamShot refs use the performer base transform");
+                 "source_servo->poll([](ghogx::milo_scene::Xfm&){});",
+                 "source servo poses and consumes movement in Character local space");
+  ok &= contains(
+      gameplay_c,
+      "!perf.external_animation_retarget&&"
+      "env_value(\"GHOGX_DISABLE_SOURCE_SERVO_RUNTIME\")==nullptr",
+      "source Character-local servo is the normal native/conversion runtime");
+  ok &= absent(
+      gameplay_c, "GHOGX_SOURCE_SERVO_RUNTIME",
+      "source Character-local ownership cannot silently remain opt-in");
+  ok &= contains(
+      gameplay_c,
+      "mat4_mul_game(xfm_to_mat4(character.root_transform.local),"
+      "perf.world_transform)",
+      "renderer and camera share Character-local plus venue-parent composition");
+  ok &= absent(gameplay_c, "GHOGX_DIAGNOSTIC_SERVO_FACING",
+               "invalid renderer-world facing probe cannot be enabled");
   ok &= contains(gameplay_c,
                  "camera_targets[camera_target_id(perf.role,{})]="
                  "performer_base_target;",
@@ -10378,9 +10525,14 @@ int main() {
                        "returncamera_resolved_target_id_for_ref(entity,subpart,targets);",
                        "camera target lookup tries preserved ObjPtr refs before inferred subpart fallback");
   ok &= contains(gameplay_c,
-                 "camera_resolved_target_id_for_ref(ref.entity,ref.subpart,"
-                 "ref.source_object,targets)",
+                 "append(ref.entity,ref.subpart,ref.source_object)",
                  "CamShot target list resolution keeps source object ids ahead of inferred entities");
+  ok &= contains(gameplay_c,
+                 "camera_resolved_target_id_for_ref(entity,subpart,source_object,targets)",
+                 "CamShot identity appender forwards the preserved source object");
+  ok &= contains(gameplay_c,
+                 "t=a->source_frame_key_blend;",
+                 "CamShot interpolation consumes GetKey blend without rounded time reconstruction");
   ok &= contains(gameplay_c,
                  "std::optional<std::string>"
                  "camera_resolved_focus_target_id_for_key(",
@@ -10682,12 +10834,11 @@ int main() {
   ok &= contains(gameplay_c,
                  "\"a_parent=%s:%s(source_object=%s)\"",
                  "camera diagnostics expose direct CamShot parent ObjPtr source objects");
-  ok &= absent(compact(function_body(
-                   gameplay,
-                   "std::vector<std::string> "
-                   "camera_resolved_target_signature_for_key")),
-               "std::sort(refs.begin(),refs.end());",
-               "CamShot SameTargets preserves resolved target-list order");
+  ok &= contains(gameplay_c,
+                 "ghogx::camera::same_target_identities("
+                 "camera_resolved_target_signature_for_key(a,targets),"
+                 "camera_resolved_target_signature_for_key(b,targets))",
+                 "PS2 SameTargets uses tested count-plus-membership semantics");
   ok &= contains(gameplay_c,
                  "\"target_centroid=a:(%.3f%.3f%.3f)\"",
                  "camera debug logs expose target-list centroid positions");
@@ -10725,32 +10876,29 @@ int main() {
                  "intforce_char_lod=-1;std::stringnext_shot_ref;",
                  "CameraKey preserves CamShot next_shot source object ref");
   ok &= contains(gameplay_c,
-                 "constexprfloatkCamShotAngleByteScale=81.16902f;"
-                 "constexprfloatkCamShotAngleByteInv=0.012319971f;"
-                 "constexprfloatkCamShotBlurByteScale=255.0f;"
-                 "constexprfloatkCamShotBlurByteInv=0.0039215689f;"
                  "constexprfloatkCamShotFrameSourceDefaultFov=1.2217305f;",
-                 "native CamShot runtime fields use ihatecompvir source byte scales");
+                 "native CamShot runtime keeps the GH2 frame constructor FOV default");
+  ok &= contains(gameplay_c,
+                 "floatcamshot_gh2_float_field(floatvalue){"
+                 "returnstd::isfinite(value)?value:0.0f;}",
+                 "GH2 CamShot scalar fields remain finite source floats without later-game byte quantization");
   ok &= contains(gameplay_c,
                  "floatcamshot_source_field_of_view(floatvalue){"
-                 "returncamshot_u8_runtime_field(value,kCamShotAngleByteScale,"
-                 "kCamShotAngleByteInv);}",
-                 "CamShot FOV mirrors source SetFieldOfView/FieldOfView byte storage");
+                 "returncamshot_gh2_float_field(value);}",
+                 "GH2 CamShot FOV preserves the float loaded and interpolated at frame offset +0x10");
   ok &= contains(gameplay_c,
                  "floatcamshot_source_default_field_of_view(){"
                  "returncamshot_source_field_of_view("
                  "kCamShotFrameSourceDefaultFov);}",
-                 "CamShotFrame constructor FOV default is byte-backed like ihatecompvir source");
+                 "GH2 CamShotFrame constructor FOV default remains float-backed");
   ok &= contains(gameplay_c,
                  "floatcamshot_source_zoom_field_of_view(floatvalue){"
-                 "returncamshot_s8_runtime_field(value,kCamShotAngleByteScale,"
-                 "kCamShotAngleByteInv);}",
-                 "CamShot zoom FOV mirrors source signed-byte storage");
+                 "returncamshot_gh2_float_field(value);}",
+                 "GH2 CamShot zoom FOV preserves source float storage");
   ok &= contains(gameplay_c,
                  "floatcamshot_source_blur_field(floatvalue){"
-                 "returncamshot_u8_runtime_field(value,kCamShotBlurByteScale,"
-                 "kCamShotBlurByteInv);}",
-                 "CamShot blur values mirror source byte-backed accessors");
+                 "returncamshot_gh2_float_field(value);}",
+                 "GH2 CamShot blur values preserve source float storage");
   ok &= contains(gameplay_c,
                  "constexprintkMiloPlatformNone=0;"
                  "constexprintkMiloPlatformPS2=1;"
@@ -10772,7 +10920,7 @@ int main() {
                  "constfloatblur_depth=r.f32();"
                  "key.blur_depth=camshot_source_blur_field("
                  "camshot_revision<0x17?1.0f-blur_depth:blur_depth);",
-                 "CamShot frame reader consumes source blur depth through source byte storage");
+                 "CamShot frame reader consumes GH2 float blur depth");
   ok &= contains(camshot_frame_reader_c,
                  "key.max_blur=camshot_revision>0x17?"
                  "camshot_source_blur_field(r.f32()):"
@@ -10781,7 +10929,7 @@ int main() {
                  "camshot_source_blur_field(r.f32()):0.0f;"
                  "key.focus_blur_multiplier=camshot_revision>0x14?"
                  "r.f32():0.0f;",
-                 "CamShot frame reader consumes source blur range fields through source byte storage");
+                 "CamShot frame reader consumes GH2 float blur range fields");
   ok &= contains(gameplay_c,
                  "constfloatvalue_a=has_a?a_value:fallback;"
                  "constfloatvalue_b=has_b?b_value:fallback;",
@@ -10790,12 +10938,12 @@ int main() {
                  "floatcamshot_source_default_blur_depth(){"
                  "returncamshot_source_blur_field("
                  "kCamShotFrameSourceDefaultBlurDepth);}",
-                 "CamShot frame blur-depth default follows SetBlurDepth byte storage");
+                 "CamShot frame blur-depth default follows GH2 float storage");
   ok &= contains(gameplay_c,
                  "floatcamshot_source_default_max_blur(){"
                  "returncamshot_source_blur_field("
                  "kCamShotFrameSourceDefaultMaxBlur);}",
-                 "CamShot frame max-blur default follows SetMaxBlur byte storage");
+                 "CamShot frame max-blur default follows GH2 float storage");
   ok &= contains(gameplay_c,
                  "constexprfloatkCamShotFrameSourceDefaultMaxBlur=1.0f;",
                  "CamShot frame max-blur default uses source MaxBlur() runtime value, not raw 0xFF storage");
@@ -10820,7 +10968,7 @@ int main() {
                  "key.max_angular_offset[0]=camshot_source_angular_offset(r.f32());"
                  "key.max_angular_offset[1]=camshot_source_angular_offset(r.f32());"
                  "key.has_shake_fields=true;",
-                 "CamShot frame reader consumes source shake fields with source angular byte storage");
+                 "CamShot frame reader consumes GH2 float shake and angular fields");
   ok &= contains(gameplay_c,
                  "constfloatlegacy_shake_noise_freq=r.f32();"
                  "constfloatlegacy_shake_noise_amp=r.f32();",
@@ -10844,7 +10992,7 @@ int main() {
   ok &= contains(camshot_frame_reader_c,
                  "key.zoom_fov=camshot_source_zoom_field_of_view(r.f32());"
                  "key.has_zoom_fov=true;",
-                 "CamShot frame reader consumes source zoom FOV through source signed-byte storage");
+                 "CamShot frame reader consumes GH2 float zoom FOV");
   ok &= contains(gameplay_c,
                  "key.parent_first_frame=r.boolean();"
                  "key.has_parent_first_frame=true;",
@@ -10906,6 +11054,7 @@ int main() {
                  "booluse_depth_of_field=false;"
                  "boolhas_use_depth_of_field=false;"
                  "floatpath_frame=-1.0f;boolhas_path_frame=false;"
+                 "floatpath_ease=0.0f;boolhas_legacy_path_ease=false;"
                  "floatlegacy_path_frame_ignored=-1.0f;"
                  "boolhas_legacy_path_frame_ignored=false;"
                  "std::stringsource_ref;"
@@ -11062,7 +11211,7 @@ int main() {
                  "floatcamshot_source_default_angular_offset(){"
                  "returncamshot_source_angular_offset("
                  "kCamShotFrameSourceDefaultAngularOffset);}",
-                 "CamShot frame angular default follows MaxAngularOffset byte storage");
+                 "CamShot frame angular default follows GH2 float storage");
   ok &= contains(gameplay_c,
                  "constfloatsource_default_fov="
                  "camshot_source_default_field_of_view();"
@@ -11146,10 +11295,11 @@ int main() {
                  "CameraKey can retain the owning CamShot pose and source SetFrame base-translation fallback beside path keys");
   ok &= contains(gameplay_h_c,
                  "floatgenerated_source_position[3]={};"
+                 "floatgenerated_source_x[3]={1.0f,0.0f,0.0f};"
                  "floatgenerated_source_forward[3]={0.0f,1.0f,0.0f};"
                  "floatgenerated_source_up[3]={0.0f,0.0f,1.0f};"
                  "boolhas_generated_source_rows=false;",
-                 "CameraKey can carry the PS2 generated camera source object rows");
+                 "CameraKey can carry all PS2 generated camera source object rows");
   ok &= contains(gameplay_c,
                  "std::stringcamshot_path_anim_ref(",
                  "regular CamShot loader extracts documented .tnm path refs");
@@ -11580,8 +11730,11 @@ int main() {
                  "conststd::unordered_map<std::string,CameraTarget>&targets)",
                  "camera result rows apply traced single-target clamp_height");
   ok &= contains(gameplay_c,
-                 "if(target_update.resolved_count!=1u)returnfalse;",
-                 "camera clamp_height follows the one resolved-target PS2 branch gate");
+                 "if(target_update.resolved_count!=1u||key.target_refs.size()>1u)returnfalse;",
+                 "camera clamp_height requires a single authored and resolved target");
+  ok &= contains(gameplay_c,
+                 "if(!camera_parent_world_for_key(key,targets,nullptr)||",
+                 "camera clamp_height is inside retail's resolved-parent branch");
   ok &= contains(gameplay_c,
                  "constfloatclamped_z=target_update.centroid[2]+key.clamp_height;",
                  "camera clamp_height uses resolved target z plus authored offset");
@@ -11612,15 +11765,14 @@ int main() {
                  "camera_source_screen_offset_translate_result_rows(",
                  "camera result rows expose source-shaped CamShot screen-offset translation rows");
   ok &= contains(gameplay_c,
-                 "constexprfloatkCamShotSourceYRatio=0.5625f;",
-                 "CamShot source local-project screen offset uses Rnd::YRatio's widescreen source ratio");
+                 "floatcamera_source_frustum_aspect(){",
+                 "CamShot source local-project screen offset reads the active output aspect");
   ok &= contains(gameplay_c,
-                 "constexprfloatkCamShotSourceFrustumAspect=1.0f/"
-                 "kCamShotSourceYRatio;",
-                 "CamShot source local-project screen offset uses the reciprocal yRatio aspect");
+                 "constchar*value=env_value(\"GHOGX_CAMERA_ASPECT\");",
+                 "CamShot source local-project screen offset shares the renderer aspect contract");
   ok &= contains(gameplay_c,
-                 "constfloattan_x=tan_y*kCamShotSourceFrustumAspect;",
-                 "source-shaped screen-offset translation uses the CamShot local-project aspect");
+                 "constfloattan_x=tan_y*camera_source_frustum_aspect();",
+                 "source-shaped screen-offset translation uses the active CamShot local-project aspect");
   ok &= contains(gameplay_c,
                  "std::optional<CameraSourceLocalProjectScale>"
                  "camera_source_local_project_scale_for_fov(floaty_fov)",
@@ -11745,12 +11897,12 @@ int main() {
                  "key.shot_filter:kCamShotSourceDefaultFilter;",
                  "camera result builder uses ihatecompvir mFilter default when decoded shot filter is absent");
   ok &= contains(gameplay_c,
-                 "returnstd::clamp(shot_filter*projected_delta,0.0f,1.0f);",
-                 "camera shot_filter is scaled by the clamped projected target delta");
+                 "returnghogx::camera::target_filter_step(shot_filter,projected_delta);",
+                 "camera uses the numerically tested retail filter bypass and projected error gain");
   ok &= contains(gameplay_c,
-                 "state->filtered_target[axis]=state->filtered_target[axis]*old_weight+"
-                 "target[axis]*filter_step;",
-                 "camera shot_filter blends the carried target toward the current target");
+                 "frame_state.filtered_target=ghogx::camera::target_filter_blend("
+                 "frame_state.filtered_target,cache.update.centroid,filter_step);",
+                 "camera shot_filter uses the numerically tested source blend helper on the per-frame carried target");
   ok &= contains(gameplay_c,
                  "std::optional<CameraResultRows>"
                  "camera_target_list_result_rows_from_seed(",
@@ -11792,28 +11944,13 @@ int main() {
                  "build_key_b.has_fov=true;"
                  "build_key_b.fov=source_screen_offset_fov;",
                  "both source BuildTransform rows use the pre-zoom CamShot frustum");
-  ok &= contains(gameplay_c,
-                 "std::optional<CameraResultRows>"
-                 "same_target_build_rows_a;"
-                 "std::optional<CameraResultRows>"
-                 "same_target_build_rows_b;",
-                 "same-target CamShot rows keep separate outgoing and incoming BuildTransform calls");
-  ok &= contains(gameplay_c,
-                 "same_target_build_rows_a="
-                 "camera_target_list_result_rows_from_seed("
-                 "source_seed_a,build_key_a,*a_target_centroid,nullptr,"
-                 "nullptr,nullptr,false);",
-                 "same-target CamShot builds outgoing without BuildTransform screen offset");
-  ok &= contains(gameplay_c,
-                 "same_target_build_rows_b="
-                 "camera_target_list_result_rows_from_seed("
-                 "source_seed_b,build_key_b,*b_target_centroid,nullptr,"
-                 "nullptr,nullptr,false);",
-                 "same-target CamShot builds incoming without BuildTransform screen offset");
+  ok &= absent(gameplay_c, "same_target_build_rows_a=",
+                 "same-target branch must not aim outgoing before interpolation");
+  ok &= absent(gameplay_c, "same_target_build_rows_b=",
+                 "same-target branch must not aim incoming before interpolation");
   ok &= contains(gameplay_c,
                  "same_target_pre_lookat_result=camera_lerp_result_rows("
-                 "same_target_outgoing_rows,"
-                 "same_target_incoming_rows,interp_t);",
+                 "source_seed_a,source_seed_b,interp_t);",
                  "same-target CamShot interpolates outgoing toward incoming before LookAt");
   ok &= contains(gameplay_c,
                  "\"source_same_target_pre_lookat_outgoing_incoming_build(\"+",
@@ -11971,7 +12108,7 @@ int main() {
                  "camera debug logs classify gameplay pose rows by source-visible versus hidden camera bodies");
   ok &= contains(gameplay_c,
                  "constexprconstchar*kCamShotVisiblePoseUnits="
-                 "\"CameraManager,GetKey,Interp_outgoing_incoming_pair,BuildTransform_frame_pair_contract,OnHasTargets,SetFrustum,DOF,Shake_tail,SetLocalXfm_tail,RndCam_UpdateLocal_projection\";",
+                 "\"CameraManager,GetKey,Interp_outgoing_incoming_pair,BuildTransform_frame_pair_contract,OnHasTargets,SetFrustum,DOF,Shake_native_body,SetLocalXfm_tail,RndCam_UpdateLocal_projection\";",
                  "camera pose proof labels the recovered frame-pair runtime units");
   ok &= contains(gameplay_c,
                  "constexprconstchar*kCamShotHiddenPoseBodies="
@@ -12012,11 +12149,11 @@ int main() {
                  "\"active_blocker_scope=%s\"",
                  "camera solver diagnostics lead with gameplay camera pose triage");
   ok &= contains(gameplay_c,
-                 "\"cam_shot_ok_rest\"",
-                 "camera blocker labels name only the unrecovered ShotOk remainder after the recovered bad_waypoints gate");
+                 "std::stringcamera_hidden_gameplay_blockers(){return\"none\";}",
+                 "camera blocker status records that the recovered gameplay pipeline has no hidden runtime blockers");
   ok &= contains(gameplay_c,
-                 "\"cam_check_shot_native\"",
-                 "camera blocker labels name the unrecovered native check-shot predicate separately");
+                 "std::stringcamera_deferred_gameplay_blockers()",
+                 "camera blocker status keeps editor/debug-only camera facilities out of normal gameplay");
   ok &= contains(gameplay_c,
                  "\"source_locals=CamShotFrame::Interp(BuildTransform,applyScreenOffset)\""
                  "\"source_tail=WorldXfm_blend->CamShot::Shake->SetLocalXfm\""
@@ -12030,14 +12167,11 @@ int main() {
                  "\"diagnostic_candidate_same_targets\"",
                  "same-target CamShot filtered-target rows stay diagnostic-only instead of becoming persistent BuildTransform state");
   ok &= contains(gameplay_c,
-                 "camera_hidden_gameplay_blockers(!submitted_result_from_ps2_trace,"
-                 "false,false,"
-                 "charwalk_gate_active)",
-                 "camera solver diagnostics keep selection-only native predicates out of active per-frame pose blockers");
+                 "camera_hidden_gameplay_blockers()",
+                 "camera solver diagnostics report the recovered shared driver without venue-specific pose blockers");
   ok &= contains(gameplay_c,
-                 "camera_deferred_gameplay_blockers(false,false,"
-                 "charwalk_gate_active)",
-                 "camera solver diagnostics keep selection/check-shot bodies visible as deferred gameplay-camera work");
+                 "camera_deferred_gameplay_blockers()",
+                 "camera solver diagnostics report no normal-gameplay deferred camera body");
   ok &= contains(gameplay_c,
                  "submitted_result_from_ps2_trace?"
                  "\"selection_only_retained_pose\":"
@@ -12046,8 +12180,8 @@ int main() {
                  "\"native_seed_or_path_boundary\"",
                  "camera solver diagnostics classify the active per-frame proof without mixing in selection-only blockers");
   ok &= contains(gameplay_c,
-                 "\"retail_Interp_outgoing_incoming_partial_BuildTransform\"",
-                 "camera debug logs identify the recovered retail Interp frame pair");
+                 "\"retail_Interp_outgoing_incoming_BuildTransform\"",
+                 "camera debug logs identify the fully recovered retail Interp frame pair without a stale partial label");
   ok &= contains(gameplay_c,
                  "\"retained_ps2_trace_payload\"",
                  "camera debug logs identify retained PS2 trace payload rows separately from native source math");
@@ -12072,8 +12206,8 @@ int main() {
                  "\"update_local_y_ratio_owner=%s\"",
                  "camera debug logs expose the recovered RndCam::UpdateLocal yRatio owner boundary");
   ok &= contains(gameplay_c,
-                 "\"gh2_ps2_partial_body_frame_pair_and_path_contract\"",
-                 "camera debug logs identify the recovered GH2 frame-pair and path boundary");
+                 "\"gh2_ps2_full_body_frame_pair_and_path_contract\"",
+                 "camera debug logs identify the recovered full GH2 frame-pair and path boundary");
   ok &= contains(gameplay_c,
                  "\"gh2_SLUS_214.47_0x00267008_full_body;\""
                  "\"Interp_outgoing_call_0x002666b8;\""
@@ -12120,13 +12254,13 @@ int main() {
                  "camera debug logs classify submitted normal gameplay cameras against target/world/crowd bounds");
   ok &= contains(gameplay_c,
                  "\"normal_gameplay_pose_concern=%ssource_fix_required=%s\"",
-                 "camera debug logs keep under-venue gameplay camera poses as open source-audit concerns");
+                 "camera debug logs keep source-authored under-venue diagnostics visible");
   ok &= contains(gameplay_c,
-                 "under_venue_concern?\"under_venue_open\":\"none\"",
-                 "under-venue gameplay camera poses are labelled as open concerns, not accepted parity");
+                 "under_venue_concern?\"under_venue_diagnostic\":\"none\"",
+                 "under-venue gameplay camera poses are diagnostic rather than venue-specific correction triggers");
   ok &= contains(gameplay_c,
-                 "\"recover_remaining_BuildTransform_or_shot_selection\"",
-                 "any remaining under-venue gameplay pose is no longer attributed to the recovered LocalProjectXfm sign");
+                 "\"review_authored_pose_or_shared_selection_state\"",
+                 "any under-venue diagnostic remains attributed to shared source pose or selection state");
   ok &= contains(gameplay_c,
                  "\"submitted_below_world_zero_and_target_no_bounds\"",
                  "camera under-venue concern falls back to target/world-zero only when venue bounds are unavailable");
@@ -12152,7 +12286,7 @@ int main() {
                  "PS2 crowd source-parent diagnostic has an aggregate crowd-group candidate");
   ok &= contains(gameplay_c,
                  "merge_venue_camera_target_worlds("
-                 "venue_camera_target_worlds_,venue_chars_scene_);",
+                 "venue_camera_target_worlds_,venue_chars_scene_,false);",
                  "venue camera source target map includes the retained venue character/crowd scene");
   ok &= contains(gameplay_c,
                  "add_target(crowd.name+\"_placement_centroid\","
@@ -12247,12 +12381,16 @@ int main() {
                  "rebuild_worldcrowd_actor_runtime(win);",
                  "venue load promotes decoded WorldCrowd actors into the render runtime");
   ok &= contains(rebuild_worldcrowd_runtime_c,
-                 "worldcrowd_actor_milo_path(set.actor_name)",
+                 "explicit_path.empty()?worldcrowd_actor_milo_path(actor_name)",
                  "WorldCrowd runtime resolves the authored crowd actor MILO generically");
   ok &= contains(rebuild_worldcrowd_runtime_c,
-                 "worldcrowd_actor_main_milo_candidates(*actor_path,"
+                 "runtime_for_actor(set.actor_name,std::string{},"
+                 "std::string{},nullptr)",
+                 "stock WorldCrowd placements use the generic actor loader");
+  ok &= contains(rebuild_worldcrowd_runtime_c,
+                 "worldcrowd_actor_main_milo_candidates(resolved_actor_path,"
                  "character)",
-                 "WorldCrowd runtime uses driver-authored crowd animation MILOs");
+                 "WorldCrowd runtime uses the resolved actor's driver-authored crowd animation MILOs");
   ok &= contains(rebuild_worldcrowd_runtime_c,
                  "runtime.renderer->set_character(std::move(character),"
                  "textures);",
@@ -13150,8 +13288,8 @@ int main() {
   ok &= appears_before(
       gameplay_c,
       "env_value(\"GHOGX_DEBUG_CAMERA_SUBMIT_CANDIDATE\")",
-      "env_value(\"GHOGX_CAMERA_DISABLE_TRACE_COMPLETE_WRITER_BRIDGE\")",
-      "explicit diagnostic camera submit selector runs before default trace-complete writer bridge promotion");
+      "env_value(\"GHOGX_DEBUG_CAMERA_TRACE_WRITER_BRIDGE\")",
+      "explicit diagnostic camera submit selector runs before opt-in trace comparison");
   ok &= absent(gameplay_c,
                "if(ps2_trace_result)return*ps2_trace_result;",
                "retained PS2 trace rows must not silently replace default native submitted cameras");
@@ -13239,8 +13377,8 @@ int main() {
                  "true,255.0f,0.001f",
                  "retained balcony_lft04 writer bridge is scoped to the accepted path-local frame 255 proof");
   ok &= contains(gameplay_c,
-                 "GHOGX_CAMERA_DISABLE_TRACE_COMPLETE_WRITER_BRIDGE",
-                 "trace-complete writer bridge submission is default-on only behind the shared evidence gate and keeps an explicit A/B disable");
+                 "if(env_value(\"GHOGX_DEBUG_CAMERA_TRACE_WRITER_BRIDGE\"))",
+                 "captured writer rows require an explicit diagnostic opt-in");
   ok &= contains(gameplay_c,
                  "std::stringsource_gate="
                  "\"source_gate=complete_writer_builder_pair\";",
@@ -13964,13 +14102,15 @@ int main() {
                  "cam.shake_noise_amp=shake_noise_amp;",
                  "runtime camera carries interpolated source CamShot shake state");
   ok &= contains(gameplay_c,
-                 "voidcamera_apply_camshot_shake_boundary_like_source("
-                 "ghogx::render::OrbitCamera&cam,boolhas_shake_fields,",
-                 "runtime camera names the ihatecompvir CamShot::Shake boundary");
+                 "CameraSourceShakeResultcamera_apply_camshot_shake_like_source("
+                 "CameraResultRows&rows,CameraResultBuilderState*state,",
+                 "runtime camera implements the recovered CamShot::Shake pose body");
   ok &= contains(gameplay_c,
-                 "camera_apply_camshot_shake_boundary_like_source(cam,"
-                 "has_shake_fields,shake_noise_amp,shake_noise_freq,",
-                 "CamShot shake fields are applied at the source boundary before SetLocalXfm");
+                 "camera_apply_camshot_shake_like_source("
+                 "submitted_result,result_builder_state,shake_noise_freq,"
+                 "shake_noise_amp,max_angular_offset_x,"
+                 "max_angular_offset_y)",
+                 "CamShot shake motion is applied to the shared result before SetLocalXfm");
   ok &= contains(gameplay_c,
                  "source_call=CamShot::Shake",
                  "camera Shake diagnostics expose the source call");
@@ -13984,10 +14124,38 @@ int main() {
                  "source_order=after_SetFrame_blend_before_SetLocalXfm",
                  "camera Shake diagnostics expose the source call order");
   ok &= contains(gameplay_c,
-                 "rb2_dump=locals_onlynative_motion=not_synthesized"
-                 "freecam_priority=deferred_last"
-                 "freecam_affects_gameplay=0",
-                 "camera Shake diagnostics avoid fabricating hidden motion math before deferred FreeCam status");
+                 "native_body=GH2_SLUS_214.47_0x00262f38_0x00263408",
+                 "camera Shake diagnostics identify the recovered PS2 motion body");
+  ok &= contains(gameplay_c,
+                 "random_source=GH2_Rand_0x002d9b10_0x002d9c60seed=0x29a",
+                 "camera Shake diagnostics identify the retail random stream");
+  ok &= contains(gameplay_c,
+                 "CameraSourceRand&random=camera_selection_random();",
+                 "CamShot shake shares the process-lifetime source stream with camera selection and duration");
+  ok &= absent(gameplay_c,
+               "camera_source_shake_load_random",
+               "CamShot shake must not fabricate a separately seeded camera-only random stream");
+  ok &= absent(gameplay_h_c,
+               "shake_random_values",
+               "CamShot state must not own a duplicate of the source process-global random generator");
+  ok &= contains(gameplay_c,
+                 "euler_radians=(%.6f%.6f%.6f)motion=source_recovered",
+                 "camera Shake diagnostics expose recovered output motion");
+  ok &= contains(gameplay_c,
+                 "camera_source_shake_spring(state->shake_translation_target,"
+                 "state->shake_translation_output,"
+                 "state->shake_translation_velocity)",
+                 "camera Shake preserves retail persistent translation spring state");
+  ok &= contains(gameplay_c,
+                 "rows.source+=\"+retail_camshot_shake\";",
+                 "camera Shake composes into the shared source rows instead of a renderer-only effect");
+  ok &= contains(gameplay_c,
+                 "rows.custom_view=mat4_affine_inverse_game(d3d_camera_world);"
+                 "rows.has_custom_view=true;returnresult;",
+                 "camera Shake preserves the source MakeRotMatrix basis through a full-affine renderer view");
+  ok &= contains(gameplay_c,
+                 "GHOGX_LOG_CAMERA_SHAKE_EVERY_FRAME",
+                 "camera diagnostics can retain every source shake-state update");
   ok &= contains(gameplay_c,
                  "voidcamera_unset_shake_like_no_current_camshot("
                  "ghogx::render::OrbitCamera&cam)",
@@ -14269,8 +14437,23 @@ int main() {
                  "key.source_path_authored_frame=authored_frame;",
                  "path-backed CamShot diagnostics carry authored TransAnim key frames");
   ok &= contains(gameplay_c,
-                 "key.frame=now_frame+((authored_frame-first_frame)-source_frame);",
+                 "key.frame=now_frame+(authored_frame-authored_path_frame);",
                  "path-backed regular CamShot frames are sampled relative to the active source frame");
+  ok &= contains(gameplay_c,
+                 "shot.path_ease=r.f32();shot.has_legacy_path_ease=true;",
+                 "GH2 path_ease is decoded instead of discarding the pre-near-plane float");
+  ok &= contains(gameplay_c,
+                 "key.path_ease=shot.path_ease;key.has_legacy_path_ease=shot.has_legacy_path_ease;",
+                 "decoded path easing reaches each owning CamShot key");
+  ok &= contains(gameplay_c,
+                 "to.path_ease=from.path_ease;to.has_legacy_path_ease=from.has_legacy_path_ease;",
+                 "path easing survives shared intro and regular metadata copies");
+  ok &= contains(gameplay_c,
+                 "ghogx::camera::source_path_frame(source_frame,source_camshot_duration_frames(shot),path_end_frame,shot.path_ease)",
+                 "GH2 path frame uses source duration/EndFrame/easing in shared driver");
+  ok &= contains(gameplay_c,
+                 "constfloatauthored_frame=authored_path_frame;",
+                 "live translation/rotation/scale page samples consume normalized path frame");
   ok &= contains(gameplay_c,
                  "key.source_path_submitted_frame=key.frame;",
                  "path-backed CamShot diagnostics carry submitted renderer frame after rebasing");
@@ -14378,8 +14561,8 @@ int main() {
                  "source_msg=shot_startedsource_script=world/camshot.dta"
                  "source_action=handle(worldpost_switch_cam)"
                  "native_handler=apply_venue_event(post_switch_cam)"
-                 "pose_body=not_synthesized\\n\"",
-                 "shot_started diagnostics expose the GH2 camshot.dta post_switch_cam dispatch through the native venue event bridge without reviving hidden pose math");
+                 "pose_owner=active_CamShot_SetFrame\\n\"",
+                 "shot_started diagnostics expose GH2 post_switch_cam dispatch while retaining active CamShot pose ownership");
   ok &= contains(gameplay_c,
                  "apply_venue_event(\"post_switch_cam\",false);",
                  "shot_started applies GH2's world post_switch_cam event through the existing dependency-free venue router");
@@ -14413,8 +14596,23 @@ int main() {
   ok &= contains(gameplay_c,
                  "&regular_camera_keys_,source_setframe_blend,"
                  "&venue_crowd_bounds,"
-                 "&active_camera_interp_debug_reported_);",
+                 "&active_camera_interp_debug_reported_,&gh1_camera_helper_);",
                  "CameraManager::Poll supplies source SetFrame blend 1.0 to native camera application with bounded Interp diagnostics");
+  ok &= absent(compact(function_body(gameplay, "Gameplay::start_camera_shot_runtime")),
+               "gh1_camera_helper_.reset()",
+               "GH1 helper survives GH2 shot-cache reset boundaries");
+  ok &= contains(compact(function_body(gameplay, "Gameplay::start_camera_shot_runtime")),
+                 "if(key.has_gh1_helper)gh1_camera_helper_.begin_shot(key.name);",
+                 "GH1 SwitchCam selection uses authored shot name, not category/path");
+  ok &= contains(gameplay_c,
+                 "gh1_helper->apply_shot_selection(player_heads.size());",
+                 "GH1 SwitchCam selection uses live roster count before sampling target");
+  ok &= contains(gameplay_c,
+                 "if(a->has_gh1_helper&&b->has_gh1_helper&&helper_targets&&gh1_helper)",
+                 "GH1 helper integration is gated away from native GH2 frames");
+  ok &= contains(gameplay_c,
+                 "gh1_helper->poll(*live,step,shake)",
+                 "GH1 runtime consumes the verified persistent helper and sampled shake");
   ok &= contains(gameplay_c,
                  "constfloatsource_shot_local_frame=camera_source_local_frame("
                  "*key,song_time_,active_regular_camera_start_,&chart_);",
@@ -14696,6 +14894,7 @@ int main() {
   ok &= contains(gameplay_c,
                  "structIntroCameraSelection{std::stringshot;"
                  "std::stringanim=\"Intro.tnm\";"
+                 "floatduration_frames=0.0f;"
                  "std::stringdistance;std::stringfacing;"
                  "boolhide_crowd=false;"
                  "boolcrowd_face_camera=false;intforce_char_lod=-1;"
@@ -15771,12 +15970,12 @@ int main() {
                  "intsource_seed,constchar*source_seed_source)",
                  "regular camera loader preserves the CameraManager Randomize call boundary");
   ok &= contains(gameplay_c,
-                 "structCameraSourceRand",
+                 "usingCameraSourceRand=ghogx::camera::SourceRand;",
                  "camera source Rand mirror remains available for scripted duration random_int");
-  ok &= contains(gameplay_c,
+  ok &= contains(camera_random_c,
                  "seed_value*0x41C64E6Du+0x3039u",
                  "camera source Rand seed step mirrors ihatecompvir Rand::Seed for script random_int");
-  ok &= contains(gameplay_c,
+  ok &= contains(camera_random_c,
                  "if(0xF9u<=++index_a)index_a=0;",
                  "camera source Rand index wrap mirrors ihatecompvir Rand::Int for script random_int");
   ok &= contains(gameplay_h_c,
@@ -15955,11 +16154,11 @@ int main() {
                "solo!=\"ok\"",
                "regular camera loader leaves solo values for source ShotMatches instead of pruning at load time");
   ok &= contains(regular_camera_selector_c,
-                 "if(key.disabled_flags!=0){",
+                 "returnkey.disabled_flags==0&&predicate(key)&&",
                  "regular camera selector mirrors CameraManager Disabled gate before ShotMatches");
   ok &= contains(regular_camera_selector_c,
-                 "FindCameraShot:shot=%sskippeddisabled=0x%08x",
-                 "regular camera diagnostics expose source disabled CamShots at selection time");
+                 "[camera-select]route=regular",
+                 "regular camera diagnostics expose weighted selection instead of fabricated bucket rotation");
   ok &= contains(regular_camera_loader_c,
                  "platform_only=%d",
                  "regular CamShot diagnostics expose source platform_only state");
@@ -16584,24 +16783,44 @@ int main() {
                  "regular camera cadence separates the source downbeat message from the check_camera_shot pick gate");
   ok &= contains(gameplay_c,
                  "boolcamera_source_guitarist0_playing_starpower("
-                 "boolnative_player0_star_power_active)",
+                 "floatnative_player0_starpower_flag_weight,"
+                 "floatnative_player0_far_starpower_flag_weight)",
                  "regular camera runtime exposes the source guitarist0 playing_starpower predicate");
   ok &= contains(gameplay_c,
-                 "return\"guitarist0::playing_starpower("
-                 "native_player0_star_power_active)\";",
+                 "return\"GH2_CharDriver::EvaluateFlags(0x00080000/0x00004000);\""
+                 "\"retail_handlers_0x0010B9E8/0x0010C948\";",
                  "regular camera diagnostics label the native player0 bridge for the source star-power gate");
   ok &= contains(gameplay_c,
                  "constboolguitarist_starpower="
                  "camera_source_guitarist0_playing_starpower("
-                 "star_power_.active);",
+                 "guitarist_starpower_flag_weight,"
+                 "guitarist_far_starpower_flag_weight);",
                  "regular camera cadence and selection share the named source star-power gate");
   ok &= contains(gameplay_c,
                  "camera_check_shot_due=!guitarist_starpower;",
                  "world_objects_worldbase.dta skips check_camera_shot during guitarist0 star mode");
   ok &= contains(gameplay_c,
                  "source_check_camera_shot_pick_due="
-                 "camera_check_shot_due&&duration_expired;",
+                 "ghogx::camera::camera_pick_due_after_downbeat("
+                 "camera_bars_left_,guitarist_starpower);",
                  "world_objects_worldbase.dta::check_camera_shot only runs pick_new_shot after the duration gate expires");
+  ok &= contains(
+      gameplay_c,
+      "if(last_camera_bar_==UINT32_MAX){"
+      "last_camera_bar_=bar;",
+      "song-clock beat zero enters the first source downbeat branch");
+  ok &= contains(
+      gameplay_c,
+      "bars_elapsed=1;source_downbeat_delivered=true;}",
+      "song-clock beat zero delivers the first source downbeat instead of discarding the six-bar intro hold");
+  ok &= contains(
+      gameplay_c,
+      "camera_bars_left_=ghogx::camera::camera_bars_after_downbeats("
+      "camera_bars_left_,bars_elapsed);",
+      "camera downbeat consumes every crossed authored bar through the shared source helper");
+  ok &= absent(gameplay_c,
+               "last_camera_bar_=bar;camera_bars_left_=0;",
+               "normal song start must not erase intro_start_msg's six-bar hold");
   ok &= contains(gameplay_h_c,
                  "size_tguitarist0_charwalk_object_count_=0;",
                  "regular camera runtime stores the source CharWalk object count from the loaded guitarist0 character MILO");
@@ -16726,8 +16945,10 @@ int main() {
                  "\"[world]cameraCharWalkobjects:"
                  "scope=guitarist0_character"
                  "source_reader=MiloEditor::CharWalk.Read"
-                 "source_body=Hmx::Object_only",
-                 "camera diagnostics cite the source CharWalk reader as object-only guitarist0 proof");
+                 "source=%sentries=%zusource_state=CharWalk::mState"
+                 "native_body=GH2_SLUS_214.47_0x00184FD0"
+                 "active_walk_clip_bridge=recovered",
+                 "camera diagnostics cite the recovered source CharWalk state and clip bridge");
   ok &= contains(gameplay_c,
                  "returnstd::string(\"guitarist0::actually_walking(\")+"
                  "\"source_objects=\"+std::to_string(source_charwalk_objects)+"
@@ -16921,23 +17142,14 @@ int main() {
                  "filter_count=%zu",
                  "source category prescan diagnostics expose direct CameraManager versus BandDirector routing");
   ok &= contains(gameplay_c,
-                 "source_category_caller=%sshot=%scategory=%s"
-                 "bucket_index=%zusource_move=MoveItem(end)"
-                 "source_return=CamShot",
-                 "source category FindCameraShot diagnostics expose the accepted CamShot return after MoveItem");
+                 "[camera-select]route=categorycategory=%scandidates=%zutotal=%.6fdraw=%.6fselected=%s",
+                 "named category diagnostics expose actual GH2 weighted choice");
   ok &= contains(gameplay_c,
-                 "if(key.category!=category)continue;"
-                 "if(key.disabled_flags!=0){",
-                 "source category picker scans one authored category and preserves Disabled gate ordering");
-  ok &= appears_before(
-      gameplay_c,
-      "if(!camera_shot_matches_source_filters(key,source_filters))continue;",
-      "if(!camera_source_shot_ok(key,source_previous,current_walkspot))continue;",
-      "source category picker applies BandDirector filters before CamShot::ShotOk");
+                 "pool.append_category(keys,category,",
+                 "named category picker uses the shared weighted category collector");
   ok &= contains(gameplay_c,
-                 "if(!camera_source_shot_ok(key,source_previous,current_walkspot))continue;"
-                 "selected=i;",
-                 "source category picker runs CamShot::ShotOk before accepting a WIN/LOSE shot");
+                 "returnkey.disabled_flags==0&&camera_shot_matches_source_filters(key,source_filters)&&camera_source_shot_ok(key,source_previous,current_walkspot);",
+                 "named category picker gates Disabled, filters, then ShotOk before weighted acceptance");
   ok &= contains(gameplay_c,
                  "boolGameplay::queue_source_category_camera_shot("
                  "std::string_viewcategory,constchar*source_message,"
@@ -17033,12 +17245,11 @@ int main() {
                  "size_tcamera_normal_category_cursor_=0;",
                  "normal gameplay camera selection owns a persistent category cursor");
   ok &= contains(gameplay_c,
-                 "constautocategory=kNormalCamShotCategoryOrder["
-                 "(cursor+offset)%kNormalCamShotCategoryOrder.size()];",
-                 "normal gameplay camera selection wraps across every authored category bucket");
-  ok &= contains(gameplay_c,
+                 "for(constautocategory:kNormalCamShotCategoryOrder)pool.append_category(keys,category,eligible);",
+                 "normal gameplay collects all requested categories into the GH2 weighted pool");
+  ok &= absent(gameplay_c,
                  "normal_category_cursor=category_cursor_after;",
-                 "normal gameplay camera selection advances only after an accepted category");
+                 "normal gameplay must not invent category round-robin priority");
   ok &= contains(gameplay_c,
                  "camera_normal_category_cursor_=0;",
                  "loading a song resets normal gameplay camera category selection");
@@ -17087,43 +17298,34 @@ int main() {
   ok &= absent(gameplay_c,
                "camera_source_num_camera_shots_probe(",
                "regular camera selection must not dispatch an extra debug NumCameraShots message");
-  ok &= appears_before(gameplay_c,
-                       "constsize_tnum_shots="
-                       "camera_source_camera_shots_prescan_count(",
-                       "camera_source_first_shot_ok("
-                       "camera_source_pick_shot_category(mode));",
-                       "regular camera diagnostic prescan runs before the single source FirstShotOk call");
-  ok &= appears_before(gameplay_c,
-                       "camera_source_first_shot_ok("
-                       "camera_source_pick_shot_category(mode));",
-                       "std::optional<size_t>selected=",
-                       "regular camera selector sends FirstShotOk immediately before source pick selection");
+  ok &= absent(gameplay_c,
+               "camera_source_first_shot_ok(camera_source_pick_shot_category(mode));",
+               "GH2 weighted selection does not inject later RB3 FirstShotOk calls");
   ok &= contains(gameplay_c,
-                 "constsize_tselected_index=*selected;",
-                 "regular camera selector takes the first eligible CamShot in the active category bucket");
+                 "constfloatdraw=camera_selection_random().float_range(0.0f,pool.total());",
+                 "weighted picker consumes the shared source random stream");
+  ok &= contains(weighted_selection_c,
+                 "if(draw<=entry.cumulative)",
+                 "GH2 selection uses inclusive cumulative threshold comparison");
   ok &= contains(gameplay_c,
                  "std::stringcamera_category_bucket_order_for_log(",
                  "regular camera selector can prove category bucket order");
   ok &= contains(gameplay_c,
                  "size_tcamera_category_bucket_index(",
                  "regular camera selector can prove the accepted bucket slot");
-  ok &= contains(gameplay_c,
+  ok &= absent(gameplay_c,
                  "keys.erase(keys.begin()+static_cast<std::ptrdiff_t>"
                  "(selected_index));",
-                 "regular camera selector removes the chosen CamShot before category-local rotation");
-  ok &= contains(gameplay_c,
+                 "GH2 weighted selector must retain source object order");
+  ok &= absent(gameplay_c,
                  "autoinserted=keys.insert(insert_pos,std::move(chosen));",
-                 "regular camera selector performs source MoveItem-style reinsertion");
+                 "GH2 selection must not use later-game MoveItem reinsertion");
   ok &= contains(gameplay_c,
-                 "\"[world]cameraFindCameraShotmove:source_manager="
-                 "CameraManager::FindCameraShotshot=%scategory=%s"
-                 "bucket_index=%zusource_move=MoveItem(end)"
-                 "source_return=CamShot"
-                 "before=%safter=%s\\n\"",
-                 "regular camera diagnostics expose source accepted-shot move-to-end and CamShot return");
+                 "source=GH2_weighted_used_cycle",
+                 "camera diagnostics identify the recovered GH2 selection algorithm");
   ok &= contains(gameplay_c,
-                 "return&*inserted;",
-                 "regular camera selector returns the category-rotated CamShot");
+                 "return&keys[*selected];",
+                 "camera selector returns the weighted winner without moving the object");
   ok &= contains(gameplay_c,
                  "choose_regular_camera_key_scripted(regular_camera_keys_,"
                  "active_regular_camera_,",
@@ -17264,7 +17466,7 @@ int main() {
                  "constexprconstchar*kCameraRecoveredRuntimeList=",
                  "regular camera source-backed status count is derived from the shared recovered-runtime token list");
   ok &= contains(gameplay_c,
-                 "constexprsize_tkCameraOpenGameplayBlockers=4;",
+                 "constexprsize_tkCameraOpenGameplayBlockers=0;",
                  "regular camera source-backed status keeps the open gameplay blocker count explicit");
   ok &= contains(gameplay_c,
                  "camera_count_csv_tokens(kCameraRecoveredRuntimeList)",
@@ -17286,12 +17488,13 @@ int main() {
                  "open_gameplay_blockers=%zu"
                  "active_hidden_gameplay_blockers=%s"
                  "deferred_gameplay_blockers=%s"
-                 "freecam_priority=deferred_last"
+                 "ps2_postprocess=not_applicable_HX_XBOX_only"
                  "freecam_affects_gameplay=0"
-                 "under_venue_concern=open"
+                 "under_venue_concern=diagnostic_only"
+                 "no_venue_specific_camera_patches=1"
                  "no_dependency_change=1"
                  "og_xbox_portability_preserved=1",
-                 "regular camera source-backed status keeps FreeCam deferred, under-venue open, and dependency status explicit");
+                 "regular camera source-backed status keeps platform scope, driver-level venue policy, and dependency status explicit");
   ok &= absent(gameplay_c, "recovered_runtime_count=97",
                "regular camera source-backed status count must not be hard-coded separately from the recovered-runtime list");
   ok &= absent(gameplay_c, "completion_percent",
@@ -17322,7 +17525,7 @@ int main() {
                  "camera_camshot_getkey_looping,"
                  "camera_frame_pair_timing,"
                  "camera_camshot_setframe_last_pair_bridge,"
-                 "camera_camshot_onsetpos_boundary,"
+                 "camera_camshot_onsetpos_editor_boundary,"
                  "camera_camshot_hastargets_boundary,"
                  "camera_camshot_position_handler_return_bridge,"
                  "camera_path_transanim_timing",
@@ -17509,7 +17712,7 @@ int main() {
                  "camera_camshot_shotok_prev_arg_bridge,"
                  "camera_current_walkspot_waypoint_bridge,"
                  "camera_camshot_shot_ok_bad_waypoints,"
-                 "camera_camshot_check_shot_probe_boundary,"
+                 "camera_camshot_check_shot_native,"
                  "camera_manager_milocamera_poll_gate,"
                  "camera_manager_prepoll_poll_order,"
                  "camera_camshot_setpreframe_noop,"
@@ -17520,7 +17723,10 @@ int main() {
                  "camera_same_target_screen_offset,"
                  "camera_camshot_clamp_height_bridge,"
                  "camera_camshot_dofproc,"
-                 "camera_camshot_shake_tail,"
+                 "camera_camshot_shake_native_body,"
+                 "camera_camshot_shake_rng,"
+                 "camera_camshot_shake_spring_state,"
+                 "camera_camshot_shake_local_transform,"
                  "camera_camshot_setlocalxfm_tail,"
                  "camera_rndcam_updatelocal_projection,"
                  "camera_camshot_dohide_unhide_visibility,"
@@ -17537,7 +17743,7 @@ int main() {
                  "camera_camshot_getkey_looping,"
                  "camera_frame_pair_timing,"
                  "camera_camshot_setframe_last_pair_bridge,"
-                 "camera_camshot_onsetpos_boundary,"
+                 "camera_camshot_onsetpos_editor_boundary,"
                  "camera_camshot_hastargets_boundary,"
                  "camera_camshot_position_handler_return_bridge,"
                  "camera_path_transanim_timing",
@@ -17600,7 +17806,7 @@ int main() {
                  "source_visible_pose_units=%s",
                  "camera debug rows expose visible CamShotFrame::Interp pose units");
   ok &= contains(gameplay_c,
-                 "SetFrustum,DOF,Shake_tail,SetLocalXfm_tail",
+                 "SetFrustum,DOF,Shake_native_body,SetLocalXfm_tail",
                  "camera visible pose-unit status counts the source SetLocalXfm tail without claiming hidden BuildTransform math");
   ok &= contains(gameplay_c,
                  "camera_lifecycle,camera_manager_enter_reset_bridge,"
@@ -17620,7 +17826,7 @@ int main() {
                  "camera_camshot_shotok_prev_arg_bridge,"
                  "camera_current_walkspot_waypoint_bridge,"
                  "camera_camshot_shot_ok_bad_waypoints,"
-                 "camera_camshot_check_shot_probe_boundary,"
+                 "camera_camshot_check_shot_native,"
                  "camera_manager_milocamera_poll_gate,"
                  "camera_manager_prepoll_poll_order",
                  "camera implementation status counts the CamShot crowd message handlers, GetCam/RndCam bridge, AnimTarget bridge, ShotOk previous-shot argument, current-walkspot lookup, recovered bad_waypoints rejection, check_shot probe boundary, source MiloCamera gate, manager poll order, and CalcFrame timing before frame sampling");
@@ -17710,7 +17916,7 @@ int main() {
   ok &= contains(gameplay_c,
                  "camera_frame_pair_timing,"
                  "camera_camshot_setframe_last_pair_bridge,"
-                 "camera_camshot_onsetpos_boundary,"
+                 "camera_camshot_onsetpos_editor_boundary,"
                  "camera_camshot_hastargets_boundary,"
                  "camera_camshot_position_handler_return_bridge,"
                  "camera_path_transanim_timing,",
@@ -17721,31 +17927,28 @@ int main() {
                  "camera_fov_anim_atframe",
                  "camera implementation status counts frame-scoped trace-complete writer bridge before audited RndCamAnim FovKeys::AtFrame sampling");
   ok &= contains(gameplay_c,
-                 "hidden_bodies_deferred=cam_shot_ok_rest,"
-                 "cam_check_shot_native,CharWalk,SetPos,BuildTransform"
-                 "postprocess_render_effect=deferred"
-                 "freecam_priority=deferred_last",
-                 "camera implementation status removes the recovered RndCam projection from hidden gameplay bodies ahead of FreeCam work");
+                 "hidden_bodies_deferred=none"
+                 "ps2_postprocess=not_applicable_HX_XBOX_only"
+                 "editor_debug_only=CamShot::OnSetPos,FreeCamera",
+                 "camera implementation status separates the complete PS2 gameplay driver from editor/debug-only camera facilities");
   ok &= contains(gameplay_c,
                  "rndcam_updatelocal_source=GH2_PS2_SLUS_214.47_0x001b1f50",
                  "camera implementation status names the recovered retail RndCam::UpdateLocal body");
   ok &= contains(gameplay_c,
-                 "postprocess_render_effect=deferred"
-                 "freecam_priority=deferred_last",
-                 "camera implementation status does not claim postprocess renderer effects while FreeCam stays deferred");
+                 "ps2_postprocess=not_applicable_HX_XBOX_only",
+                 "camera implementation status does not claim Xbox-only postprocess effects on PS2");
   ok &= contains(gameplay_c,
-                 "under_venue_concern=open"
+                 "under_venue_concern=diagnostic_only"
+                 "no_venue_specific_camera_patches=1"
                  "no_dependency_change=1"
                  "og_xbox_portability_preserved=1",
-                 "camera implementation status keeps under-venue and dependency risks explicit");
+                 "camera implementation status keeps driver-level venue coverage and dependency status explicit");
   ok &= contains(gameplay_c,
-                 "camera_hidden_gameplay_blockers("
-                 "true,true,true,kGuitaristWalking)",
-                 "regular camera sweep keeps pose, ShotOk, and check_shot blockers active during source selection");
+                 "camera_hidden_gameplay_blockers()",
+                 "regular camera sweep reports no unresolved shared gameplay driver blockers");
   ok &= contains(gameplay_c,
-                 "camera_deferred_gameplay_blockers("
-                 "true,true,kGuitaristWalking)",
-                 "regular camera sweep keeps inactive CharWalk visible as deferred gameplay-camera work");
+                 "camera_deferred_gameplay_blockers()",
+                 "regular camera sweep reports editor-only facilities outside gameplay scope");
   ok &= appears_before(gameplay_c,
                        "priority=gameplay_camera",
                        "hidden_gameplay_blockers=%sdeferred_gameplay_blockers=%s",
@@ -17761,18 +17964,23 @@ int main() {
   ok &= contains(gameplay_c,
                  "caseCameraSourceShotOkReturn::kStringReject:"
                  "caseCameraSourceShotOkReturn::kIntReject:"
+                 "caseCameraSourceShotOkReturn::kNativeSpecialReject:"
+                 "caseCameraSourceShotOkReturn::kNativeStarpowerReject:"
+                 "caseCameraSourceShotOkReturn::kNativeFarStarpowerReject:"
                  "caseCameraSourceShotOkReturn::kNativeBadWaypointReject:"
                  "returnfalse;",
-                 "regular camera shot_ok bridge rejects source string/false integer returns");
+                 "regular camera shot_ok bridge rejects all recovered native false/string paths");
   ok &= contains(gameplay_c,
                  "caseCameraSourceShotOkReturn::kUnhandledAccept:"
                  "caseCameraSourceShotOkReturn::kIntAccept:"
-                 "caseCameraSourceShotOkReturn::kNativeDeferredAccept:"
+                 "caseCameraSourceShotOkReturn::kNativeSpecialCategoryAccept:"
+                 "caseCameraSourceShotOkReturn::kNativeAccept:"
                  "returntrue;",
-                 "regular camera shot_ok bridge accepts source unhandled/true integer returns");
+                 "regular camera shot_ok bridge accepts source unhandled and all recovered native true returns");
   ok &= contains(gameplay_c,
-                 "returnCameraSourceShotOkReturn::kNativeDeferredAccept;",
-                 "regular camera shot_ok bridge keeps unrecovered GH2 cam_shot_ok permissive");
+                 "native_body=GH2_SLUS_214.47_0x0011f8c8"
+                 "shared_predicate=0x0011f628",
+                 "regular camera shot_ok diagnostics identify the fully recovered native body and shared predicate");
   ok &= contains(gameplay_c,
                  "CameraSourceShotOkReturncamera_source_cam_shot_ok_return("
                  "constGameplay::CameraKey&key,std::string_viewcurrent_walkspot)",
@@ -17810,16 +18018,67 @@ int main() {
                  "regular camera shot_ok diagnostics preserve the current walkspot key even when no bad_waypoints are authored");
   ok &= contains(gameplay_c,
                  "cam_shot_ok_recovered=%scam_shot_ok_unrecovered=%s",
-                 "regular camera shot_ok diagnostics split recovered bad_waypoints from the unrecovered native predicate");
+                 "regular camera shot_ok diagnostics expose complete recovery status");
   ok &= contains(gameplay_c,
-                 "bad_waypoint_match.ref?\"bad_waypoints\":\"none\"",
-                 "regular camera shot_ok recovery label is tied only to the authored bad_waypoints rule");
+                 "constchar*cam_shot_ok_recovered=\"all\";"
+                 "constchar*cam_shot_ok_unrecovered=\"none\";",
+                 "regular camera shot_ok probe records complete native predicate recovery");
   ok &= contains(gameplay_c,
-                 "\"native_deferred_rest\"",
-                 "regular camera shot_ok diagnostics keep the unrecovered cam_shot_ok remainder explicit");
+                 "if(camera_source_cam_shot_ok_special_category(key.category)){"
+                 "returnCameraSourceShotOkReturn::kNativeSpecialCategoryAccept;}"
+                 "if(key.special){returnCameraSourceShotOkReturn::kNativeSpecialReject;}",
+                 "regular camera shot_ok bridge preserves the retail terminal-category and special-shot branches");
   ok &= contains(gameplay_c,
                  "std::stringGameplay::camera_source_guitarist0_nearest_walkspot()const",
                  "regular camera shot_ok bridge uses the current guitarist0 walkspot source context");
+  ok &= contains(gameplay_c,
+                 "if(has_gh1_walk_spot){"
+                 "for(constauto&target:venue_camera_target_worlds_){"
+                 "if(!starts_with(target.first,\"gh1_walk_spot_\"))continue;",
+                 "converted GH1 bad_walk_spots consume the Arena logical walk-spot index instead of a coincident GH2 start waypoint");
+  ok &= contains(gameplay_c,
+                 "constboolhas_gh1_walk_spot="
+                 "gh1_arena_spot_route_active_&&"
+                 "std::any_of(venue_camera_target_worlds_.begin(),",
+                 "stock GH2 camera eligibility cannot consume GH1 Arena walk-spot aliases retained by editor geometry");
+  ok &= contains(gameplay_c,
+                 "if(include_gh1_arena_spot_aliases){"
+                 "if(constautoindex=gh1_numbered_spot_index("
+                 "lower_name,\"stage_spot_\"))",
+                 "numbered GH1 Arena placement aliases are created only for a decoded GH1 camera route");
+  ok &= contains(gameplay_c,
+                 "gh1_arena_spot_route_active_=raw_gh1_regular_camera_route||"
+                 "std::any_of(regular_camera_keys_.begin(),",
+                 "GH1 Arena spot routing is derived from the loaded camera package rather than a venue-specific exception");
+  ok &= contains(gameplay_c,
+                 "merge_venue_camera_target_worlds("
+                 "venue_camera_target_worlds_,lighting_scene,"
+                 "gh1_arena_spot_route_active_);",
+                 "lighting-section helper meshes follow the shared decoded camera-route gate");
+  ok &= contains(gameplay_c,
+                 "elseif(gh1_content_layout&&"
+                 "gh1_arena_spot_route_active_)",
+                 "GH1 character fallback placement cannot consume same-named editor helpers in a stock GH2 venue");
+  ok &= contains(gameplay_c,
+                 "source_call=CharSys::get_spot"
+                 "source_container=Arena::walk_spots"
+                 "metric=native_world_position_distance2",
+                 "GH1 current-walkspot diagnostics identify the source logical spot contract");
+  ok &= contains(gameplay_c,
+                 "boolcamera_authored_parent_dependencies_resolved("
+                 "constGameplay::CameraKey&shot,"
+                 "conststd::unordered_map<std::string,CameraTarget>&targets,",
+                 "loose camera packages validate every authored parent reference before use");
+  ok &= contains(gameplay_c,
+                 "source_invariant=retail_CamShot_ObjPtr_resolves_from_loaded_world_character_package"
+                 "action=skip_candidate"
+                 "no_collision_or_shot_specific_fix=1",
+                 "normal camera selection rejects unresolved DLC parent dependencies without venue-specific repairs");
+  ok &= contains(gameplay_c,
+                 "source_invariant=retail_CamShot_ObjPtr_resolves_from_loaded_world_character_package"
+                 "action=retain_last_valid_camera"
+                 "no_collision_or_shot_specific_fix=1",
+                 "camera submission retains the last valid pose if a dependency disappears after selection");
   ok &= contains(gameplay_c,
                  "waypoint.world_stored.pos[0]-px",
                  "regular camera current walkspot uses Waypoint world position for FindNearest distance");
@@ -17850,10 +18109,10 @@ int main() {
                  "CameraManager::FirstShotOk"
                  "//discardstheHandleTypereturn",
                  "regular camera first_shot_ok bridge records that the source return is ignored");
-  ok &= contains(gameplay_c,
+  ok &= absent(gameplay_c,
                  "camera_source_first_shot_ok("
                  "camera_source_pick_shot_category(mode));",
-                 "regular camera selector sends first_shot_ok before source shot filtering");
+                 "GH2 regular selector does not send an unverified later-game first_shot_ok message");
   ok &= contains(gameplay_c,
                  "returnmode==CameraShotMode::Lighter?\"LIGHTER\""
                  ":\"NORMAL_CAMSHOT_CATEGORIES\";",
@@ -17865,14 +18124,15 @@ int main() {
                  "source_return=discardedresult=ignored\\n\"",
                  "regular camera diagnostics expose ignored BandDirector first_shot_ok return class");
   ok &= contains(gameplay_c,
-                 "if(!camera_source_shot_ok(key,previous,current_walkspot))continue;",
+                 "returnkey.disabled_flags==0&&predicate(key)&&camera_source_shot_ok(key,previous,current_walkspot);",
                  "regular camera selector runs source shot_ok after ShotMatches filters");
   ok &= contains(gameplay_c,
                  "\"[world]camerashot_ok:"
                  "pipeline_scope=normal_gameplay_camera"
                  "priority=gameplay_camera"
                  "source_dispatch_recovered=CamShot::ShotOk"
-                 "hidden_gameplay_blocker=cam_shot_ok_rest"
+                 "native_body=GH2_SLUS_214.47_0x0011f8c8"
+                 "shared_predicate=0x0011f628"
                  "source_msg=shot_ok"
                  "source_script=world/camshot.dta::shot_ok"
                  "source_dtb=world/gen/camshot.dtb:77-78"
@@ -17886,7 +18146,10 @@ int main() {
                  "native_call=cam_shot_ok($this)"
                  "shot=%sprevious=%snative_prev_shot_visible=0"
                  "cam_shot_ok=%ssource_return=%s"
-                 "result=%scurrent_walkspot=%s"
+                 "result=%splaying_starpower=%dstarpower_ok=%d"
+                 "playing_far_starpower=%dfar_starpower_ok=%d"
+                 "special=%dspecial_category_bypass=%d"
+                 "current_walkspot=%s"
                  "current_walkspot_key=%s"
                  "bad_waypoint_match=%s"
                  "bad_waypoint_match_mode=%s"
@@ -17895,7 +18158,7 @@ int main() {
                  "cam_shot_ok_recovered=%scam_shot_ok_unrecovered=%s"
                  "freecam_priority=deferred_last"
                  "freecam_affects_gameplay=0\\n\"",
-                 "regular camera diagnostics expose the unrecovered ShotOk remainder after recovered bad_waypoints before deferred FreeCam status");
+                 "regular camera diagnostics expose the fully recovered ShotOk branch and predicate state");
   ok &= contains(gameplay_c,
                  "source_dtb=world/gen/camshot.dtb:77-78"
                  "source_script_body=cam_shot_ok_this_no_prev_arg"
@@ -17913,7 +18176,9 @@ int main() {
                "regular camera selector must not pre-reject the active shot before source shot_ok");
   ok &= contains(gameplay_c,
                  "boolcamera_source_check_shot(constGameplay::CameraKey&key,"
-                 "uint32_tcamera_beat_state,constchar*source_caller)",
+                 "uint32_tcamera_beat_state,"
+                 "std::string_viewcurrent_walkspot,"
+                 "constchar*source_caller)",
                  "regular camera runtime exposes GH2 cam_check_shot hook");
   ok &= contains(gameplay_c,
                  "structCameraSourceCheckShotProbe",
@@ -17922,7 +18187,8 @@ int main() {
                  "CameraSourceCheckShotProbe"
                  "camera_source_check_shot_probe("
                  "constGameplay::CameraKey&key,"
-                 "uint32_tcamera_beat_state)",
+                 "uint32_tcamera_beat_state,"
+                 "std::string_viewcurrent_walkspot)",
                  "regular camera check_shot probe captures source camera_beat state");
   ok &= contains(gameplay_c,
                  "probe.camera_beat_state=camera_beat_state;",
@@ -17931,7 +18197,8 @@ int main() {
                  "\"[world]cameracheck_shot:"
                  "pipeline_scope=normal_gameplay_camera"
                  "priority=gameplay_camera"
-                 "hidden_gameplay_blocker=cam_check_shot_native"
+                 "native_body=GH2_SLUS_214.47_0x0011f848"
+                 "shared_predicate=0x0011f628"
                  "source_msg=check_shot"
                  "source_script=world/camshot.dta::check_shot"
                  "source_dtb=world/gen/camshot.dtb:72-73"
@@ -17943,10 +18210,13 @@ int main() {
                  "native_beat_arg_visible=0"
                  "source_reject_action=%s"
                  "cam_check_shot=%ssource_return=%s"
-                 "result=%s"
+                 "predicate_result=%s"
+                 "playing_starpower=%dstarpower_ok=%d"
+                 "playing_far_starpower=%dfar_starpower_ok=%d"
+                 "current_walkspot=%sresult=%s"
                  "freecam_priority=deferred_last"
                  "freecam_affects_gameplay=0\\n\"",
-                 "regular camera diagnostics expose deferred source check_shot hook and native argument boundary");
+                 "regular camera diagnostics expose the recovered source check_shot body and native argument boundary");
   ok &= contains(gameplay_c,
                  "source_dtb=world/gen/camshot.dtb:72-73"
                  "source_script_body=cam_check_shot_this_no_args"
@@ -17982,7 +18252,9 @@ int main() {
                  "camera_beat=%uresult=state\\n\"",
                  "regular camera diagnostics expose world_objects_worldbase.dta beat latch updates");
   ok &= contains(gameplay_c,
-                 "if(!camera_source_check_shot(*active_key,source_beat,"
+                 "if(!camera_source_check_shot("
+                 "*active_key,source_beat,"
+                 "camera_source_guitarist0_nearest_walkspot(),"
                  "\"world_objects_worldbase.dta::beat\")){",
                  "regular camera runtime routes rejected check_shot results to a new pick");
   ok &= contains(gameplay_c,
@@ -18583,12 +18855,14 @@ int main() {
   ok &= contains(app_main_c,
                  "engine.iterate_camera_shots_like_source();",
                  "diagnostic source iterate_shot trigger calls the gameplay bridge");
-  ok &= absent(gameplay_c, "regular_camera_selection_weight(",
-               "regular camera selection must not consume the legacy CamShot category float as a weight");
-  ok &= absent(gameplay_c, "choose_weighted_regular_camera_key(",
-               "regular camera fallback must not use invented weighted shot selection");
-  ok &= absent(gameplay_c, "selection_weight",
-               "camera runtime keeps ihatecompvir's legacy CamShot float discarded");
+  ok &= contains(gameplay_c, "shot.selection_weight=r.f32();",
+                 "GH2 Load2650A8 retains the authored weight at shot+44");
+  ok &= contains(gameplay_c, "key.selection_weight=shot.selection_weight;",
+                 "shared shot decoder preserves weight for every venue");
+  ok &= contains(weighted_selection_c, "shot.selection_used=false;",
+                 "GH2 exhausted-category retry clears eligible used markers");
+  ok &= contains(weighted_selection_c, "*entry.used=true;",
+                 "GH2 weighted winner receives the source used marker");
   ok &= contains(gameplay_c,
                  "CameraResultRowscamera_source_seed_result_rows_for_key(",
                  "camera diagnostics expose the compact PS2 source seed rows");
@@ -18940,8 +19214,11 @@ int main() {
                  "source_final_forced_pick_refreshes_duration;",
                  "coalesced forced camera picks only leave one final get_shot_duration call live");
   ok &= contains(gameplay_c,
-                 "camera_shot_counter_+=duration_refreshes_to_burn;",
-                 "coalesced forced camera picks burn overwritten source duration draws");
+                 "for(size_ti=0;i<duration_refreshes_to_burn;++i){"
+                 "constsize_tburned_draw=camera_shot_counter_++;"
+                 "(void)source_random_int_camera_duration_bars("
+                 "duration.second.first,duration.second.second,burned_draw);}",
+                 "coalesced forced camera picks consume overwritten source duration draws from the shared Rand stream");
   ok &= contains(gameplay_c,
                  "\"[world]cameraforceddurationburn:"
                  "source_action=get_shot_durationcoalesced_picks=%zu",
@@ -18968,6 +19245,46 @@ int main() {
                "constexprdoublekPostSwitchSeconds=2.06;",
                "regular CamShot frame cadence is no longer a fixed native constant");
 
+  ok &= contains(gameplay_c,
+                 "key.camera_target_fallback=prop_symbol(shot.props,\"gh1_camera_target_fallback\");",
+                 "converted source target exists/else policy is loaded");
+  ok &= contains(gameplay_c,
+                 "camera_resolved_direct_object_id(object,member,targets).has_value()",
+                 "camera exists policy does not use entity-root fallback");
+  ok &= contains(gameplay_c,
+                 "venue_camera_target_worlds_.find(ref+\"_transform\")",
+                 "requested arena refs prefer authored Group WorldXfm over diagnostic centroid");
+  ok &= contains(gameplay_c,
+                 "camera_apply_reference_fallbacks(*resolved_a,targets);",
+                 "outgoing camera target/parent policy is resolved before the shared solver");
+  ok &= contains(gameplay_c,
+                 "camera_apply_reference_fallbacks(*resolved_b,targets);",
+                 "incoming camera target/parent policy is resolved before the shared solver");
+  ok &= contains(gameplay_c,
+                 "poll_track_intro_feedback();poll_authored_music_start();"
+                 "poll_venue_presentation_tasks();"
+                 "if(intro_presentation_time_+0.0001<intro_camera_seconds_)return;",
+                 "intro camera advances authored music_start and venue tasks before its early return");
+  ok &= contains(gameplay_c,
+                 "rebase_venue_presentation_tasks(song_time_);song_time_=0.0;",
+                 "scene tasks preserve elapsed time when the intro clock changes origin");
+  ok &= contains(gameplay_c,
+                 "constdoubleevent_sec=chart_.tick_to_sec(ev.tick);"
+                 "if(event_sec>song_time_)break;"
+                 "if(ev.text==\"[music_start]\"||ev.text==\"music_start\")",
+                 "music_start follows its authored chart timestamp");
+  ok &= appears_before_after(
+      gameplay_c, "if(track_intro_active_){",
+      "poll_authored_music_start();", "poll_venue_presentation_tasks();",
+      "pre-song music_start publishes before its authored venue task is polled");
+  ok &= absent_between(
+      gameplay_c, "world_=std::make_unique<ghogx::render::MiloSceneRenderer>",
+      "std::fprintf(stderr,\"[world]venueloaded:",
+      "apply_venue_event(\"music_start\"",
+      "venue load does not send music_start before its MIDI event");
+  ok &= contains(gameplay_c,
+                 "apply_lighting_event(\"intro_start\");std::fprintf",
+                 "lighting load does not send music_start before its MIDI event");
   if (!ok) {
     std::cerr
         << "Venue/band orchestration must remain trace-shaped. Do not replace "

@@ -966,12 +966,19 @@ Result convert_gh1_directory_to_gh2_rnddir(
                         self(self, child);
                     visiting_animations.erase(name);
                 };
+                // View7 serializes its drawable and animatable member lists
+                // on the View itself. children_owner is a legacy ownership /
+                // editor link and is not an alias for those lists. Retail
+                // Theatre demonstrates why that distinction is load-bearing:
+                // verse.anim names chorus.anim as children_owner while its
+                // own members are verselight01/02/03.envanim. Following the
+                // owner silently binds verse lighting to the chorus tracks.
                 for (const auto& name :
-                     owner->second.animatable.objects)
+                     source_view.animatable.objects)
                     append_animation_closure(
                         append_animation_closure, name);
                 std::set<std::string> visiting_drawables;
-                for (const auto& name : owner->second.drawable.objects)
+                for (const auto& name : source_view.drawable.objects)
                     append_drawable_closure(
                         append_drawable_closure, name, graph,
                         visiting_drawables);

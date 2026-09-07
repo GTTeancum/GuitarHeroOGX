@@ -3256,6 +3256,91 @@ int main() {
     std::cerr << "CharClip beat-to-facing sample mismatch\n";
     ok = false;
   }
+  {
+    using namespace ghogx::character;
+    constexpr float pi = 3.14159265358979323846f;
+    CharClip delta_clip = facing_clip;
+    delta_clip.name = "facing_delta";
+    delta_clip.loaded = true;
+    delta_clip.start_beat = 0.0f;
+    delta_clip.end_beat = 2.0f;
+    delta_clip.fps = 1;
+    delta_clip.beats_per_second = 0.5f; // not the normalized sample interval
+    delta_clip.frames[0][1].angle = pi / 2.0f;
+    delta_clip.frames[1][1].angle = pi / 2.0f;
+    auto check_delta = [&](const SourceCharFacingDelta& got, float x,
+                           float y, float angle, const char* label) {
+      if (!got.has_position || !nearf(got.position[0], x) ||
+          !nearf(got.position[1], y) || !nearf(got.rotation, angle)) {
+        std::cerr << "FacingBones " << label << " mismatch: "
+                  << got.position[0] << ',' << got.position[1] << ','
+                  << got.rotation << '\n';
+        ok = false;
+      }
+    };
+    check_delta(source_char_clip_facing_delta_at_beat(delta_clip, .5f, 1, 1),
+                0, -.5f, 0, "previous-facing local translation/weight");
+    check_delta(source_char_clip_facing_delta_at_beat(delta_clip, 1, 3, 5),
+                0, -2, 0, "independent endpoint clamps");
+    check_delta(source_char_clip_facing_delta_at_beat(delta_clip, 1, 3, .5f),
+                0, 0, 0, "both endpoints beyond end");
+    check_delta(source_char_clip_facing_delta_at_beat(delta_clip, 1, 1, 0),
+                0, 0, 0, "zero delta");
+    delta_clip.frames[0][1].angle = 3.0f;
+    delta_clip.frames[1][1].angle = -3.0f;
+    const auto wrapped = source_char_clip_facing_delta_at_beat(
+        delta_clip, .5f, 2, 2);
+    if (!wrapped.has_rotation || !nearf(wrapped.rotation, pi - 3.0f)) {
+      std::cerr << "FacingBones wrapped radian delta mismatch\n";
+      ok = false;
+    }
+    delta_clip.frames[0][1].angle = 0;
+    delta_clip.frames[1][1].angle = pi;
+    if (!nearf(source_char_clip_facing_delta_at_beat(
+                   delta_clip, 1, 2, 2).rotation, -pi)) {
+      std::cerr << "FacingBones half-open angle range mismatch\n";
+      ok = false;
+    }
+    delta_clip.frames[0].resize(1);
+    delta_clip.frames[1].resize(1);
+    check_delta(source_char_clip_facing_delta_at_beat(delta_clip, 1, 1, 1),
+                1, 0, 0, "translation without rotation allocation");
+    if (source_char_clip_facing_delta_at_beat(delta_clip, 0, 1, 1).has_position ||
+        source_char_clip_facing_delta_at_beat(CharClip{}, 1, 1, 1).has_position) {
+      std::cerr << "FacingBones empty/zero-weight output mismatch\n";
+      ok = false;
+    }
+    delta_clip.beats_per_second = 1;
+    CharClipPlayer delta_player;
+    delta_player.play(delta_clip, kCharPlayNoLoop | kCharPlayNoBlend | 0x2000u);
+    delta_player.advance_source(.6f, .2f, .2f);
+    check_delta(delta_player.source_facing_delta(), .2f, 0, 0,
+                "node d_beat, not alignment advance");
+    delta_player.clear();
+    delta_player.play(delta_clip, kCharPlayLoop | kCharPlayNoBlend);
+    delta_player.advance_source(2.25f, 2.25f, 2.25f);
+    check_delta(delta_player.source_facing_delta(), .25f, 0, 0,
+                "looped node beat with source endpoint clamp");
+    delta_player.clear();
+    delta_player.play(delta_clip, kCharPlayNoLoop | kCharPlayNoBlend);
+    delta_player.advance_source(.5f, .5f, .5f);
+    CharClip displaced = delta_clip;
+    displaced.name = "displaced_facing_delta";
+    displaced.frames[0][0].pos[0] = 100;
+    displaced.frames[1][0].pos[0] = 106; // triple the velocity, shifted origin
+    delta_player.play_source(displaced, kCharPlayNoLoop | kCharPlayFirst,
+                             0, 0, 1);
+    delta_player.advance_source(.75f, .25f, .25f);
+    const float incoming = source_gh2_char_clip_driver_eased_weight(.25f);
+    check_delta(delta_player.source_facing_delta(),
+                .25f * (1 - incoming) + .75f * incoming, 0, 0,
+                "per-node eased deltas, not blended pose differences");
+    delta_player.clear();
+    if (delta_player.source_facing_delta().has_position) {
+      std::cerr << "FacingBones clear retained stale delta\n";
+      ok = false;
+    }
+  }
   ghogx::character::CharClip stop_clip;
   stop_clip.start_beat = 0.0f;
   stop_clip.end_beat = 10.0f;

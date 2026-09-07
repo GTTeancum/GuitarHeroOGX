@@ -681,6 +681,14 @@ bool scene_node_xfm_for(const milo_scene::Scene& scene,
     out.constraint = 0;
     return true;
   }
+  for (const auto& camera : scene.cams) {
+    if (camera.name != name || !camera.decoded) continue;
+    out.local = xfm_to_mat4(camera.local);
+    out.world_stored = xfm_to_mat4(camera.world_stored);
+    out.parent = camera.parent;
+    out.constraint = camera.constraint;
+    return true;
+  }
   return false;
 }
 
@@ -911,6 +919,9 @@ void apply_absolute_local_rot_scale(
   }
 }
 
+std::array<float, 4> slerp_quat_xyzw(std::array<float, 4> a,
+                                    std::array<float, 4> b, float t);
+
 void apply_mesh_transform_sample_full(
     std::array<float, 16>& world,
     const MiloSceneRenderer::MeshTransformSample& sample) {
@@ -936,6 +947,10 @@ void apply_mesh_transform_sample_full(
 void apply_mesh_transform_sample(
     std::array<float, 16>& world,
     const MiloSceneRenderer::MeshTransformSample& sample) {
+  if (sample.has_local_transform) {
+    world = sample.local_transform;
+    return;
+  }
   const float blend = std::isfinite(sample.blend)
                           ? std::clamp(sample.blend, 0.0f, 1.0f)
                           : 1.0f;
@@ -965,7 +980,9 @@ void apply_mesh_transform_sample(
       source_normalized_rows(world, base_rot);
       const auto base_quat = quat_xyzw_from_row_rot(base_rot);
       blended.rotation_xyzw =
-          fast_interp_quat_xyzw(base_quat, sample.rotation_xyzw, blend);
+          sample.rotation_slerp
+              ? slerp_quat_xyzw(base_quat, sample.rotation_xyzw, blend)
+              : fast_interp_quat_xyzw(base_quat, sample.rotation_xyzw, blend);
     } else {
       blended.rotation_xyzw =
           fast_interp_quat_xyzw({0.0f, 0.0f, 0.0f, 1.0f},
@@ -1229,6 +1246,7 @@ MiloSceneRenderer::MeshTransformSample sample_transform_anim(
   MiloSceneRenderer::MeshTransformSample sample;
   sample.has_source_frame = true;
   sample.source_frame = frame;
+  sample.rotation_slerp = anim.rotation_slerp;
   if (!anim.translation_keys.empty()) {
     sample.has_translation = true;
     sample.translation_is_absolute = true;
@@ -1760,6 +1778,8 @@ bool mesh_bbox_outside_clip_frustum(const milo_scene::MeshObj& mesh,
 struct DebugVenuePick {
   bool hit = false;
   std::string mesh;
+  std::string multi_mesh;
+  float draw_origin[3] = {};
   std::string material;
   float distance = 0.0f;
   float point[3] = {0.0f, 0.0f, 0.0f};
@@ -1792,6 +1812,7 @@ struct DebugVenuePickAccumulator {
 };
 
 struct DebugVenuePickMeshState {
+  std::string multi_mesh;
   bool would_draw = true;
   bool source_pick = false;
   bool hidden_by_filter = false;
@@ -1970,7 +1991,11 @@ void apply_debug_venue_freecam(Window* win, OrbitCamera& cam,
     state.camera = cam;
     freecam_seed_from_current_camera(state.camera);
     state.initialized = true;
-    if (first_init) state.axes_enabled = env_enabled("GHOGX_VENUE_PICK_AXES");
+    if (first_init) {
+      state.axes_enabled = env_enabled("GHOGX_VENUE_PICK_AXES");
+      state.highlight_enabled =
+          !env_enabled("GHOGX_VENUE_FREECAM_NO_HIGHLIGHT");
+    }
     if (!state.announced) {
       std::fprintf(stderr,
                    "[venue-freecam] enabled: mouse look, WASD move, E/R up, "
@@ -2127,6 +2152,8 @@ void accumulate_debug_venue_pick(DebugVenuePickAccumulator& pick,
         debug_pick_culled_by_cull_mode(mesh_state.cull_mode, backfacing);
     pick.best.would_draw = mesh_state.would_draw && !culled_by_backface;
     pick.best.source_pick = mesh_state.source_pick;
+    pick.best.multi_mesh = mesh_state.multi_mesh;
+    for (int k = 0; k < 3; ++k) pick.best.draw_origin[k] = world[12 + k];
     pick.best.hidden_by_filter = mesh_state.hidden_by_filter;
     pick.best.source_showing = mesh_state.source_showing;
     pick.best.material_invisible = mesh_state.material_invisible;
@@ -2231,6 +2258,11 @@ void update_debug_venue_title(Window* win, DebugVenueInspectorState& state) {
   char title[384];
   char key[384];
   if (state.pick.hit) {
+    std::fprintf(stderr,
+                 "[venue-freecam] pick provenance mesh=%s multimesh=%s origin=(%.3f %.3f %.3f)\n",
+                 state.pick.mesh.c_str(),
+                 state.pick.multi_mesh.empty() ? "<standalone>" : state.pick.multi_mesh.c_str(),
+                 state.pick.draw_origin[0], state.pick.draw_origin[1], state.pick.draw_origin[2]);
     const char* status =
         state.pick.would_draw
             ? "renders"
@@ -3191,6 +3223,33 @@ void MiloSceneRenderer::set_mesh_translation_offsets(
   }
 }
 
+MiloSceneRenderer::MeshTransformSample
+MiloSceneRenderer::compose_transform_animation_sample(
+    const std::array<float, 16>& base_local,
+    const MeshTransformSample* current,
+    const MeshTransformSample& incoming) {
+  // GH2 RndTransAnim::SetFrame 0x1E0FA0 copies the current LocalXfm before
+  // MakeTransform(0x1E0790), then publishes it. Preserve unkeyed channels and
+  // the exact zero-blend pose, including scale/handedness. Do not advance this
+  // state per draw: one object may be drawn by several cameras/passes.
+  auto local = base_local;
+  if (current) apply_mesh_transform_sample(local, *current);
+  apply_mesh_transform_sample(local, incoming);
+  auto result = incoming;
+  result.has_local_transform = true;
+  result.local_transform = local;
+  return result;
+}
+
+bool MiloSceneRenderer::compose_transform_animation_sample(
+    const std::string& target, const MeshTransformSample* current,
+    MeshTransformSample& incoming) const {
+  SceneNodeXfm node;
+  if (!scene_node_xfm_for(scene_, target, node)) return false;
+  incoming = compose_transform_animation_sample(node.local, current, incoming);
+  return true;
+}
+
 void MiloSceneRenderer::set_mesh_transform_offsets(
     std::map<std::string, MeshTransformSample> offsets) {
   mesh_transform_offsets_ = std::move(offsets);
@@ -3384,6 +3443,59 @@ const milo_scene::MatObj* MiloSceneRenderer::find_material(
   return it != materials_by_name_.end() ? it->second : nullptr;
 }
 
+void MiloSceneRenderer::select_gh1_crowd_region(int index) {
+  if (gh1_crowd_regions_.regions().empty()) return;
+  pending_gh1_crowd_auto_ = index < 0 && !last_crowd_camera_valid_;
+  const bool selected = index >= 0 ? gh1_crowd_regions_.select(index) :
+      (!pending_gh1_crowd_auto_ && gh1_crowd_regions_.select_auto(
+          last_crowd_camera_view_, last_crowd_camera_projection_));
+  const int active = gh1_crowd_regions_.selected();
+  std::fprintf(stderr,
+      "[crowd_region] request=%d selected=%d regions=%zu flat_excluded=%zu total=%zu "
+      "selection_ok=%d camera=%s promoted=%zu replacement_3d_pool=wired "
+      "source=SLUS_212.24:1727B0\n",
+      index, active, gh1_crowd_regions_.regions().size(),
+      active >= 0 ? gh1_crowd_regions_.regions()[active].members.size() : 0,
+      gh1_crowd_regions_.instance_count(), selected ? 1 : 0,
+      pending_gh1_crowd_auto_ ? "pending_first_submission" : "previous_submission",
+      gh1_crowd_regions_.promoted_count());
+}
+
+void MiloSceneRenderer::set_gh1_crowd_sizes(float promoted_fraction,
+                                            float flat_fraction) {
+  gh1_crowd_regions_.set_sizes(promoted_fraction, flat_fraction);
+  if (!gh1_crowd_regions_.regions().empty()) {
+    std::fprintf(
+        stderr,
+        "[crowd_region] sizes promoted_fraction=%.3f flat_fraction=%.3f "
+        "promoted=%zu active_flat=%zu total=%zu "
+        "source=SLUS_212.24:172EC8\n",
+        gh1_crowd_regions_.promoted_fraction(),
+        gh1_crowd_regions_.flat_fraction(),
+        gh1_crowd_regions_.promoted_count(),
+        gh1_crowd_regions_.active_flat_count(),
+        gh1_crowd_regions_.instance_count());
+  }
+}
+
+std::vector<std::array<float, 16>>
+MiloSceneRenderer::gh1_crowd_promoted_worlds() const {
+  return gh1_crowd_regions_.promoted_worlds();
+}
+
+void MiloSceneRenderer::exclude_gh1_crowd_already_owned_by(
+    const MiloSceneRenderer& owner) {
+  nonowning_gh1_crowd_drawables_ =
+      Gh1CrowdRegions::duplicate_drawables(owner.scene_, scene_);
+  if (!nonowning_gh1_crowd_drawables_.empty()) {
+    std::fprintf(stderr,
+        "[crowd_region] single_owner=%s secondary=%s duplicate_draws=%zu "
+        "match=ownership_template_geometry_instances source=Arena::Crowd\n",
+        owner.scene_.dir_name.c_str(), scene_.dir_name.c_str(),
+        nonowning_gh1_crowd_drawables_.size());
+  }
+}
+
 void MiloSceneRenderer::set_scene(
     milo_scene::Scene scene,
     const std::map<std::string, ghogx::asset::Image>& textures) {
@@ -3400,6 +3512,10 @@ void MiloSceneRenderer::set_scene(
   }
   flare_visibility_.clear();
   scene_ = std::move(scene);
+  nonowning_gh1_crowd_drawables_.clear();
+  gh1_crowd_regions_.rebuild(scene_);
+  last_crowd_camera_valid_ = false;
+  pending_gh1_crowd_auto_ = false;
   selected_camera_name_.clear();
   materials_by_name_.clear();
   for (const auto& mat : scene_.mats) {
@@ -3541,6 +3657,23 @@ void MiloSceneRenderer::set_scene(
                       }),
         missing_multi_mesh_templates);
   }
+  if (gh1_crowd_regions_.instance_count() &&
+      std::getenv("GHOGX_DEBUG_VENUE_FILTERS")) {
+    size_t standalone_cards = 0;
+    for (const auto& draw : ordered_mesh_draws_) {
+      if (!draw.mesh || draw.multi_mesh ||
+          draw.mesh->name.rfind("Crowd_", 0) != 0) continue;
+      if (standalone_cards++ < 16) {
+        std::fprintf(stderr,
+            "[crowd_region] scene=%s standalone=%s showing=%d parent=%s\n",
+            scene_.dir_name.c_str(), draw.mesh->name.c_str(),
+            draw.mesh->showing, draw.mesh->parent.c_str());
+      }
+    }
+    std::fprintf(stderr,
+        "[crowd_region] scene=%s standalone_cards=%zu draws=%zu\n",
+        scene_.dir_name.c_str(), standalone_cards, ordered_mesh_draws_.size());
+  }
   spotlight_template_meshes_.clear();
   auto add_spotlight_group_meshes = [&](const std::string& group_name) {
     std::vector<std::string> pending{group_name};
@@ -3674,6 +3807,45 @@ void MiloSceneRenderer::set_scene(
   const auto multimesh_alpha_textures =
       source_multimesh_alpha_textures(scene_);
   for (const auto& kv : textures) {
+    if (env_enabled("GHOGX_LOG_TEXTURE_ALPHA") &&
+        mesh_matches_env_spec("GHOGX_LOG_TEXTURE_ALPHA_MATCH", kv.first)) {
+      uint8_t min_alpha = 255;
+      uint8_t max_alpha = 0;
+      std::array<uint8_t, 3> min_rgb = {255, 255, 255};
+      std::array<uint8_t, 3> max_rgb = {0, 0, 0};
+      size_t transparent = 0;
+      size_t partial = 0;
+      size_t black = 0;
+      for (size_t i = 0; i + 3 < kv.second.rgba.size(); i += 4) {
+        for (size_t channel = 0; channel < 3; ++channel) {
+          min_rgb[channel] = std::min(min_rgb[channel], kv.second.rgba[i + channel]);
+          max_rgb[channel] = std::max(max_rgb[channel], kv.second.rgba[i + channel]);
+        }
+        const uint8_t alpha = kv.second.rgba[i + 3];
+        min_alpha = std::min(min_alpha, alpha);
+        max_alpha = std::max(max_alpha, alpha);
+        transparent += alpha == 0 ? 1u : 0u;
+        partial += alpha > 0 && alpha < 255 ? 1u : 0u;
+        black += kv.second.rgba[i] == 0 && kv.second.rgba[i + 1] == 0 &&
+                         kv.second.rgba[i + 2] == 0
+                     ? 1u
+                     : 0u;
+      }
+      std::fprintf(stderr,
+                   "[milo_scene] texture alpha name=%s size=%dx%d "
+                   "range=%u..%u transparent=%zu partial=%zu "
+                   "rgb=%u..%u,%u..%u,%u..%u black=%zu pixels=%zu\n",
+                   kv.first.c_str(), kv.second.width, kv.second.height,
+                   static_cast<unsigned>(min_alpha),
+                   static_cast<unsigned>(max_alpha), transparent, partial,
+                   static_cast<unsigned>(min_rgb[0]),
+                   static_cast<unsigned>(max_rgb[0]),
+                   static_cast<unsigned>(min_rgb[1]),
+                   static_cast<unsigned>(max_rgb[1]),
+                   static_cast<unsigned>(min_rgb[2]),
+                   static_cast<unsigned>(max_rgb[2]), black,
+                   kv.second.rgba.size() / 4);
+    }
     const ghogx::asset::Image* upload_image = &kv.second;
     ghogx::asset::Image reconstructed;
     if (multimesh_alpha_textures.find(kv.first) !=
@@ -4182,6 +4354,12 @@ void MiloSceneRenderer::draw_impl(bool clear_target, bool draw_scene,
     constexpr float kScreenOffsetToClip = 1.0f / 768.0f;
     proj.m[2][0] += cam_.screen_offset[0] * kScreenOffsetToClip;
     proj.m[2][1] += cam_.screen_offset[1] * kScreenOffsetToClip;
+  }
+  if (draw_scene) {
+    std::memcpy(last_crowd_camera_view_.data(), &view, 64);
+    std::memcpy(last_crowd_camera_projection_.data(), &proj, 64);
+    last_crowd_camera_valid_ = true;
+    if (pending_gh1_crowd_auto_) select_gh1_crowd_region(-1);
   }
   if (clear_target && env_enabled("GHOGX_LOG_CAMERA_MATRIX")) {
     log_camera_matrix_rows(cam_, eye, at, up ? up : cam_.authored_up, aspect,
@@ -5669,6 +5847,9 @@ void MiloSceneRenderer::draw_impl(bool clear_target, bool draw_scene,
 
   for (const auto& ordered_draw : draw_meshes) {
     if (!ordered_draw.mesh) continue;
+    if (ordered_draw.multi_mesh && nonowning_gh1_crowd_drawables_.count(
+            ordered_draw.multi_mesh->name)) continue;
+    if (!gh1_crowd_regions_.allows_flat(ordered_draw.instance_world)) continue;
     const auto& m = *ordered_draw.mesh;
     const bool multi_mesh_instance =
         ordered_draw.multi_mesh && ordered_draw.instance_world;
@@ -6052,6 +6233,7 @@ void MiloSceneRenderer::draw_impl(bool clear_target, bool draw_scene,
     for (auto& venue_pick : venue_picks) {
       if (!venue_pick.source_mode && !would_reach_draw) continue;
       DebugVenuePickMeshState pick_mesh_state;
+      if (ordered_draw.multi_mesh) pick_mesh_state.multi_mesh = ordered_draw.multi_mesh->name;
       pick_mesh_state.would_draw = would_reach_draw;
       pick_mesh_state.source_pick = venue_pick.source_mode;
       pick_mesh_state.hidden_by_filter =

@@ -13,6 +13,7 @@
 #pragma once
 
 #include "milo_scene/milo_scene.h"
+#include "render/gh1_crowd_regions.h"
 
 #include <array>
 #include <cstdint>
@@ -219,6 +220,12 @@ class MiloSceneRenderer {
   void set_particle_end_colors(
       std::map<std::string, std::array<float, 4>> colors);
   void set_hidden_meshes(std::unordered_set<std::string> mesh_names);
+  // GH1 SwitchCam selects once, against the last submitted camera, not every
+  // frame. Native GH2 renderers have no GH1 ownership group and are unaffected.
+  void select_gh1_crowd_region(int index);
+  void set_gh1_crowd_sizes(float promoted_fraction, float flat_fraction);
+  std::vector<std::array<float, 16>> gh1_crowd_promoted_worlds() const;
+  void exclude_gh1_crowd_already_owned_by(const MiloSceneRenderer& owner);
   void set_post_text_meshes(std::unordered_set<std::string> mesh_names);
   void set_post_text_mesh_world_offsets(
       std::map<std::string, std::array<float, 3>> offsets);
@@ -293,7 +300,21 @@ class MiloSceneRenderer {
     float blend = 1.0f;
     bool has_source_frame = false;
     float source_frame = 0.0f;
+    bool rotation_slerp = false;
+    // SetFrame has already blended this snapshot at update time. Drawing
+    // publishes it verbatim; it must not blend against the bind pose again.
+    bool has_local_transform = false;
+    std::array<float, 16> local_transform = {};
   };
+  static MeshTransformSample compose_transform_animation_sample(
+      const std::array<float, 16>& base_local,
+      const MeshTransformSample* current,
+      const MeshTransformSample& incoming);
+  // Resolve a decoded local-space target. False leaves incoming unchanged for
+  // external targets whose transform owner is not this scene.
+  bool compose_transform_animation_sample(
+      const std::string& target, const MeshTransformSample* current,
+      MeshTransformSample& incoming) const;
   void set_mesh_transform_offsets(
       std::map<std::string, MeshTransformSample> offsets);
   // Update one live transform target without discarding the other sampled
@@ -352,6 +373,12 @@ class MiloSceneRenderer {
   Window* win_ = nullptr;
   IDirect3DDevice9* dev_ = nullptr;
   milo_scene::Scene scene_;
+  Gh1CrowdRegions gh1_crowd_regions_;
+  std::unordered_set<std::string> nonowning_gh1_crowd_drawables_;
+  std::array<float, 16> last_crowd_camera_view_{};
+  std::array<float, 16> last_crowd_camera_projection_{};
+  bool last_crowd_camera_valid_ = false;
+  bool pending_gh1_crowd_auto_ = false;
   struct OrderedMeshDraw {
     const milo_scene::MeshObj* mesh = nullptr;
     const milo_scene::MultiMeshObj* multi_mesh = nullptr;

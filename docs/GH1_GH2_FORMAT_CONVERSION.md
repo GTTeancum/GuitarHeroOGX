@@ -544,20 +544,31 @@ memberships are carried by the separately audited View-to-Group graph.
 
 ## Closed View7-to-Group membership mapping
 
-A View's `children_owner` selects the source View that owns its ordered
-animation and drawable lists. The converter now resolves both lists as graphs:
-nested Views retain Group boundaries, non-View drawable membership is expanded
-recursively with cycle detection, MatAnim references gain every non-static
-split pass, and non-View Animatable0 membership is recursively expanded with
-the same cycle gate.
+A View serializes its own ordered animation and drawable member lists.
+`children_owner` is a separate legacy ownership/editor relationship; it is not
+an alias for another View's lists. This distinction is observable in retail
+Theatre: `verse.anim` names `chorus.anim` as its `children_owner` while its own
+animation members are the `verselight01/02/03.envanim` tracks. Following the
+owner silently assigned chorus lighting to the verse state. The converter and
+independent audit now both traverse the lists on the source View itself.
 
-`conversion-audit.tsv.view-values.tsv` covers all 678 Views. It independently
-reconstructs 1,132 animation references (348 TransAnim references, three
-nested Animatable0 members, and 14 MatAnim pass expansions) and 5,433 drawable
-references, then compares every reparsed primary Group list. Ordered Environ
-changes require 72 native scope Groups across 28 multi-segment Views; 51 Views
-require a native draw-only Group, and 10 require an AnimFilter. All primary and
-synthesized Group fields match.
+The converter resolves those lists as graphs: nested Views retain Group
+boundaries, non-View drawable membership is expanded recursively with cycle
+detection, MatAnim references gain every non-static split pass, and non-View
+Animatable0 membership is recursively expanded with the same cycle gate. A
+focused regression fixture gives `verse.anim` and `chorus.anim` distinct member
+lists while sharing the legacy owner link and requires the converted verse
+Group to contain only its own members.
+
+The fresh full-corpus audit in
+`proofs/manage-band-20260906/gh1-view-member-regeneration-v4/` covers all 678
+Views and reports all 678 exact. It independently reconstructs 1,161 animation
+references and 5,402 drawable references, then compares every reparsed primary
+Group list. Ordered Environ changes require 70 native scope Groups; 26 Views
+require a native draw-only Group, and 10 require an AnimFilter. The same rebuild
+converted 105/105 assets with zero blockers, all seven venue camera tables (201
+records and 191,626 emitted keyframes), all seven venue scripts, all 33 venue
+assets, and all 28 placement audit rows.
 
 The recursive animation closure fixed a corpus-wide omission rather than
 special-casing assets. The two source instances are:
@@ -1063,6 +1074,27 @@ events, whereas stock GH2 normally drives facial bones through
 builds a native Morph/event graph instead of pretending the stock FaceFx input
 registers are Morph outputs.
 
+The pose meshes also retain a source ownership distinction that is easy to
+lose during packaging. In GH1 they live in a separate face `RndDir`; they are
+geometry donors referenced by `Morph`, but they are not members of the
+character model's drawable LOD closure. Their local `RndDrawable::showing`
+value therefore does not make them visible beside the live model. Combining
+the face directory with a GH2 character package changes that ownership
+boundary: leaving the donor bit untouched caused every facial pose—including
+an alternate teeth pose—to render simultaneously on Johnny Napalm.
+
+`merge_face_model` now preserves every donor mesh and Morph reference while
+serializing all merged face-pose donors with `showing=false`. This is a format
+rule for every GH1 face package, not a Johnny/teeth name check or transform
+offset. The focused merger test requires both reference and expression donors
+to remain present and hidden. In the regenerated Johnny package the native
+inventory changes from 158/158 showing meshes to 138/158: exactly the twenty
+face donors cease drawing while the authored live head and teeth remain.
+The full conversion sweep still passes 105/105 assets, 926/926 animation
+clips, and 13/13 character packages with zero blocked rows. Native before/after
+images, logs, source inspection, and the regenerated-package audit are under
+`proofs/gh1-punk-face-fix/`.
+
 The runtime Morph reader now accepts both source revision 3 and target revision
 4. Revision 4 consumes the native Hmx::Object base and revision-4 Animatable
 frame/rate fields before the same pose/key payload. A converted Small Club
@@ -1378,13 +1410,16 @@ the source `camera.dtb` is not shipped beside those objects. Native CamShots
 are authoritative at runtime, with the old DTB reader retained only as a
 legacy fallback when no native camera keys exist.
 
-The normal single-player subject is exact retail behavior, not an inferred
-body anchor. `VenueCam::Update` at `SLUS-21224:0x0016E080` selects
-ArenaSinger slot zero (the player guitarist), and the selected ArenaSinger
-virtual at `0x0018D3C0` looks up `bone_head.mesh` before returning its world
-transform. Conversion therefore emits
-`guitarist0:bone_head.mesh`; `singer_in/out` remain historical framing-field
-names and do not select the vocalist.
+The default single-player target-position resolver at
+`SLUS-21224:0x0016E080` selects ArenaSinger slot zero (the player guitarist);
+its virtual at `0x0018D3C0` looks up `bone_head.mesh`. This function was
+previously mislabeled as the complete camera update. The 2026-09-03 audit
+found that `arena/gen/cam_paths.dtb` overrides parent and target per path.
+The converter now consumes that source policy instead of emitting one blanket
+pair. Explicit stage/singer/guitar-neck refs and default translation-only
+player-head parents are distinct. Conditional guitar-reference fallbacks are
+retained in TypeProps for runtime resolution against the actual character.
+`singer_in/out` are historical framing-field names, not vocalist selection.
 
 CamShot `ObjectFields` use the real HMX `TypeProps` wire contract recovered
 from `TypeProps.cpp`: one flat DataArray whose roots alternate

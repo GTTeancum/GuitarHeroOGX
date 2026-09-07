@@ -39,6 +39,14 @@ struct CharacterVariant {
   std::string fret_anim_path;
   std::string highway_surface_path;
   std::string portrait_path;
+  // Optional source-authored instrument fallback used only when the player
+  // has not selected an instrument. Add-on packages may also name its finish
+  // and authored paint indices; unavailable DLC instruments fall back to the
+  // normal first-guitar behavior.
+  Symbol preferred_guitar;
+  Symbol preferred_guitar_skin;
+  int preferred_guitar_paint_primary = -1;
+  int preferred_guitar_paint_secondary = -1;
   // Optional model whose animation/controller graph drives this outfit.
   // This is the general cross-skeleton retarget contract used by external
   // characters as well as the two singer-as-guitarist variants.
@@ -127,6 +135,7 @@ class ConfigDb {
   std::vector<Symbol> venues() const;
   std::size_t venue_count() const;
   bool is_venue(Symbol venue) const;
+  std::string venue_label(Symbol venue) const;
   int venue_index(Symbol venue) const;  // zero-based, -1 when absent
   Symbol default_venue() const;
   std::vector<Symbol> campaign_songs(Symbol venue) const;
@@ -179,6 +188,7 @@ class ConfigDb {
   std::vector<Symbol> native_character_outfits_;
   std::vector<CharacterVariant> character_variants_;
   std::vector<Symbol> addon_venues_;
+  std::vector<std::pair<Symbol, std::string>> addon_venue_labels_;
   std::vector<Symbol> addon_quickplay_songs_;
   std::vector<DlcSetlist> addon_setlists_;
   std::vector<DlcPackageSummary> dlc_packages_;

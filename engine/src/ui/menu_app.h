@@ -54,6 +54,9 @@ inline std::array<float, 9> source_charsys_external_door_rotation(
 }
 
 struct MenuRunOptions {
+  // Developer proof hook.  Uses the normal ScreenManager transition into the
+  // named stock screen after init.dtb has booted; it never fabricates a panel.
+  std::string start_screen;
   // Menu navigation stays human-driven.  This flag affects only the in-song
   // controller so the normal front-end flow can be exercised hands-free.
   bool gameplay_autoplay = false;

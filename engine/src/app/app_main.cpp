@@ -606,7 +606,8 @@ class AppEngine : public ghogx::Engine {
                 .count();
       }
       const auto hud_start = std::chrono::steady_clock::now();
-      song_intro_overlay_.draw(gameplay_.song_time());
+      if (std::getenv("GHOGX_HIDE_SONG_INTRO_OVERLAY") == nullptr)
+        song_intro_overlay_.draw(gameplay_.intro_presentation_time());
       if (!diagnostic_hide_hud_enabled()) {
         draw_gameplay_hud();
         if (state_ == AppState::Failed) {
@@ -3215,6 +3216,7 @@ int main(int argc, char** argv) {
   const bool argument_free_launch = argc == 1;
   int max_frames = 0;
   std::string ark_dir;
+  std::string addons_dir;
   std::string explicit_hdr;
   std::string explicit_ark;
   std::string content_hdr;
@@ -3242,6 +3244,7 @@ int main(int argc, char** argv) {
   HudTestOptions hud_test_options;
   bool hud_options_requested = false;
   bool menu_mode = false;  // --menu: the windowed menu system
+  std::string menu_hook;
   std::string song_name = "shoutatthedevil";
   int difficulty = 0;  // Easy
   bool auto_start = false;  // skip splash/title, load song immediately
@@ -3292,6 +3295,8 @@ int main(int argc, char** argv) {
       max_frames = std::atoi(argv[++i]);
     } else if (std::strcmp(argv[i], "--ark-dir") == 0 && i + 1 < argc) {
       ark_dir = argv[++i];
+    } else if (std::strcmp(argv[i], "--addons-dir") == 0 && i + 1 < argc) {
+      addons_dir = argv[++i];
     } else if (std::strcmp(argv[i], "--hdr") == 0 && i + 1 < argc) {
       explicit_hdr = argv[++i];
     } else if (std::strcmp(argv[i], "--ark") == 0 && i + 1 < argc) {
@@ -3334,6 +3339,9 @@ int main(int argc, char** argv) {
     } else if (std::strcmp(argv[i], "--hud-ref-highway") == 0) {
       hud_test_options.ref_highway = true;
     } else if (std::strcmp(argv[i], "--menu") == 0) {
+      menu_mode = true;
+    } else if (std::strcmp(argv[i], "--manageband") == 0) {
+      menu_hook = "manage-band";
       menu_mode = true;
     } else if (std::strcmp(argv[i], "--song") == 0 && i + 1 < argc) {
       song_name = argv[++i];
@@ -3671,6 +3679,20 @@ int main(int argc, char** argv) {
   std::fprintf(stderr, "[ghogx] render size: %dx%d\n",
                render_size.width, render_size.height);
 
+  // RndCam::UpdateLocal and the venue renderer consume one output-aspect
+  // value in retail. Publish the actual backbuffer ratio through the existing
+  // renderer contract so CamShot BuildTransform uses the identical ratio.
+  char camera_aspect_value[32] = {};
+  const double camera_aspect =
+      render_size.height > 0
+          ? static_cast<double>(render_size.width) /
+                static_cast<double>(render_size.height)
+          : 16.0 / 9.0;
+  std::snprintf(camera_aspect_value, sizeof(camera_aspect_value), "%.9g",
+                camera_aspect);
+  _putenv_s("GHOGX_CAMERA_ASPECT", camera_aspect_value);
+  std::fprintf(stderr, "[ghogx] camera aspect: %s\n", camera_aspect_value);
+
   if ((capture_enabled && !show_window) || defer_window_show) {
     _putenv_s("GHOGX_HIDE_WINDOW", "1");
   }
@@ -3726,6 +3748,23 @@ int main(int argc, char** argv) {
       return 2;
     }
   }
+  if (!addons_dir.empty()) {
+    const fs::path requested =
+        fs::absolute(fs::path(addons_dir)).lexically_normal();
+    std::error_code addon_error;
+    if (!fs::is_directory(requested, addon_error) || addon_error) {
+      std::fprintf(stderr, "[ghogx] --addons-dir is not a directory: %s\n",
+                   requested.string().c_str());
+      return 2;
+    }
+#ifdef _WIN32
+    _putenv_s("GHOGX_ADDONS_DIR", requested.string().c_str());
+#else
+    setenv("GHOGX_ADDONS_DIR", requested.string().c_str(), 1);
+#endif
+    std::fprintf(stderr, "[ghogx] DLC directory: %s\n",
+                 requested.string().c_str());
+  }
   const auto auxiliary_asset_archives = discover_auxiliary_asset_archives(
       hdr, ark, content_hdr, content_ark);
   const auto direct_load_dlc_db =
@@ -3755,6 +3794,11 @@ int main(int argc, char** argv) {
       return 2;
     }
     menu_options.gameplay_autoplay = diagnostic_autoplay;
+    if (!menu_hook.empty()) {
+      if (menu_hook == "manage-band" || menu_hook == "manage_band")
+        menu_options.start_screen = "manage_band_screen";
+      else return 2;
+    }
     menu_options.gameplay_front_camera_role = diagnostic_front_camera;
     menu_options.gameplay_proof_lighting = diagnostic_unlit_performers;
     menu_options.automate_full_loop = env_flag("GHOGX_MENU_AUTO_LOOP");

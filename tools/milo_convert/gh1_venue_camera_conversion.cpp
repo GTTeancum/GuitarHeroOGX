@@ -30,6 +30,16 @@ constexpr double kScreenTolerance = 1.0e-6;
 constexpr double kFovTolerance = 1.0e-7;
 constexpr unsigned kMaximumSubdivisionDepth = 20;
 
+float gh1_horizontal_to_gh2_vertical_fov(float horizontal) {
+    // GH1 SLUS_212.24 UpdateLocal 0x1B1FBC..0x1B2004:
+    // mxx=1/tan(fov/2), mzx=-1/(tan(fov/2)*YRatio).
+    // GH2 SLUS_214.47 0x1B2054..0x1B2094 instead has
+    // mxx=YRatio/tan(fov/2), mzx=-1/tan(fov/2).
+    // Preserve GH1's authored 4:3 framing as GH2 vertical FOV. The source
+    // savestate's 45-degree GH1 camera confirms mxx=2.414214, mzx=-3.218952.
+    return 2.0f * std::atan(std::tan(horizontal * 0.5f) * 0.75f);
+}
+
 struct CameraRecord {
     std::string category;
     std::string path;
@@ -62,11 +72,26 @@ struct CameraRecord {
 };
 
 struct CurveState {
+    std::array<float, 3> helper_shake{};
     std::array<float, 3> position{};
     std::array<float, 4> rotation = {0.0f, 0.0f, 0.0f, 1.0f};
     bool has_rotation = false;
     std::array<float, 2> screen{};
     float fov = 0.872664626f;
+};
+
+struct CameraReferencePolicy {
+    gh::milo_object::CamShotSubPart20 ref{0, "guitarist0", "bone_head.mesh"};
+    std::string fallback;
+    bool helper = true;
+};
+
+struct CameraPathPolicy {
+    CameraReferencePolicy target;
+    CameraReferencePolicy parent;
+    // The default GH1 helper is translated to ArenaSinger's head, not rotated
+    // with that bone. Explicit cam_paths parents use their full WorldXfm.
+    bool parent_rotation = false;
 };
 
 std::optional<float> number(const NodePtr& node) {
@@ -79,6 +104,68 @@ std::optional<float> number(const NodePtr& node) {
 
 std::string text(const NodePtr& node) {
     return node ? gh::dtb::as_string(*node).value_or("") : std::string{};
+}
+
+gh::milo_object::CamShotSubPart20 split_reference(const std::string& value) {
+    const auto split = value.find("::");
+    if (split == std::string::npos || split == 0 || split + 2 == value.size())
+        throw std::runtime_error("GH1 camera policy: invalid reference " + value);
+    return {0, value.substr(0, split), value.substr(split + 2)};
+}
+
+CameraReferencePolicy parse_reference_policy(const NodePtr& node) {
+    CameraReferencePolicy policy;
+    policy.helper = false;
+    if (const std::string value = text(node); !value.empty()) {
+        policy.ref = split_reference(value);
+        return policy;
+    }
+    if (node && gh::dtb::is_array(*node)) {
+        const auto& expression = gh::dtb::children(*node);
+        if (expression.size() == 4 && text(expression[0]) == "if_else" &&
+            expression[1] && gh::dtb::is_array(*expression[1])) {
+            const auto& condition = gh::dtb::children(*expression[1]);
+            const auto primary = text(expression[2]);
+            if (condition.size() == 2 && text(condition[0]) == "exists" &&
+                text(condition[1]) == primary && !primary.empty()) {
+                policy.ref = split_reference(primary);
+                policy.fallback = text(expression[3]);
+                (void)split_reference(policy.fallback);
+                return policy;
+            }
+        }
+    }
+    throw std::runtime_error("GH1 camera policy: unsupported reference expression");
+}
+
+std::map<std::string, CameraPathPolicy> parse_path_policies(
+    const std::vector<uint8_t>& bytes) {
+    const auto tree = gh::dtb::parse(bytes);
+    std::map<std::string, CameraPathPolicy> policies;
+    for (const auto& node : tree.root) {
+        if (!node || !gh::dtb::is_array(*node))
+            throw std::runtime_error("GH1 camera policy: expected path row");
+        const auto& row = gh::dtb::children(*node);
+        if (row.empty() || text(row[0]).empty())
+            throw std::runtime_error("GH1 camera policy: unnamed path");
+        CameraPathPolicy policy;
+        for (size_t i = 1; i < row.size(); ++i) {
+            if (!row[i] || !gh::dtb::is_array(*row[i]))
+                throw std::runtime_error("GH1 camera policy: expected property");
+            const auto& property = gh::dtb::children(*row[i]);
+            if (property.size() != 2)
+                throw std::runtime_error("GH1 camera policy: invalid property");
+            const auto name = text(property[0]);
+            if (name == "target") policy.target = parse_reference_policy(property[1]);
+            else if (name == "parent") {
+                policy.parent = parse_reference_policy(property[1]);
+                policy.parent_rotation = true;
+            } else throw std::runtime_error("GH1 camera policy: unknown property " + name);
+        }
+        if (!policies.emplace(text(row[0]), std::move(policy)).second)
+            throw std::runtime_error("GH1 camera policy: duplicate path " + text(row[0]));
+    }
+    return policies;
 }
 
 std::optional<CameraRecord> parse_record(
@@ -385,6 +472,18 @@ std::array<float, 4> sample_rotation(
     return normalize_quaternion(out);
 }
 
+std::array<float, 9> quaternion_matrix(const std::array<float, 4>& quaternion);
+
+std::array<float, 4> multiply_quaternions(
+    const std::array<float, 4>& a, const std::array<float, 4>& b) {
+    return normalize_quaternion({
+        a[3]*b[0] + a[0]*b[3] + a[1]*b[2] - a[2]*b[1],
+        a[3]*b[1] - a[0]*b[2] + a[1]*b[3] + a[2]*b[0],
+        a[3]*b[2] + a[0]*b[1] - a[1]*b[0] + a[2]*b[3],
+        a[3]*b[3] - a[0]*b[0] - a[1]*b[1] - a[2]*b[2],
+    });
+}
+
 float ease(float t, float severity) {
     t = std::clamp(t, 0.0f, 1.0f);
     if (!std::isfinite(severity) || severity == 0.0f) return t;
@@ -433,6 +532,8 @@ CurveState evaluate(
                   0.0f, 1.0f);
     CurveState state;
     state.position = sample_translation(animation, source_frame);
+    state.rotation = sample_rotation(animation, source_frame);
+    state.has_rotation = !animation.rotation_keys.empty();
     for (size_t axis = 0; axis < 3; ++axis) {
         state.position[axis] +=
             record.offset_in[axis] +
@@ -440,13 +541,23 @@ CurveState evaluate(
                 framing_progress;
     }
     if (shake_animation) {
+        // SLUS_212.24:16E804 calls Multiply(shake, path, path).
+        // 24B608..24B660 uses row transforms: shake translation is rotated
+        // by the path basis before adding path translation. Offsets are
+        // added afterward, not rotated by the shake. Preserve shake rotation
+        // even when the path itself has no rotation keys.
         const auto shake =
             sample_translation(*shake_animation, elapsed_source_units);
-        for (size_t axis = 0; axis < 3; ++axis)
-            state.position[axis] += shake[axis];
+        state.helper_shake = shake;
+        const auto path_basis = quaternion_matrix(state.rotation);
+        for (size_t axis = 0; axis < 3; ++axis) {
+            for (size_t row = 0; row < 3; ++row)
+                state.position[axis] += shake[row] * path_basis[row * 3 + axis];
+        }
+        state.rotation = multiply_quaternions(
+            sample_rotation(*shake_animation, elapsed_source_units), state.rotation);
+        state.has_rotation = state.has_rotation || !shake_animation->rotation_keys.empty();
     }
-    state.rotation = sample_rotation(animation, source_frame);
-    state.has_rotation = !animation.rotation_keys.empty();
     const float singer_x =
         record.singer_in[0] +
         (record.singer_out[0] - record.singer_in[0]) *
@@ -461,10 +572,11 @@ CurveState evaluate(
     // ((u - 0.5) * 2, (v - 0.5) * -2), exactly inverting GH1's
     // ((x + 1) / 2, (1 - y) / 2) viewport mapping.
     state.screen = {singer_x, singer_y};
-    state.fov =
+    const float horizontal_fov =
         (record.fov_in +
          (record.fov_out - record.fov_in) * framing_progress) *
         0.01745329251994329577f;
+    state.fov = gh1_horizontal_to_gh2_vertical_fov(horizontal_fov);
     return state;
 }
 
@@ -573,13 +685,26 @@ std::array<float, 9> quaternion_matrix(
 
 gh::milo_object::CamShot20 compile_record(
     const CameraRecord& record,
+    const CameraPathPolicy& policy,
     const gh::milo_object::TransAnim6& animation,
     const gh::milo_object::TransAnim6* shake_animation,
-    Gh2VenueCameraConversion& metrics) {
+    Gh2VenueCameraConversion& metrics, std::optional<float> helper_filter) {
     gh::milo_object::CamShot20 shot;
     shot.object_fields.type = "gh1_venue_camera";
     shot.object_fields.has_type_properties = true;
     auto& properties = shot.object_fields.type_properties;
+    append_symbol_property(properties, "gh1_fov_space", "gh2_vertical");
+    if (helper_filter) {
+        append_float_property(properties, "gh1_helper_filter", *helper_filter);
+        append_integer_property(properties, "gh1_helper_target", policy.target.helper);
+        append_integer_property(properties, "gh1_helper_parent", policy.parent.helper);
+    }
+    // Preserve source exists/else decisions until the live character and
+    // instrument are known. Do not freeze these to the converter's roster.
+    if (!policy.target.fallback.empty())
+        append_symbol_property(properties, "gh1_camera_target_fallback", policy.target.fallback);
+    if (!policy.parent.fallback.empty())
+        append_symbol_property(properties, "gh1_camera_parent_fallback", policy.parent.fallback);
     append_integer_property(
         properties, "hide_crowd", record.hide_crowd);
     append_integer_property(properties, "walk_ok", record.walk_ok);
@@ -621,9 +746,14 @@ gh::milo_object::CamShot20 compile_record(
     shot.near_plane = record.near_plane;
     shot.far_plane = record.far_plane;
     shot.use_depth_of_field = record.enable_dof;
-    shot.filter = 1.0f;
+    shot.filter = helper_filter ? 0.0f : 1.0f;
     shot.clamp_height = -1.0f;
     shot.category = record.category;
+    // GH2 Load2650A8 reads this float into the selection weight (+44), not a
+    // frame number. GH1 switch_cam records have no individual weight, so each
+    // converted entry contributes one equal unit to the GH2 category pool.
+    // Zero is not neutral: it makes RandomFloat(0,total) degenerate.
+    shot.legacy_category_frame = 1.0f;
     shot.looping = false;
 
     std::map<float, CurveState> samples;
@@ -724,6 +854,7 @@ gh::milo_object::CamShot20 compile_record(
                     (static_cast<double>(a.fov) + b.fov) * 0.5);
                 if (depth >= kMaximumSubdivisionDepth ||
                     (position_error <= kPositionTolerance &&
+                     vector_error(middle.helper_shake, a.helper_shake, b.helper_shake) <= kPositionTolerance &&
                      rotation_error <= kRotationTolerance &&
                      screen_error <= kScreenTolerance &&
                      fov_error <= kFovTolerance)) {
@@ -777,9 +908,22 @@ gh::milo_object::CamShot20 compile_record(
         throw std::runtime_error(
             "GH1 VenueCam: adaptive CamShot exceeds 65535 keyframes");
     shot.keyframes.reserve(ordered.size());
+    gh::milo_object::TypePropertyNode helper_shake_keys;
+    helper_shake_keys.type = 0x10;
     for (size_t i = 0; i < ordered.size(); ++i) {
         const float time = ordered[i].first;
         const CurveState& state = ordered[i].second;
+        if (helper_filter && record.shaky) {
+            gh::milo_object::TypePropertyNode sample;
+            sample.type = 0x10;
+            for (float value : state.helper_shake) {
+                gh::milo_object::TypePropertyNode axis;
+                axis.type = 0x01;
+                axis.floating = value;
+                sample.children.push_back(std::move(axis));
+            }
+            helper_shake_keys.children.push_back(std::move(sample));
+        }
         gh::milo_object::CamShotFrame20 frame;
         frame.duration = 0.0f;
         frame.blend =
@@ -794,19 +938,17 @@ gh::milo_object::CamShot20 compile_record(
             frame.world_offset[9 + axis] = state.position[axis];
         frame.screen_offset = state.screen;
         frame.blur_depth = 0.5f;
-        // GH1 VenueCam does not resolve the misleadingly named
-        // singer_in/singer_out coordinates against the band vocalist.
-        // VenueCam::Update (SLUS-21224 0x0016E080) selects an ArenaSinger
-        // entry through the record's target index; the normal single-player
-        // path uses slot zero, which is the player guitarist.  The selected
-        // ArenaSinger virtual at 0x0018D3C0 resolves bone_head.mesh and
-        // returns that transform's world matrix. Keep that exact source
-        // subject when materializing the native GH2 CamShot.
-        frame.targets.push_back(
-            {0, "guitarist0", "bone_head.mesh"});
-        frame.parent = {0, "arena", "venue.view"};
-        frame.use_parent_rotation = true;
+        // SwitchCam 0x16fbc8..0x16fcc4 resolves arena/cam_paths by path name.
+        // 0x16e080 resolves only the default ArenaSinger helper position;
+        // it is not the complete camera-update routine.
+        frame.targets.push_back(policy.target.ref);
+        frame.parent = policy.parent.ref;
+        frame.use_parent_rotation = policy.parent_rotation;
         shot.keyframes.push_back(std::move(frame));
+    }
+    if (helper_filter && record.shaky) {
+        append_property_key(properties, "gh1_helper_shake_keys");
+        properties.push_back(std::move(helper_shake_keys));
     }
     return shot;
 }
@@ -824,15 +966,90 @@ gh::milo::Entry make_entry(
 
 }  // namespace
 
+float gh1_camera_helper_filter_from_game_config(const std::vector<uint8_t>& bytes) {
+    const auto tree = gh::dtb::parse(bytes);
+    for (const auto& node : tree.root) {
+        if (!node || !gh::dtb::is_array(*node)) continue;
+        const auto& row = gh::dtb::children(*node);
+        if (row.empty() || text(row[0]) != "arena") continue;
+        for (size_t i = 1; i < row.size(); ++i) {
+            if (!row[i] || !gh::dtb::is_array(*row[i])) continue;
+            const auto& field = gh::dtb::children(*row[i]);
+            if (field.size() != 2 || text(field[0]) != "cam_filter") continue;
+            const auto value = number(field[1]);
+            if (!value || !std::isfinite(*value))
+                throw std::runtime_error("Invalid GH1 arena cam_filter");
+            return *value;
+        }
+    }
+    throw std::runtime_error("GH1 game config has no explicit arena cam_filter; resolve source merge before compiling");
+}
+
+Gh2VenueCameraConversion rebind_gh1_venue_camera_paths(
+    const std::vector<uint8_t>& camera_paths_dtb,
+    const gh::milo::Directory& converted_main_directory) {
+    Gh2VenueCameraConversion result;
+    result.main_directory = converted_main_directory;
+    const auto policies = parse_path_policies(camera_paths_dtb);
+    for (auto& entry : result.main_directory.entries) {
+        if (entry.type != "CamShot") continue;
+        auto shot = gh::milo_object::parse_cam_shot20(entry.body_bytes);
+        if (shot.object_fields.type != "gh1_venue_camera") continue;
+        auto& properties = shot.object_fields.type_properties;
+        std::string path;
+        std::string fov_space;
+        for (size_t i = 0; i + 1 < properties.size(); i += 2) {
+            if (properties[i].symbol == "gh1_source_path") path = properties[i + 1].symbol;
+            if (properties[i].symbol == "gh1_fov_space") fov_space = properties[i + 1].symbol;
+        }
+        if (!fov_space.empty() && fov_space != "gh2_vertical")
+            throw std::runtime_error("Unsupported converted GH1 FOV space: " + fov_space);
+        if (fov_space.empty()) {
+            for (auto& frame : shot.keyframes)
+                frame.field_of_view = gh1_horizontal_to_gh2_vertical_fov(frame.field_of_view);
+            append_symbol_property(properties, "gh1_fov_space", "gh2_vertical");
+        }
+        if (path.size() >= 4 && path.substr(path.size() - 4) == ".tnm") path.resize(path.size() - 4);
+        const auto found = policies.find(path);
+        if (found == policies.end())
+            throw std::runtime_error("GH1 camera policy: missing path " + path);
+        const auto& policy = found->second;
+        // Remove old lowered conditions so this operation is idempotent.
+        for (size_t i = 0; i + 1 < properties.size();) {
+            if (properties[i].symbol == "gh1_camera_target_fallback" ||
+                properties[i].symbol == "gh1_camera_parent_fallback")
+                properties.erase(properties.begin() + i, properties.begin() + i + 2);
+            else i += 2;
+        }
+        if (!policy.target.fallback.empty())
+            append_symbol_property(properties, "gh1_camera_target_fallback", policy.target.fallback);
+        if (!policy.parent.fallback.empty())
+            append_symbol_property(properties, "gh1_camera_parent_fallback", policy.parent.fallback);
+        for (auto& frame : shot.keyframes) {
+            frame.targets = {policy.target.ref};
+            frame.parent = policy.parent.ref;
+            frame.use_parent_rotation = policy.parent_rotation;
+        }
+        result.keyframes += shot.keyframes.size();
+        ++result.records;
+        entry.body_bytes = gh::milo_object::serialize_cam_shot20(shot);
+        entry.size = entry.body_bytes.size();
+    }
+    if (!result.records) throw std::runtime_error("No converted GH1 cameras to rebind");
+    return result;
+}
+
 Gh2VenueCameraConversion convert_gh1_venue_cameras_to_gh2_camshots(
     const std::vector<uint8_t>& camera_dtb,
+    const std::vector<uint8_t>& camera_paths_dtb,
     const gh::milo::Directory& converted_main_directory,
     const gh::milo::Directory& converted_campaths_directory,
     const std::map<std::string, gh::milo_object::TransAnim6>&
-        shared_animations) {
+        shared_animations, std::optional<float> helper_filter) {
     Gh2VenueCameraConversion result;
     result.main_directory = converted_main_directory;
     const auto records = parse_records(camera_dtb);
+    const auto policies = parse_path_policies(camera_paths_dtb);
     std::map<std::string, gh::milo_object::TransAnim6> animations;
     for (const auto& entry : converted_campaths_directory.entries) {
         if (entry.type != "TransAnim") continue;
@@ -844,6 +1061,9 @@ Gh2VenueCameraConversion convert_gh1_venue_cameras_to_gh2_camshots(
     for (const auto& entry : result.main_directory.entries)
         target_names.insert(entry.name);
     for (const auto& record : records) {
+        const auto policy = policies.find(record.path);
+        if (policy == policies.end())
+            throw std::runtime_error("GH1 camera policy: missing path " + record.path);
         if (!target_names.insert(record.name).second)
             throw std::runtime_error(
                 "GH1 VenueCam: CamShot name collides: " + record.name);
@@ -869,7 +1089,7 @@ Gh2VenueCameraConversion convert_gh1_venue_cameras_to_gh2_camshots(
         }
         const auto shot =
             compile_record(
-                record, animation, shake_animation, result);
+                record, policy->second, animation, shake_animation, result, helper_filter);
         result.keyframes += shot.keyframes.size();
         result.main_directory.entries.push_back(
             make_entry(

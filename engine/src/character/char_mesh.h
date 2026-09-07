@@ -6766,6 +6766,10 @@ struct Character {
   bool root_self_shadow = false;
   std::string root_sphere_base;
   std::string root_environment;
+  // Character is itself a RndTransformable. CharServoBone owns this LOCAL
+  // transform; it must never receive the renderer's composed stage/world row.
+  // Keep the stored world and parent/constraint metadata separately.
+  milo_scene::TransObj root_transform;
 
   std::vector<SkinnedMesh> meshes;
   std::vector<milo_scene::TransObj> bones;  // skeleton (Trans "bone_*"/"spot_*")

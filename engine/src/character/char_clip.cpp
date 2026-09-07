@@ -35,6 +35,7 @@
 // .rotx=3 .roty=4 .rotz=5, matching ihatecompvir CharBones::Type.
 
 #include "character/char_clip.h"
+#include "character/char_bones_output.h"
 
 #include "ark_v3.h"
 #include "milo.h"
@@ -2895,8 +2896,12 @@ std::vector<std::vector<ClipChannel>> parse_all(
     const uint8_t* d, size_t n, int& num_samples_out,
     CharClip::RawChannelCounts* raw_channel_counts,
     size_t* sample_header_offset_out = nullptr,
-    size_t preferred_sample_header_offset = SIZE_MAX) {
+    size_t preferred_sample_header_offset = SIZE_MAX,
+    CharClip::Gh2FacingSamples* facing_samples = nullptr,
+    Gh2ClipPoseSamples* pose_samples = nullptr) {
   num_samples_out = 0;
+  if (facing_samples) *facing_samples = {};
+  if (pose_samples) *pose_samples = {};
   if (sample_header_offset_out) *sample_header_offset_out = SIZE_MAX;
   if (n < 4) return {};
   uint32_t samples_version = 0;
@@ -3032,9 +3037,27 @@ std::vector<std::vector<ClipChannel>> parse_all(
   // constant channels; repeat that single sample so every frame is a complete
   // pose instead of silently losing those channels after frame 0.
   size_t data = p;
+  std::size_t page_index = 0;
   for (auto& bl : lists) {
     int frames_here = bl.num_samples > 0 ? bl.num_samples : num_samples;
+    if (pose_samples) {
+      if (page_index >= pose_samples->pages.size())
+        throw std::runtime_error("GH2 pose sample page count mismatch");
+      auto& page = pose_samples->pages[page_index++];
+      page.sample_count = static_cast<std::size_t>(bl.num_samples);
+      page.compression = static_cast<std::uint32_t>(bl.compression);
+      for (std::size_t i = 0; i < bl.names.size(); ++i)
+        page.channels.push_back({bl.names[i], static_cast<Gh2BoneChannelType>(bl.cats[i])});
+      const std::size_t bytes = page.sample_count * bl.frame_bytes;
+      if (data > n || bytes > n-data)
+        throw std::runtime_error("truncated GH2 pose sample page");
+      page.disk_samples.assign(d + data, d + data + bytes);
+      page.validate();
+    }
     bool comp = bl.compression != 0;
+    // Channel() searches the full list before the one-sample list.
+    const bool collect_facing_pos = facing_samples && facing_samples->positions.empty();
+    const bool collect_facing_rot = facing_samples && facing_samples->rotations.empty();
     for (int f = 0; f < num_samples; ++f) {
       if (frames_here != 1 && f >= frames_here) break;
       int sample_idx = (frames_here == 1) ? 0 : f;
@@ -3071,6 +3094,10 @@ std::vector<std::vector<ClipChannel>> parse_all(
           default:
             break;
         }
+        if (f < frames_here && collect_facing_pos && bl.names[bi] == "bone_facing.pos")
+          facing_samples->positions.push_back({ch.pos[0], ch.pos[1], ch.pos[2]});
+        if (f < frames_here && collect_facing_rot && bl.names[bi] == "bone_facing.rotz")
+          facing_samples->rotations.push_back(ch.angle);
       }
     }
     data += (size_t)frames_here * bl.frame_bytes;
@@ -3309,6 +3336,8 @@ struct LoadedClipMilo {
   std::string resolved_path;
   std::vector<uint8_t> payload;
   gh::milo::Directory directory;
+  std::shared_ptr<const Gh2ClipSetBinding> gh2_binding;
+  std::string gh2_binding_error;
 };
 
 std::vector<uint8_t> read_binary_file(const std::string& path) {
@@ -3378,6 +3407,14 @@ std::shared_ptr<const LoadedClipMilo> load_clip_milo(
   const auto header = gh::milo::parse_header(bytes);
   loaded->payload = gh::milo::inflate_payload(bytes, header);
   loaded->directory = gh::milo::parse_directory(loaded->payload);
+  try {
+    loaded->gh2_binding = std::make_shared<const Gh2ClipSetBinding>(
+        decode_gh2_clip_set_binding(loaded->directory));
+  } catch (const std::exception& e) {
+    // Keep existing supported non-GH2 playback paths, but expose failure to
+    // allocation callers. Never convert a decode failure to move_self=false.
+    loaded->gh2_binding_error = e.what();
+  }
   {
     std::lock_guard<std::mutex> lock(loaded_clip_milo_cache_mutex());
     loaded_clip_milo_cache_key() = key;
@@ -4015,6 +4052,16 @@ static CharClip::OutputBone decode_output_bone(
   return out;
 }
 
+std::shared_ptr<const Gh2ClipSetBinding> load_gh2_clip_set_binding(
+    const std::string& hdr_path, const std::string& ark_path,
+    const std::string& milo_path) {
+  const auto loaded = load_clip_milo(hdr_path, ark_path, milo_path);
+  if (!loaded) throw std::runtime_error("cannot load clip set: " + milo_path);
+  if (!loaded->gh2_binding)
+    throw std::runtime_error(milo_path + ": " + loaded->gh2_binding_error);
+  return loaded->gh2_binding;
+}
+
 CharClip load_clip(const std::string& hdr_path, const std::string& ark_path,
                    const std::string& milo_path, const std::string& clip_name) {
   CharClip result;
@@ -4031,6 +4078,8 @@ CharClip load_clip(const std::string& hdr_path, const std::string& ark_path,
         load_clip_milo(hdr_path, ark_path, milo_path);
     if (!loaded) return result;
     result.source_milo_path = loaded->resolved_path;
+    result.gh2_binding = loaded->gh2_binding;
+    result.gh2_binding_error = loaded->gh2_binding_error;
     const auto& payload = loaded->payload;
     const auto& dir = loaded->directory;
 
@@ -4083,10 +4132,15 @@ CharClip load_clip(const std::string& hdr_path, const std::string& ark_path,
                      clip_name.c_str(), metadata.valid ? 1 : 0,
                      metadata.samples_offset, sz);
       }
+      result.gh2_facing_samples.emplace();
+      auto pose_samples = std::make_shared<Gh2ClipPoseSamples>();
+      result.gh2_pose_samples = pose_samples;
       result.frames = parse_all(body, sz, ns, &result.raw_channel_counts,
                                 &sample_header_offset,
                                 metadata.valid ? metadata.samples_offset
-                                               : SIZE_MAX);
+                                               : SIZE_MAX,
+                                &*result.gh2_facing_samples,
+                                pose_samples.get());
       result.fps = 30;  // CharClipSamples are authored at 30 fps; refine if needed.
       result.start_frame = 0.0f;
       result.end_frame = result.frames.empty()
@@ -13397,6 +13451,8 @@ void dump_lane_mixer_layers(const std::vector<ClipChannelLayer>& layers) {
 
 std::optional<SourceCharUtlClipPredictFrame>
 source_char_clip_facing_sample_at_beat(const CharClip& clip, float beat) {
+  if (clip.gh2_facing_samples)
+    return source_gh2_char_clip_facing_sample_at_beat(clip, beat);
   if (clip.frames.empty() || clip.fps <= 0 ||
       clip.beats_per_second <= 0.0f) {
     return std::nullopt;
@@ -13405,6 +13461,84 @@ source_char_clip_facing_sample_at_beat(const CharClip& clip, float beat) {
       (beat - clip.start_beat) *
       static_cast<float>(clip.fps) / clip.beats_per_second;
   return source_char_walk_facing_sample(interpolate_frame(clip, frame));
+}
+
+std::optional<SourceCharUtlClipPredictFrame>
+source_gh2_char_clip_facing_sample_at_beat(const CharClip& clip, float beat) {
+  if (!clip.gh2_facing_samples) return std::nullopt;
+  const auto& samples = *clip.gh2_facing_samples;
+  if (samples.positions.empty() || samples.rotations.empty()) return std::nullopt;
+  // CharClipSamples::EvaluateChannel 0x16B128 normalizes the authored beat
+  // interval, independent of fps/bps. Degenerate intervals are not a valid
+  // predict input; do not invent the one-beat fallback used by ScaleAdd.
+  const float span = clip.end_beat - clip.start_beat;
+  if (!(span > 0.0f) || !std::isfinite(span) || !std::isfinite(beat))
+    throw std::runtime_error("GH2 EvaluateChannel: invalid facing beat interval");
+  const float normalized = std::clamp((beat - clip.start_beat) / span, 0.0f, 1.0f);
+  struct Index { size_t first, second; float fraction; };
+  const auto index = [normalized](size_t count, bool interpolate) -> Index {
+    // CharBonesSamples::FracToSample 0x1937F0, including one-sample and
+    // interpolation-disabled nearest-sample branches.
+    const float frame = normalized * static_cast<float>(count - 1);
+    const size_t first = std::min(static_cast<size_t>(frame + (interpolate ? 0.0f : .5f)), count - 1);
+    const size_t second = interpolate ? std::min(first + 1, count - 1) : first;
+    return {first, second, second == first ? 0.0f : frame - static_cast<float>(first)};
+  };
+  const auto p = index(samples.positions.size(), samples.interpolate_position);
+  const auto r = index(samples.rotations.size(), samples.interpolate_rotation);
+  SourceCharUtlClipPredictFrame result;
+  for (size_t i = 0; i < 3; ++i)
+    result.facing_pos[i] = samples.positions[p.second][i] * p.fraction +
+        samples.positions[p.first][i] * (1.0f - p.fraction);
+  // EvaluateChannel interpolates scalar values, not shortest-path angles.
+  // ClipPredict wraps the difference AFTER evaluating the two endpoints.
+  result.facing_rot = samples.rotations[r.first] +
+      (samples.rotations[r.second] - samples.rotations[r.first]) * r.fraction;
+  return result;
+}
+
+SourceCharFacingDelta source_char_clip_facing_delta_at_beat(
+    const CharClip& clip, float weight, float beat, float d_beat) {
+  SourceCharFacingDelta result;
+  if (clip.frames.empty() || weight == 0.0f) return result;
+  // GH2 PS2 CharClipSamples::ScaleAdd (16B2F0) normalizes beats; its
+  // FacingBones::ScaleAdd (16AB88) independently clamps both endpoints.
+  const float span = clip.end_beat == clip.start_beat
+                         ? 1.0f : clip.end_beat - clip.start_beat;
+  const float current = (beat - clip.start_beat) / span;
+  const float previous = current - d_beat / span;
+  const float last = static_cast<float>(clip.frames.size() - 1);
+  const auto first = interpolate_frame(
+      clip, std::clamp(previous, 0.0f, 1.0f) * last);
+  const auto second = interpolate_frame(
+      clip, std::clamp(current, 0.0f, 1.0f) * last);
+  const auto a = source_char_walk_facing_sample(first);
+  const auto b = source_char_walk_facing_sample(second);
+  // The source checks the facing-position allocation before doing any work.
+  if (!a || !b) return result;
+  result.has_position = true;
+  for (const auto& channel : first) {
+    if ((channel.bone_name == "bone_facing" ||
+         channel.bone_name == "bone_facing.mesh") &&
+        channel.type == ClipChannel::kRotZ) {
+      result.has_rotation = true;
+      break;
+    }
+  }
+  for (size_t axis = 0; axis < 3; ++axis) {
+    result.position[axis] = b->facing_pos[axis] - a->facing_pos[axis];
+  }
+  if (result.has_rotation) {
+    constexpr float pi = 3.14159265358979323846f;
+    const float wrapped = std::fmod(b->facing_rot - a->facing_rot + pi,
+                                    2.0f * pi);
+    result.rotation = weight * (wrapped < 0.0f ? wrapped + pi : wrapped - pi);
+    // Delta translation is in the previous facing frame, not character-world
+    // space. MoveToDeltaFacing subsequently multiplies it by the owner basis.
+    source_rotate_about_z_vec(result.position.data(), -a->facing_rot);
+  }
+  for (float& component : result.position) component *= weight;
+  return result;
 }
 
 std::optional<float> source_charwalk_find_stop_start_beat(
@@ -14375,6 +14509,11 @@ const CharClip* CharClipPlayer::source_first_playing_clip() const {
   return nullptr;
 }
 
+SourceCharServoTransition CharClipPlayer::source_regulation_transition() const {
+  if (layers_.size() < 2) return {};
+  return {layers_[0].clip, layers_[0].beat, layers_[1].ramp_in};
+}
+
 uint32_t CharClipPlayer::source_first_playing_flags() const {
   const CharClip* clip = source_first_playing_clip();
   return clip ? clip->flags : 0u;
@@ -14814,6 +14953,37 @@ void CharClipPlayer::poll_source_scheduler(float frame) {
   }
 }
 
+void CharClipPlayer::accumulate_source_pose(SourceCharBonesMeshesOutput& output, float weight) {
+  if (layers_.empty()) return;
+  const auto eased = [](float fraction) {
+    return 0.5f-0.5f*std::sin(fraction*3.1415927410125732421875f+1.57079637050628662109375f);
+  };
+  // Advance 198E3C returns headEase+(1-headEase)*olderCoverage. CharDriver
+  // 171BFC scales ONLY the current clip's channels by 1-weight*coverage.
+  float coverage=0;
+  for (const auto& layer : layers_) {
+    if (!layer.clip || !layer.clip->gh2_pose_samples)
+      throw std::runtime_error("GH2 driver lacks original pose sample pages");
+    const float e=eased(layer.blend_fraction);
+    coverage=e+(1-e)*coverage;
+  }
+  output.scale_down_clip(*layers_.back().clip->gh2_pose_samples,1-weight*coverage);
+  // 198E78 recursively visits newest to oldest, without collapsing to two
+  // clips or normalizing away a still-unfilled part of the blend stack.
+  float remaining=weight;
+  for (auto it=layers_.rbegin(); it!=layers_.rend() && remaining != 0; ++it) {
+    auto& layer=*it;
+    const float contribution=remaining*eased(layer.blend_fraction);
+    layer.weight=contribution;
+    const auto& clip=*layer.clip;
+    const float span=clip.end_beat == clip.start_beat ? 1.0f : clip.end_beat-clip.start_beat;
+    const float now=(layer.beat-clip.start_beat)/span;
+    const float previous=now-layer.d_beat/span;
+    output.scale_add_clip(*clip.gh2_pose_samples,previous,now,contribution);
+    remaining -= contribution;
+  }
+}
+
 void CharClipPlayer::apply(Character& character, float weight) const {
   if (layers_.empty() || weight <= 0.0f) return;
   weight = std::clamp(weight, 0.0f, 1.0f);
@@ -14882,9 +15052,9 @@ std::vector<ClipChannelLayer> CharClipPlayer::sampled_pose_layers(
     return out;
   }
 
-  // CharBonesSamples::ScaleAddSample gives the adjacent-sample split inside a
-  // clip. CharClipDriver::ScaleAdd still lacks a reviewable statement body, so
-  // multi-node driver blends keep the existing collapsed diagnostic layer.
+  // Legacy compatibility publisher. The original GH2 stack transport is now
+  // implemented by accumulate_source_pose; this older API still returns a
+  // collapsed layer until its callers migrate to the persistent output owner.
   auto channels = sampled_pose();
   if (overlay_override) strip_overlay_lower_body_channels(channels);
   if (channels.empty()) return out;
@@ -14921,6 +15091,30 @@ std::vector<ClipChannelLayer> CharClipPlayer::sampled_pose_layers(
       std::move(channels), weight, clip ? &clip->output_bones : nullptr,
       debug_name, relative, overlay_override});
   return out;
+}
+
+SourceCharFacingDelta CharClipPlayer::source_facing_delta(float weight) const {
+  SourceCharFacingDelta result;
+  // CharClipDriver::ScaleAdd 198E78: newest receives the eased incoming
+  // weight, then recurses with the remainder. d_beat is distinct from the
+  // alignment-adjusted advance_beat and belongs to this node, not the stack.
+  float remaining = weight;
+  for (size_t i = layers_.size(); i > 0 && remaining != 0.0f; --i) {
+    const Layer& layer = layers_[i - 1];
+    const float contribution = remaining *
+        source_gh2_char_clip_driver_eased_weight(layer.blend_fraction);
+    remaining -= contribution;
+    if (!layer.clip) continue;
+    const auto delta = source_char_clip_facing_delta_at_beat(
+        *layer.clip, contribution, layer.beat, layer.d_beat);
+    result.has_position |= delta.has_position;
+    result.has_rotation |= delta.has_rotation;
+    for (size_t axis = 0; axis < 3; ++axis) {
+      result.position[axis] += delta.position[axis];
+    }
+    result.rotation += delta.rotation;
+  }
+  return result;
 }
 
 std::vector<ClipChannel> CharClipPlayer::sampled_pose() const {

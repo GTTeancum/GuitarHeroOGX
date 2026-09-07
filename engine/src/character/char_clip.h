@@ -5,11 +5,14 @@
 #pragma once
 
 #include "character/char_mesh.h"
+#include "character/char_clip_binding.h"
+#include "character/char_bones_samples.h"
 
 #include <array>
 #include <cstddef>
 #include <cstdint>
 #include <functional>
+#include <memory>
 #include <optional>
 #include <string>
 #include <string_view>
@@ -17,6 +20,8 @@
 #include <vector>
 
 namespace ghogx::character {
+
+class SourceCharBonesMeshesOutput;
 
 enum SourceCharBonesType {
   kSourceCharBonesTypePos = 0,
@@ -821,6 +826,16 @@ struct SourceCharUtlClipPredictFrame {
   float facing_rot = 0.0f;
 };
 
+// Virtual FacingBones output, not a transform in the resident skeleton.
+// Recomputed from each driver's own beat/d_beat every poll; never accumulated
+// by differencing two blended poses (which introduces crossfade root motion).
+struct SourceCharFacingDelta {
+  bool has_position = false;
+  bool has_rotation = false;
+  std::array<float, 3> position = {};
+  float rotation = 0.0f;
+};
+
 struct SourceCharUtlClipPredictState {
   std::array<float, 3> pos = {0.0f, 0.0f, 0.0f};
   float ang = 0.0f;
@@ -1015,8 +1030,8 @@ struct ClipChannel {
   float pos[3] = {};      // kPos: X,Y,Z
   float scale[3] = {1.0f, 1.0f, 1.0f};  // kScale: local X,Y,Z scale
   float quat[4] = {};     // kQuat: X,Y,Z,W
-  // Scalar samples are stored as normalized half-turns. PoseMeshes converts
-  // them through the game's sinpi-style axis helpers at final publication.
+  // Scalar samples are radians after decompression (GH2 int16 * 0x3A200000).
+  // PoseMeshes and the virtual bone_facing channels must not multiply by pi.
   float angle = 0.0f;
 };
 
@@ -1037,6 +1052,22 @@ struct CharClip {
 
   std::string name;
   std::string source_milo_path;
+  // Decoded once per loaded MILO; shared by all clips from that directory.
+  // Null plus a nonempty error means an unsupported/unreadable profile,
+  // NOT that the character has no facing channels.
+  std::shared_ptr<const Gh2ClipSetBinding> gh2_binding;
+  std::string gh2_binding_error;
+  struct Gh2FacingSamples {
+    // Keep the actual full/one channel counts. Expanded pose frames and the
+    // nominal 30 fps are not GH2 EvaluateChannel's sampling domain.
+    std::vector<std::array<float, 3>> positions;
+    std::vector<float> rotations;
+    // CharBonesSamples ctor 0x1935F0 initializes interpolation to true.
+    bool interpolate_position = true;
+    bool interpolate_rotation = true;
+  };
+  std::optional<Gh2FacingSamples> gh2_facing_samples;
+  std::shared_ptr<const Gh2ClipPoseSamples> gh2_pose_samples;
   std::vector<std::vector<ClipChannel>> frames;  // frames[f][ch]
   struct RawChannelCounts {
     int pos = 0;
@@ -1198,6 +1229,12 @@ enum CharPlayFlags : uint32_t {
 // Lightweight viewer-side CharDriver play-node emulation. It owns clip time,
 // loop/clamp behavior, and the previous-node blend that the game runtime uses
 // when a new clip is started without kCharPlayNoBlend.
+struct SourceCharServoTransition {
+  const CharClip* outgoing_clip = nullptr;
+  float outgoing_beat = 0.0f;
+  float next_ramp_in = 0.0f;
+};
+
 class CharClipPlayer {
  public:
   struct CrossedEvent {
@@ -1228,7 +1265,11 @@ class CharClipPlayer {
   // delta, and real-time delta separately to CharClipDriver::Evaluate.
   void advance_source(float frame, float dframe, float dt_seconds);
   void apply(Character& character, float weight = 1.0f) const;
+  // Original GH2 CharDriver post-Advance buffer publication. Call after
+  // advance_source; does not pose meshes or run the servo/controllers itself.
+  void accumulate_source_pose(SourceCharBonesMeshesOutput& output, float weight = 1.0f);
   std::vector<ClipChannel> sampled_pose() const;
+  SourceCharFacingDelta source_facing_delta(float weight = 1.0f) const;
   std::vector<ClipChannelLayer> sampled_pose_layers(
       float weight = 1.0f,
       bool overlay_override = false) const;
@@ -1240,6 +1281,9 @@ class CharClipPlayer {
   const CharClip* current_clip() const;
   float current_time_seconds() const;
   const CharClip* source_first_playing_clip() const;
+  // GH2 Regulate uses Last() and Before(Last()), regardless of blend weight.
+  // This is the oldest pair, not current_clip()/the newest scheduled node.
+  SourceCharServoTransition source_regulation_transition() const;
   uint32_t source_first_playing_flags() const;
   float source_first_playing_time_seconds() const;
   float source_first_playing_beat() const;
@@ -1447,6 +1491,11 @@ CharacterPoseStackFrameResult apply_character_pose_stack_frame(
 CharacterPoseControllerFrameResult apply_character_pose_controller_frame(
     Character& character,
     const CharacterPoseControllerFrameSources& sources);
+
+// Strict directory-level GH2 allocation metadata; throws on decode failure.
+std::shared_ptr<const Gh2ClipSetBinding> load_gh2_clip_set_binding(
+    const std::string& hdr_path, const std::string& ark_path,
+    const std::string& milo_path);
 
 // Load all frames of a named CharClipSamples entry from the PS2 ARK.
 // Returns a CharClip with frames.empty() on failure.
@@ -2955,6 +3004,10 @@ std::optional<SourceCharUtlClipPredictFrame>
 source_char_walk_facing_sample(const std::vector<ClipChannel>& channels);
 std::optional<SourceCharUtlClipPredictFrame>
 source_char_clip_facing_sample_at_beat(const CharClip& clip, float beat);
+std::optional<SourceCharUtlClipPredictFrame>
+source_gh2_char_clip_facing_sample_at_beat(const CharClip& clip, float beat);
+SourceCharFacingDelta source_char_clip_facing_delta_at_beat(
+    const CharClip& clip, float weight, float beat, float d_beat);
 std::optional<float> source_charwalk_find_stop_start_beat(
     const CharClip& stop_clip, float beat_remainder);
 SourceCharWalkMotionPlan source_charwalk_build_motion_plan(

@@ -10,6 +10,7 @@ JSON recipe only declares which retail prefab parts compose the character.
 from __future__ import annotations
 
 import argparse
+import copy
 import json
 import math
 import re
@@ -20,7 +21,7 @@ from typing import Any, Iterable
 
 from PIL import Image
 
-from convert_rb2_instruments import compose_single_color, parse_color_palette
+from convert_rb2_instruments import parse_color_palette
 from rb2_native_assets import (
     FormatError,
     Reader,
@@ -38,10 +39,85 @@ from rb2_native_assets import (
     transform_direction,
     transform_position,
 )
+from rb2_deform import (
+    deform_sample_weights,
+    evaluate_deform,
+    parse_deform_clip,
+)
+from rb2_ambient_occlusion import bake_ambient_occlusion
 
 
 MAGIC = b"GH3M2MB\0"
 VERSION = 9
+
+
+def asset_prefix(recipe: dict[str, Any]) -> str:
+    value = str(recipe.get("asset_prefix", recipe["id"])).lower()
+    value = re.sub(r"[^a-z0-9]+", "_", value).strip("_")
+    if not value:
+        raise ValueError("recipe id does not produce a usable asset prefix")
+    return value
+
+
+def quaternion_rows(value: tuple[float, ...]) -> list[list[float]]:
+    x, y, z, w = value
+    return [
+        [1.0 - 2.0 * (y * y + z * z), 2.0 * (x * y + z * w), 2.0 * (x * z - y * w)],
+        [2.0 * (x * y - z * w), 1.0 - 2.0 * (x * x + z * z), 2.0 * (y * z + x * w)],
+        [2.0 * (x * z + y * w), 2.0 * (y * z - x * w), 1.0 - 2.0 * (x * x + y * y)],
+    ]
+
+
+def apply_deform_to_transforms(
+    transforms: dict[str, Any], channels: dict[str, tuple[float, ...]]
+) -> dict[str, Any]:
+    """Apply RB2's authored absolute local transform channels to a rig copy."""
+    result = copy.deepcopy(transforms)
+    grouped: dict[str, dict[str, tuple[float, ...]]] = defaultdict(dict)
+    for name, value in channels.items():
+        stem, kind = name.rsplit(".", 1)
+        key = stem.lower()
+        if key not in result and f"{key}.mesh" in result:
+            key = f"{key}.mesh"
+        grouped[key][kind] = value
+    for key, values in grouped.items():
+        transform = result.get(key)
+        if transform is None:
+            continue
+        local = list(transform.local)
+        current_scales = [
+            math.sqrt(sum(local[row * 3 + column] ** 2 for column in range(3)))
+            for row in range(3)
+        ]
+        rows = [
+            [
+                local[row * 3 + column] / max(current_scales[row], 1.0e-8)
+                for column in range(3)
+            ]
+            for row in range(3)
+        ]
+        if "quat" in values:
+            rows = quaternion_rows(values["quat"])
+        scales = list(values.get("scale", tuple(current_scales)))
+        for row in range(3):
+            for column in range(3):
+                local[row * 3 + column] = rows[row][column] * scales[row]
+        if "pos" in values:
+            local[9:12] = values["pos"]
+        transform.local = local
+    return result
+
+
+def bone_deform_matrices(
+    neutral: dict[str, Any], deformed: dict[str, Any]
+) -> dict[str, list[float]]:
+    result: dict[str, list[float]] = {}
+    for key in neutral:
+        result[key] = matrix_multiply(
+            invert_affine(source_world(key, neutral)),
+            source_world(key, deformed),
+        )
+    return result
 
 
 def write_u8(out: bytearray, value: int) -> None:
@@ -143,6 +219,41 @@ def compose_unmasked_two_color(
     return Image.frombytes("RGBA", base.size, bytes(output))
 
 
+def compose_single_palette_color(
+    diffuse: Image.Image,
+    primary: tuple[int, int, int],
+) -> Image.Image:
+    """Reproduce an RB2 material whose runtime changes only color one.
+
+    ``CompositeCharacter::SetEyeColor`` writes the selected palette entry to
+    the material's first color and immediately calls ``RndMat::CompositeTwoColor``.
+    The retail material's untouched second color is white.  The diffuse alpha
+    interpolates from the selected color at zero to white at 255, preserving
+    fixed-color areas such as the sclera while tinting the iris.  Skin and
+    other one-channel character materials use the same compositor contract.
+    """
+    return compose_unmasked_two_color(diffuse, primary, (255, 255, 255))
+
+
+def validate_material_texture_spec(spec: dict[str, Any]) -> None:
+    """Reject RB2 compositor outputs being mistaken for authored masks.
+
+    Character outfit ``*_comp`` textures are zero-mip scratch/output surfaces
+    populated by RB2's CompositeTwoColor pass.  Their on-disc pixels are not an
+    authored mask and can contain uninitialised tile data.  Authored fixed-color
+    masks use the ``*_mask`` convention.  When no mask exists, the diffuse alpha
+    alone drives the two palette colors.
+    """
+    mask = spec.get("mask")
+    if mask is None:
+        return
+    if Path(str(mask)).name.lower().endswith("_comp"):
+        raise ValueError(
+            f"{mask}: RB2 *_comp textures are compositor outputs, not masks; "
+            "omit mask or select the authored *_mask texture"
+        )
+
+
 def load_texture(root: Path, spec: str) -> Image.Image:
     directory, stem = spec.split("/", 1)
     path = root / directory / f"Tex__{stem}.tex"
@@ -151,11 +262,32 @@ def load_texture(root: Path, spec: str) -> Image.Image:
     return decode_embedded_wii_bitmap(path.read_bytes())
 
 
+def encode_hmx_texture(image: Image.Image) -> dict[str, Any]:
+    image = image.convert("RGBA")
+    rgba = image.tobytes()
+    hmx = bytearray()
+    for offset in range(0, len(rgba), 4):
+        hmx.extend(rgba[offset:offset + 3])
+        hmx.append(min(128, (rgba[offset + 3] + 1) // 2))
+    return {
+        "width": image.width,
+        "height": image.height,
+        "bits_per_pixel": 32,
+        "header_kind": 1,
+        "encoding": 3,
+        "mipmap_count": 0,
+        "bytes_per_line": image.width * 4,
+        "wii_alpha": 0,
+        "data": bytes(hmx),
+    }
+
+
 def make_texture(
     root: Path,
     spec: dict[str, Any],
     palettes: dict[str, list[tuple[int, int, int]]],
-) -> tuple[dict[str, Any], dict[str, Any]]:
+) -> tuple[dict[str, Any], dict[str, Any], Image.Image]:
+    validate_material_texture_spec(spec)
     diffuse = load_texture(root, spec["texture"])
     primary = None
     secondary = None
@@ -183,30 +315,36 @@ def make_texture(
             diffuse, load_texture(root, spec["mask"]), primary, primary
         )
     elif primary is not None:
-        image = compose_single_color(diffuse, primary)
+        image = compose_single_palette_color(diffuse, primary)
     else:
         image = diffuse.convert("RGBA")
+
+    overlay_audit: list[dict[str, Any]] = []
+    for overlay_spec in spec.get("overlays", []):
+        overlay = load_texture(root, overlay_spec["texture"]).convert("RGBA")
+        source_size = list(overlay.size)
+        fit = str(overlay_spec.get("fit", "normalized_uv"))
+        if fit != "normalized_uv":
+            raise ValueError(f"unsupported texture overlay fit {fit!r}")
+        if overlay.size != image.size:
+            # RB2's character-compositor maps these independent makeup maps
+            # over the normalized head UV domain.  Resizing to the authored
+            # head-map dimensions reproduces that mapping without a
+            # character-specific pixel offset.
+            overlay = overlay.resize(image.size, Image.Resampling.BILINEAR)
+        image = Image.alpha_composite(image.convert("RGBA"), overlay)
+        overlay_audit.append({
+            "source": overlay_spec["texture"],
+            "source_size": source_size,
+            "fit": fit,
+            "output_size": list(image.size),
+        })
 
     preserve_alpha = bool(spec.get("preserve_alpha", False))
     if not preserve_alpha:
         image = image.copy()
         image.putalpha(255)
-    rgba = image.tobytes()
-    hmx = bytearray()
-    for offset in range(0, len(rgba), 4):
-        hmx.extend(rgba[offset:offset + 3])
-        hmx.append(min(128, (rgba[offset + 3] + 1) // 2))
-    texture = {
-        "width": image.width,
-        "height": image.height,
-        "bits_per_pixel": 32,
-        "header_kind": 1,
-        "encoding": 3,
-        "mipmap_count": 0,
-        "bytes_per_line": image.width * 4,
-        "wii_alpha": 0,
-        "data": bytes(hmx),
-    }
+    texture = encode_hmx_texture(image)
     audit = {
         "source": spec["texture"],
         "size": [image.width, image.height],
@@ -214,8 +352,127 @@ def make_texture(
         "secondary_rgb": secondary,
         "preserve_alpha": preserve_alpha,
         "alpha_range": list(image.getchannel("A").getextrema()),
+        "overlays": overlay_audit,
     }
-    return texture, audit
+    return texture, audit, image
+
+
+def _paste_with_gutter(
+    atlas: Image.Image, image: Image.Image, x: int, y: int, padding: int
+) -> None:
+    image = image.convert("RGBA")
+    width, height = image.size
+    atlas.paste(image, (x, y))
+    if padding <= 0:
+        return
+    atlas.paste(image.crop((0, 0, 1, height)).resize((padding, height)), (x - padding, y))
+    atlas.paste(image.crop((width - 1, 0, width, height)).resize((padding, height)), (x + width, y))
+    atlas.paste(image.crop((0, 0, width, 1)).resize((width, padding)), (x, y - padding))
+    atlas.paste(image.crop((0, height - 1, width, height)).resize((width, padding)), (x, y + height))
+    corners = [
+        ((0, 0, 1, 1), (x - padding, y - padding)),
+        ((width - 1, 0, width, 1), (x + width, y - padding)),
+        ((0, height - 1, 1, height), (x - padding, y + height)),
+        ((width - 1, height - 1, width, height), (x + width, y + height)),
+    ]
+    for crop, position in corners:
+        atlas.paste(image.crop(crop).resize((padding, padding)), position)
+
+
+def build_texture_atlases(
+    recipe: dict[str, Any],
+    material_images: dict[str, Image.Image],
+    chunks: list[dict[str, Any]],
+) -> tuple[dict[str, dict[str, Any]], dict[str, Any]]:
+    config = recipe.get("texture_atlas")
+    if not config or not bool(config.get("enabled", False)):
+        return {}, {"enabled": False}
+    size = int(config.get("size", 512))
+    padding = int(config.get("padding", 4))
+    if size <= 0 or padding < 0:
+        raise ValueError("texture_atlas size/padding must be non-negative")
+
+    placements: dict[str, dict[str, int]] = {}
+    pages: list[dict[str, Any]] = []
+    ordered = sorted(
+        material_images.items(),
+        key=lambda row: (-row[1].height, -row[1].width, row[0].lower()),
+    )
+    for material, image in ordered:
+        item_padding = min(
+            padding,
+            max(0, (size - image.width) // 2),
+            max(0, (size - image.height) // 2),
+        )
+        # Exact half/full-page maps tile without a gutter.  Retaining their
+        # authored resolution is preferable to resampling; Duke's source UVs
+        # stay inside the map edges and the output carries no mip chain.
+        if image.width >= size // 2 or image.height >= size // 2:
+            item_padding = 0
+        outer_w = image.width + item_padding * 2
+        outer_h = image.height + item_padding * 2
+        if outer_w > size or outer_h > size:
+            raise ValueError(
+                f"{material} texture {image.size} exceeds {size}px atlas with gutter"
+            )
+        chosen = None
+        for page_index, page in enumerate(pages):
+            x, y, row_height = page["x"], page["y"], page["row_height"]
+            if x + outer_w > size:
+                x, y, row_height = 0, y + row_height, 0
+            if y + outer_h <= size:
+                chosen = (page_index, x, y, row_height)
+                break
+        if chosen is None:
+            pages.append({"x": 0, "y": 0, "row_height": 0})
+            chosen = (len(pages) - 1, 0, 0, 0)
+        page_index, outer_x, outer_y, row_height = chosen
+        page = pages[page_index]
+        page["x"] = outer_x + outer_w
+        page["y"] = outer_y
+        page["row_height"] = max(row_height, outer_h)
+        placements[material] = {
+            "page": page_index,
+            "x": outer_x + item_padding,
+            "y": outer_y + item_padding,
+            "width": image.width,
+            "height": image.height,
+            "padding": item_padding,
+        }
+
+    prefix = asset_prefix(recipe)
+    atlases = [Image.new("RGBA", (size, size), (0, 0, 0, 0)) for _ in pages]
+    for material, image in material_images.items():
+        place = placements[material]
+        _paste_with_gutter(
+            atlases[place["page"]], image, place["x"], place["y"],
+            place["padding"],
+        )
+    textures = {
+        f"{prefix}_atlas_{index}.tex": encode_hmx_texture(image)
+        for index, image in enumerate(atlases)
+    }
+    for chunk in chunks:
+        place = placements[chunk["material"]]
+        chunk["texture"] = f"{prefix}_atlas_{place['page']}.tex"
+        for vertex in chunk["vertices"]:
+            u, v = vertex["uv"]
+            # Retail Duke UVs are authored for edge-clamped character maps;
+            # clamp their small artist bleed into the duplicated atlas gutter.
+            u = min(1.0, max(0.0, u))
+            v = min(1.0, max(0.0, v))
+            vertex["uv"] = [
+                (place["x"] + u * place["width"]) / size,
+                (place["y"] + v * place["height"]) / size,
+            ]
+    return textures, {
+        "enabled": True,
+        "size": [size, size],
+        "padding": padding,
+        "source_textures": len(material_images),
+        "atlas_pages": len(atlases),
+        "placements": placements,
+    }
 
 
 def load_transforms(
@@ -298,22 +555,69 @@ def collect_meshes(
     transforms: dict[str, Any],
     material_specs: dict[str, dict[str, Any]],
     source_materials: dict[str, Path],
-) -> tuple[list[dict[str, Any]], dict[str, dict[str, Any]], dict[str, list[list[float]]]]:
+    deform_matrices: dict[str, list[float]] | None = None,
+    deformed_transforms: dict[str, Any] | None = None,
+) -> tuple[
+    list[dict[str, Any]],
+    dict[str, dict[str, Any]],
+    dict[str, list[list[float]]],
+    list[dict[str, Any]],
+]:
     chunks: list[dict[str, Any]] = []
     bind_transforms: dict[str, dict[str, Any]] = {}
     observed_bind_worlds: dict[str, list[list[float]]] = defaultdict(list)
+    component_selection: list[dict[str, Any]] = []
     package_name = recipe["package_name"]
+    prefix = asset_prefix(recipe)
     for component in recipe["components"]:
         directory = component["directory"]
         pattern = re.compile(component["include"])
-        selected = [
-            path for path in sorted((root / directory).glob("Mesh__*.mesh"))
-            if pattern.fullmatch(path.name)
-        ]
+        inventory = sorted((root / directory).glob("Mesh__*.mesh"))
+        parsed_inventory = {
+            path: parse_mesh34(path.read_bytes()) for path in inventory
+        }
+        selected = [path for path in inventory if pattern.fullmatch(path.name)]
         if not selected:
             raise RuntimeError(f"{directory}: include selected no meshes")
+        required_materials = set(component.get("require_full_material_coverage", []))
+        available_by_material = {
+            material: [
+                path.name
+                for path, mesh in parsed_inventory.items()
+                if mesh.material == material
+            ]
+            for material in sorted(required_materials)
+        }
+        missing_materials = [
+            material
+            for material, paths in available_by_material.items()
+            if not paths
+        ]
+        if missing_materials:
+            raise RuntimeError(
+                f"{directory}: required source materials have no meshes: "
+                + ", ".join(missing_materials)
+            )
+        selected_set = set(selected)
+        omitted = [
+            path.name
+            for path, mesh in parsed_inventory.items()
+            if mesh.material in required_materials and path not in selected_set
+        ]
+        if omitted:
+            raise RuntimeError(
+                f"{directory}: include omitted meshes belonging to required "
+                f"materials: {', '.join(omitted)}"
+            )
+        component_selection.append({
+            "directory": directory,
+            "inventory_meshes": len(inventory),
+            "selected_meshes": [path.name for path in selected],
+            "required_full_material_coverage": sorted(required_materials),
+            "available_by_required_material": available_by_material,
+        })
         for path in selected:
-            mesh = parse_mesh34(path.read_bytes())
+            mesh = parsed_inventory[path]
             source_material = mesh.material
             if source_material not in material_specs:
                 raise KeyError(
@@ -326,7 +630,7 @@ def collect_meshes(
             if mat_path.is_file():
                 source_materials.setdefault(material, mat_path)
             chunk_index = len(chunks)
-            chunk_name = f"duke_{chunk_index:03d}.mesh"
+            chunk_name = f"{prefix}_{chunk_index:03d}.mesh"
             vertices: list[dict[str, Any]] = []
             bone_slots = [bone.name for bone in mesh.bones]
             bind_names: list[str] = []
@@ -334,8 +638,17 @@ def collect_meshes(
             if mesh.bones:
                 for slot_index, bone in enumerate(mesh.bones):
                     bind_world = matrix12(invert_affine(matrix4(bone.matrix)))
+                    if deformed_transforms is not None and deform_matrices is not None:
+                        delta = deform_matrices.get(bone.name.lower())
+                        if delta is not None:
+                            # Keep the component's authored bind offset while
+                            # moving its joint to the same CharDeform pose that
+                            # was baked into the vertices below.
+                            bind_world = matrix12(
+                                matrix_multiply(matrix4(bind_world), delta)
+                            )
                     observed_bind_worlds[bone.name.lower()].append(bind_world)
-                    bind_name = f"duke_bind_{chunk_index:03d}_{slot_index}.mesh"
+                    bind_name = f"{prefix}_bind_{chunk_index:03d}_{slot_index}.mesh"
                     bind_names.append(bind_name)
                     bind_transforms[bind_name] = {
                         "source_name": bone.name,
@@ -361,9 +674,32 @@ def collect_meshes(
                     else:
                         weights = [value / total for value in weights]
                     weights += [0.0] * (4 - len(weights))
+                    position = list(source.position)
+                    neutral_position = list(position)
+                    normal = normalize(source.normal)
+                    if deform_matrices is not None:
+                        deformed_position = [0.0, 0.0, 0.0]
+                        deformed_normal = [0.0, 0.0, 0.0]
+                        for slot_index, weight in enumerate(weights):
+                            if weight <= 1.0e-8:
+                                continue
+                            delta = deform_matrices.get(bone_slots[slot_index].lower())
+                            if delta is None:
+                                continue
+                            point = transform_position(position, delta)
+                            direction = transform_direction(normal, delta)
+                            for axis in range(3):
+                                deformed_position[axis] += weight * point[axis]
+                                deformed_normal[axis] += weight * direction[axis]
+                        position = deformed_position
+                        normal = normalize(deformed_normal)
                     vertices.append({
-                        "position": list(source.position),
-                        "normal": normalize(source.normal),
+                        "position": position,
+                        "normal": normal,
+                        "deform_distance": math.sqrt(sum(
+                            (position[axis] - neutral_position[axis]) ** 2
+                            for axis in range(3)
+                        )),
                         "color_or_weights": weights[:4],
                         "uv": list(source.uv),
                     })
@@ -376,9 +712,14 @@ def collect_meshes(
                 bone_slots = [parent]
                 parent_world = source_world(parent, transforms)
                 mesh_world = matrix_multiply(matrix4(mesh.transform.local), parent_world)
-                bind_world = matrix12(parent_world)
+                bind_world_matrix = parent_world
+                if deformed_transforms is not None and deform_matrices is not None:
+                    delta = deform_matrices.get(parent.lower())
+                    if delta is not None:
+                        bind_world_matrix = matrix_multiply(parent_world, delta)
+                bind_world = matrix12(bind_world_matrix)
                 observed_bind_worlds[parent.lower()].append(bind_world)
-                bind_name = f"duke_bind_{chunk_index:03d}_0.mesh"
+                bind_name = f"{prefix}_bind_{chunk_index:03d}_0.mesh"
                 bind_names = [bind_name]
                 bind_transforms[bind_name] = {
                     "source_name": parent,
@@ -387,9 +728,21 @@ def collect_meshes(
                     "world": bind_world,
                 }
                 for source in mesh.vertices:
+                    position = transform_position(source.position, mesh_world)
+                    neutral_position = list(position)
+                    normal = normalize(transform_direction(source.normal, mesh_world))
+                    if deform_matrices is not None:
+                        delta = deform_matrices.get(parent.lower())
+                        if delta is not None:
+                            position = transform_position(position, delta)
+                            normal = normalize(transform_direction(normal, delta))
                     vertices.append({
-                        "position": transform_position(source.position, mesh_world),
-                        "normal": normalize(transform_direction(source.normal, mesh_world)),
+                        "position": position,
+                        "normal": normal,
+                        "deform_distance": math.sqrt(sum(
+                            (position[axis] - neutral_position[axis]) ** 2
+                            for axis in range(3)
+                        )),
                         "color_or_weights": [1.0, 0.0, 0.0, 0.0],
                         "uv": list(source.uv),
                     })
@@ -399,14 +752,14 @@ def collect_meshes(
                 "source": f"{directory}/{path.name}",
                 "material": material,
                 "source_material": source_material,
-                "texture": f"duke_{Path(material).stem}.tex",
+                "texture": f"{prefix}_{Path(material).stem}.tex",
                 "sphere": sphere([vertex["position"] for vertex in vertices]),
                 "bone_slots": bone_slots,
                 "bind_names": bind_names,
                 "vertices": vertices,
                 "faces": [list(face) for face in mesh.faces],
             })
-    return chunks, bind_transforms, observed_bind_worlds
+    return chunks, bind_transforms, observed_bind_worlds, component_selection
 
 
 def write_bundle(
@@ -482,6 +835,11 @@ def main() -> int:
     parser.add_argument("--component-root", type=Path, required=True)
     parser.add_argument("--recipe", type=Path, required=True)
     parser.add_argument("--target-transform-root", type=Path)
+    parser.add_argument(
+        "--deform-clip",
+        type=Path,
+        help="extracted RB2 CharClipSamples__deform object for source-exact body shape",
+    )
     parser.add_argument("--out-bundle", type=Path, required=True)
     parser.add_argument("--audit", type=Path, required=True)
     args = parser.parse_args()
@@ -499,18 +857,54 @@ def main() -> int:
     source_transforms, transform_names, transform_conflicts = load_transforms(
         root, directories
     )
+    deform_audit: dict[str, Any] | None = None
+    deform_matrices = None
+    deformed_transforms = None
+    if args.deform_clip is not None:
+        shape = recipe["body_shape"]
+        deform_clip = parse_deform_clip(args.deform_clip)
+        deform_channels = evaluate_deform(
+            deform_clip.full, float(shape["height"]), float(shape["weight"])
+        )
+        deformed_transforms = apply_deform_to_transforms(
+            source_transforms, deform_channels
+        )
+        deform_matrices = bone_deform_matrices(
+            source_transforms, deformed_transforms
+        )
+        deform_audit = {
+            "clip": str(args.deform_clip.resolve()),
+            "height": float(shape["height"]),
+            "weight": float(shape["weight"]),
+            "sample_weights": deform_sample_weights(
+                float(shape["height"]), float(shape["weight"])
+            ),
+            "channels": len(deform_channels),
+            "mapped_transforms": sum(
+                1
+                for name in deform_channels
+                if (
+                    name.rsplit(".", 1)[0].lower() in source_transforms
+                    or f"{name.rsplit('.', 1)[0].lower()}.mesh" in source_transforms
+                )
+            ),
+            "method": "RB2 CharDeform five-point triangle bake",
+        }
     source_materials: dict[str, Path] = {}
-    chunks, bind_transforms, observed_bind_worlds = collect_meshes(
-        root, recipe, source_transforms, recipe["materials"], source_materials
+    chunks, bind_transforms, observed_bind_worlds, component_selection = collect_meshes(
+        root, recipe, source_transforms, recipe["materials"], source_materials,
+        deform_matrices,
+        deformed_transforms,
     )
 
+    rig_transforms = deformed_transforms or source_transforms
     used_bones = {bone.lower(): bone for chunk in chunks for bone in chunk["bone_slots"]}
     output_transforms: dict[str, dict[str, Any]] = {
         transform_names[key]: output_transform(
-            transform_names[key], transform, source_transforms,
+            transform_names[key], transform, rig_transforms,
             recipe["package_name"]
         )
-        for key, transform in source_transforms.items()
+        for key, transform in rig_transforms.items()
     }
     for name in recipe.get("target_required_transforms", []):
         if args.target_transform_root is None:
@@ -533,7 +927,7 @@ def main() -> int:
         key = name.lower()
         if any(existing.lower() == key for existing in output_transforms):
             continue
-        transform = source_transforms.get(key)
+        transform = rig_transforms.get(key)
         if transform is None:
             missing_bones.append(name)
             output_transforms[name] = {
@@ -544,21 +938,23 @@ def main() -> int:
             }
             continue
         output_transforms[name] = output_transform(
-            name, transform, source_transforms, recipe["package_name"]
+            name, transform, rig_transforms, recipe["package_name"]
         )
-        if transform.parent.lower() in source_transforms:
+        if transform.parent.lower() in rig_transforms:
             pending.append(transform.parent)
     output_transforms.update(bind_transforms)
 
     textures: dict[str, dict[str, Any]] = {}
+    material_images: dict[str, Image.Image] = {}
     texture_audit: dict[str, Any] = {}
     render: dict[str, dict[str, Any]] = {}
     for source_material, spec in recipe["materials"].items():
         material = str(recipe.get("material_prefix", "")) + source_material
-        texture_name = f"duke_{Path(material).stem}.tex"
-        textures[texture_name], texture_audit[material] = make_texture(
+        texture_name = f"{asset_prefix(recipe)}_{Path(material).stem}.tex"
+        texture, texture_audit[material], material_images[material] = make_texture(
             root, spec, palettes
         )
+        textures[texture_name] = texture
         if material not in source_materials:
             candidates = list(root.glob(f"*/Mat__{material}"))
             if not candidates:
@@ -568,6 +964,29 @@ def main() -> int:
         for key in ("blend", "z_mode", "alpha_cut", "alpha_write", "cull"):
             if key in spec:
                 render[material][key] = spec[key]
+
+    ao_config = recipe.get("ambient_occlusion", {})
+    ao_audit: dict[str, Any] = {"enabled": False}
+    if bool(ao_config.get("enabled", False)):
+        ao_audit = bake_ambient_occlusion(
+            chunks,
+            material_images,
+            {
+                str(recipe.get("material_prefix", "")) + source_material
+                for source_material, spec in recipe["materials"].items()
+                if bool(spec.get("preserve_alpha", False))
+            },
+            samples=int(ao_config.get("samples", 8)),
+            max_distance=float(ao_config.get("max_distance", 5.0)),
+            bias=float(ao_config.get("bias", 0.06)),
+            strength=float(ao_config.get("strength", 0.15)),
+        )
+
+    atlas_textures, atlas_audit = build_texture_atlases(
+        recipe, material_images, chunks
+    )
+    if atlas_textures:
+        textures = atlas_textures
 
     bind_consistency: dict[str, Any] = {}
     for bone, worlds in observed_bind_worlds.items():
@@ -589,6 +1008,7 @@ def main() -> int:
             "display_name": recipe["display_name"],
             "skeleton": recipe["source_skeleton"],
             "body_shape": recipe["body_shape"],
+            "preferred_guitar": recipe.get("preferred_guitar"),
         },
         "target": {
             "package_name": recipe["package_name"],
@@ -615,17 +1035,35 @@ def main() -> int:
             }
             for chunk in chunks
         ],
+        "component_selection": component_selection,
         "textures": texture_audit,
+        "texture_atlas": atlas_audit,
+        "ambient_occlusion": ao_audit,
         "render": render,
         "bind_consistency": bind_consistency,
         "missing_bones": sorted(set(missing_bones), key=str.lower),
         "transform_conflicts": transform_conflicts,
+        "body_shape_bake": deform_audit,
         "body_shape_note": (
-            "RB2 C-a-C height/weight are runtime deform parameters. This first "
-            "conversion preserves the retail component meshes and skeleton but "
-            "does not yet bake those two continuous deform channels."
+            "RB2 C-a-C height/weight were baked from the authored revision-14 "
+            "deform clip using CharDeform's five-point triangle surface."
+            if deform_audit is not None else
+            "No deform clip was supplied; the neutral source component shape was retained."
         ),
     }
+    if deform_audit is not None:
+        distances = [
+            vertex["deform_distance"]
+            for chunk in chunks
+            for vertex in chunk["vertices"]
+        ]
+        deform_audit["vertices_affected"] = sum(
+            value > 1.0e-6 for value in distances
+        )
+        deform_audit["max_vertex_displacement"] = max(distances, default=0.0)
+        deform_audit["rms_vertex_displacement"] = math.sqrt(
+            sum(value * value for value in distances) / max(1, len(distances))
+        )
     args.audit.parent.mkdir(parents=True, exist_ok=True)
     args.audit.write_text(json.dumps(audit, indent=2) + "\n", encoding="utf-8")
     print(

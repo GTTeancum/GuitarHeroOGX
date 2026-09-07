@@ -3682,17 +3682,21 @@ int main(int argc, char** argv) {
     mgr.set_global(Symbol("component"), DataNode::Obj(video_calibrate_button));
     video_panel->handle_property(Symbol("SELECT_START_MSG"), DataArray());
     CHECK(mgr.current_screen() != nullptr &&
-          mgr.current_screen()->name() == Symbol("lag_screen"));
-    Object* routed_lag_panel = mgr.find_object(Symbol("lag_panel"));
-    CHECK(routed_lag_panel != nullptr);
-    if (routed_lag_panel) {
-      DataNode from_panel = routed_lag_panel->get_property(Symbol("from_panel"));
-      Object* from_panel_obj = from_panel.as_object();
-      CHECK(from_panel_obj != nullptr &&
-            from_panel_obj->name() == Symbol("video_settings_panel"));
+          mgr.current_screen()->name() == Symbol("soundcheck_screen"));
+    Object* routed_soundcheck =
+        mgr.find_object(Symbol("soundcheck_panel"));
+    CHECK(routed_soundcheck != nullptr);
+    if (routed_soundcheck) {
+      CHECK(routed_soundcheck->get_property(Symbol("stage"))
+                .as_symbol()
+                .value_or(Symbol()) == Symbol("main"));
+      CHECK(routed_soundcheck->get_property(Symbol("file"))
+                .as_symbol()
+                .value_or(Symbol()) ==
+            Symbol("sel_diff_practice.milo"));
       mgr.set_global(Symbol("button"), DataNode::Sym(Symbol("kPad_Tri")));
-      routed_lag_panel->handle_property(Symbol("BUTTON_DOWN_MSG"),
-                                        DataArray());
+      routed_soundcheck->handle_property(Symbol("BUTTON_DOWN_MSG"),
+                                         DataArray());
       CHECK(mgr.current_screen() != nullptr &&
             mgr.current_screen()->name() == Symbol("video_settings_screen"));
     }
@@ -3715,148 +3719,99 @@ int main(int argc, char** argv) {
     options->handle_property(Symbol("set_sync_offset"), set_sync);
   }
   mgr.goto_screen(Symbol("lag_screen"));
-  Object* lag_panel = mgr.find_object(Symbol("lag_panel"));
-  Object* lag_instructions = mgr.resolve_object(Symbol("instructions.lbl"));
-  Object* lag_instructions2 = mgr.resolve_object(Symbol("instructions2.lbl"));
-  Object* lag_setting = mgr.resolve_object(Symbol("setting.lbl"));
-  Object* lag_countdown = mgr.resolve_object(Symbol("countdown.lbl"));
-  Object* lag_auto = mgr.resolve_object(Symbol("autocalibrate.btn"));
-  Object* lag_reset = mgr.resolve_object(Symbol("reset_to_zero.btn"));
-  Object* lag_buttons = mgr.resolve_object(Symbol("buttons.grp"));
-  Object* lag_helpbar = mgr.resolve_object(Symbol("helpbar"));
-  Object* sync_click = mgr.resolve_object(Symbol("sync_click.cue"));
-  Object* practice_hat = mgr.resolve_object(Symbol("practice_hat"));
-  CHECK(lag_panel != nullptr);
-  CHECK(lag_instructions != nullptr);
-  CHECK(lag_instructions2 != nullptr);
-  CHECK(lag_setting != nullptr);
-  CHECK(lag_countdown != nullptr);
-  CHECK(lag_auto != nullptr);
-  CHECK(lag_reset != nullptr);
-  CHECK(lag_buttons != nullptr);
-  CHECK(sync_click != nullptr);
-  CHECK(practice_hat != nullptr);
-  if (auto* lag_ui = dynamic_cast<ui::UiObject*>(lag_panel))
-    CHECK(lag_ui->has_handler(Symbol("SELECT_START_MSG")));
-  if (lag_panel && lag_instructions && lag_instructions2 && lag_setting &&
-      lag_countdown && lag_auto && lag_reset && lag_buttons) {
-    CHECK(lag_panel->get_property(Symbol("state"))
+  CHECK(mgr.current_screen() != nullptr &&
+        mgr.current_screen()->name() == Symbol("soundcheck_screen"));
+  Object* soundcheck = mgr.find_object(Symbol("soundcheck_panel"));
+  CHECK(soundcheck != nullptr);
+  if (soundcheck) {
+    CHECK(soundcheck->get_property(Symbol("stage"))
               .as_symbol()
-              .value_or(Symbol()) == Symbol("init"));
-    CHECK(lag_panel->get_property(Symbol("lag")).as_int().value_or(999) ==
-          -12);
-    CHECK(lag_instructions->get_property(Symbol("text"))
+              .value_or(Symbol()) == Symbol("main"));
+    CHECK(soundcheck->get_property(Symbol("audio_offset_ms"))
+              .as_int()
+              .value_or(999) == 0);
+    CHECK(soundcheck->get_property(Symbol("video_input_offset_ms"))
+              .as_int()
+              .value_or(999) == 12);
+    CHECK(!truthy(soundcheck->get_property(Symbol("show_highway"))));
+
+    const auto set_stage = [&](const char* stage) {
+      DataArray args;
+      args.push(DataNode::Sym(Symbol(stage)));
+      soundcheck->handle_property(Symbol("debug_set_stage"), args);
+    };
+    const auto record = [&](int milliseconds) {
+      DataArray args;
+      args.push(DataNode::Int(milliseconds));
+      soundcheck->handle_property(Symbol("debug_record_sample_ms"), args);
+    };
+    const auto button = [&](const char* name) {
+      mgr.set_global(Symbol("button"), DataNode::Sym(Symbol(name)));
+      soundcheck->handle_property(Symbol("BUTTON_DOWN_MSG"), DataArray());
+    };
+
+    set_stage("audio_measure");
+    CHECK(soundcheck->get_property(Symbol("stage"))
               .as_symbol()
-              .value_or(Symbol()) == Symbol("lag_info_why"));
-    CHECK(lag_instructions2->get_property(Symbol("text"))
+              .value_or(Symbol()) == Symbol("audio_measure"));
+    for (const int sample : {38, 40, 39, 41, 40, 42, 39, 220})
+      record(sample);
+    CHECK(soundcheck->get_property(Symbol("stage"))
               .as_symbol()
-              .value_or(Symbol()) == Symbol("lag_info_howto"));
-    const std::string setting_text(
-        lag_setting->get_property(Symbol("text")).as_string().value_or(""));
-    CHECK(setting_text.find("%D") == std::string::npos);
-    CHECK(setting_text.find("-12") != std::string::npos);
-    CHECK(setting_text.find("ms") != std::string::npos);
-    CHECK(lag_auto->get_property(Symbol("text"))
+              .value_or(Symbol()) == Symbol("audio_result"));
+    CHECK(soundcheck->get_property(Symbol("audio_offset_ms"))
+              .as_int()
+              .value_or(999) == 40);
+
+    button("kPad_X");
+    CHECK(soundcheck->get_property(Symbol("stage"))
               .as_symbol()
-              .value_or(Symbol()) == Symbol("lag_button_calibrate"));
-    CHECK(lag_countdown->get_property(Symbol("text"))
+              .value_or(Symbol()) == Symbol("video_measure"));
+    CHECK(truthy(soundcheck->get_property(Symbol("show_highway"))));
+    for (const int sample : {63, 65, 64, 66, 65, 67, 64, -200})
+      record(sample);
+    CHECK(soundcheck->get_property(Symbol("stage"))
+              .as_symbol()
+              .value_or(Symbol()) == Symbol("results"));
+    CHECK(soundcheck->get_property(Symbol("video_input_offset_ms"))
+              .as_int()
+              .value_or(999) == -65);
+
+    button("kPad_X");
+    CHECK(soundcheck->get_property(Symbol("stage"))
+              .as_symbol()
+              .value_or(Symbol()) == Symbol("combined_test"));
+    record(65);
+    CHECK(soundcheck->get_property(Symbol("feedback"))
               .as_string()
-              .value_or("not-cleared") == "");
-    CHECK(truthy(lag_buttons->get_property(Symbol("showing"))));
-    if (lag_helpbar) {
-      CHECK(array_contains_symbol(lag_helpbar->get_property(Symbol("display")),
-                                  Symbol("help_select")));
-      CHECK(array_contains_symbol(lag_helpbar->get_property(Symbol("display")),
-                                  Symbol("help_back")));
-    }
+              .value_or("") == "CENTERED");
+    button("kPad_Tri");
+    CHECK(soundcheck->get_property(Symbol("stage"))
+              .as_symbol()
+              .value_or(Symbol()) == Symbol("main"));
 
-    DataArray calibrating;
-    calibrating.push(DataNode::Sym(Symbol("calibrating")));
-    lag_panel->handle_property(Symbol("set_state"), calibrating);
-    CHECK(lag_panel->get_property(Symbol("state"))
-              .as_symbol()
-              .value_or(Symbol()) == Symbol("calibrating"));
-    CHECK(!truthy(lag_buttons->get_property(Symbol("showing"))));
-    CHECK(lag_instructions->get_property(Symbol("text"))
-              .as_symbol()
-              .value_or(Symbol()) == Symbol("lag_measuring"));
-    CHECK(lag_instructions2->get_property(Symbol("text"))
-              .as_string()
-              .value_or("") == "");
-    CHECK(lag_setting->get_property(Symbol("text")).as_string().value_or("") ==
-          "");
-    if (lag_helpbar) {
-      CHECK(array_contains_symbol(lag_helpbar->get_property(Symbol("display")),
-                                  Symbol("help_hitonchange")));
-      CHECK(!array_contains_symbol(lag_helpbar->get_property(Symbol("display")),
-                                   Symbol("help_select")));
-    }
-
-    mgr.set_global(Symbol("button"), DataNode::Sym(Symbol("kPad_DDown")));
-    lag_panel->handle_property(Symbol("BUTTON_DOWN_MSG"), DataArray());
-    auto hits = lag_panel->get_property(Symbol("hits")).as_array();
-    CHECK(hits && hits->size() == 1);
-
-    lag_panel->set_property(Symbol("lag"), DataNode::Int(44));
-    CHECK(lag_reset->name() == Symbol("reset_to_zero.btn"));
-    mgr.set_global(Symbol("component"), DataNode::Obj(lag_reset));
-    CHECK(mgr.get_global(Symbol("component")).as_object() == lag_reset);
-    lag_panel->handle_property(Symbol("SELECT_START_MSG"), DataArray());
-    CHECK(near(lag_panel->get_property(Symbol("lag"))
-                   .as_float()
-                   .value_or(-1.0f),
-               0.0f));
-    CHECK(lag_panel->get_property(Symbol("state"))
-              .as_symbol()
-              .value_or(Symbol()) == Symbol("init"));
-    CHECK(truthy(lag_buttons->get_property(Symbol("showing"))));
-
-    mgr.set_global(Symbol("component"), DataNode::Obj(lag_auto));
-    lag_panel->handle_property(Symbol("SELECT_START_MSG"), DataArray());
-    CHECK(lag_panel->get_property(Symbol("state"))
-              .as_symbol()
-              .value_or(Symbol()) == Symbol("calibrating"));
-    mgr.update(0.0f);
-    CHECK(lag_countdown->get_property(Symbol("text"))
-              .as_symbol()
-              .value_or(Symbol()) == Symbol("lag_3"));
-    if (practice_hat) {
-      CHECK(practice_hat->get_property(Symbol("play_count"))
-                .as_int()
-                .value_or(0) == 1);
-    }
-    mgr.update(0.734f);
-    CHECK(lag_countdown->get_property(Symbol("text"))
-              .as_symbol()
-              .value_or(Symbol()) == Symbol("lag_2"));
-    if (practice_hat) {
-      CHECK(practice_hat->get_property(Symbol("play_count"))
-                .as_int()
-                .value_or(0) == 2);
-    }
-    mgr.update(2.3f);
-    if (sync_click) {
-      CHECK(sync_click->get_property(Symbol("play_count"))
-                .as_int()
-                .value_or(0) >= 1);
-    }
-    mgr.clear_script_tasks();
-    DataArray success_state;
-    success_state.push(DataNode::Sym(Symbol("success")));
-    lag_panel->handle_property(Symbol("set_state"), success_state);
-    CHECK(lag_auto->get_property(Symbol("text"))
-              .as_symbol()
-              .value_or(Symbol()) == Symbol("lag_button_recalibrate"));
-    CHECK(lag_instructions->get_property(Symbol("text"))
-              .as_symbol()
-              .value_or(Symbol()) == Symbol("lag_success"));
-
-    lag_panel->set_property(Symbol("lag"), DataNode::Int(23));
-    mgr.goto_screen(Symbol("options_screen"));
+    DataArray offsets;
+    offsets.push(DataNode::Int(23));
+    offsets.push(DataNode::Int(-44));
+    soundcheck->handle_property(Symbol("debug_set_offsets"), offsets);
+    button("kPad_DDown");
+    button("kPad_DDown");
+    button("kPad_DDown");
+    button("kPad_X");
+    CHECK(mgr.current_screen() != nullptr &&
+          mgr.current_screen()->name() == Symbol("options_screen"));
     if (Object* options = mgr.resolve_object(Symbol("options"))) {
+      CHECK(options->handle_property(Symbol("get_audio_offset"), DataArray())
+                .as_int()
+                .value_or(999) == 23);
+      CHECK(options
+                ->handle_property(Symbol("get_video_input_offset"),
+                                  DataArray())
+                .as_int()
+                .value_or(999) == -44);
       CHECK(options->handle_property(Symbol("get_sync_offset"), DataArray())
                 .as_int()
-                .value_or(999) == -23);
+                .value_or(999) == -44);
     }
   }
 

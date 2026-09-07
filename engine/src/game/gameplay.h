@@ -11,10 +11,14 @@
 #include "character/char_clip.h"
 #include "character/char_facefx.h"
 #include "character/char_renderer.h"
+#include "character/char_servo_character.h"
 #include "character/character_type_script.h"
 #include "game/audio_player.h"
 #include "game/gameplay_session.h"
 #include "game/gameplay_rules.h"
+#include "game/camera_intro_timing.h"
+#include "game/gh1_camera_helper.h"
+#include "game/source_anim_task.h"
 #include "game/highway_renderer.h"
 #include "render/milo_scene_renderer.h"
 
@@ -174,12 +178,28 @@ struct CameraResultBuilderState {
   bool has_filtered_target = false;
   std::array<float, 3> filtered_target = {0.0f, 0.0f, 0.0f};
 
+  // CamShot::Shake persistent members. GH2 stores the translation/angular
+  // output, impulse target, and velocity vectors on the active CamShot and
+  // clears all six in StartAnim. Keep the same lifetime here instead of
+  // deriving frame-local noise in the renderer.
+  std::array<float, 3> shake_translation_output = {0.0f, 0.0f, 0.0f};
+  std::array<float, 3> shake_angular_output = {0.0f, 0.0f, 0.0f};
+  std::array<float, 3> shake_translation_target = {0.0f, 0.0f, 0.0f};
+  std::array<float, 3> shake_angular_target = {0.0f, 0.0f, 0.0f};
+  std::array<float, 3> shake_translation_velocity = {0.0f, 0.0f, 0.0f};
+  std::array<float, 3> shake_angular_velocity = {0.0f, 0.0f, 0.0f};
   void reset() {
     frames.clear();
     selected_outgoing_frame.clear();
     selected_incoming_frame.clear();
     has_filtered_target = false;
     filtered_target = {0.0f, 0.0f, 0.0f};
+    shake_translation_output = {0.0f, 0.0f, 0.0f};
+    shake_angular_output = {0.0f, 0.0f, 0.0f};
+    shake_translation_target = {0.0f, 0.0f, 0.0f};
+    shake_angular_target = {0.0f, 0.0f, 0.0f};
+    shake_translation_velocity = {0.0f, 0.0f, 0.0f};
+    shake_angular_velocity = {0.0f, 0.0f, 0.0f};
   }
 };
 
@@ -258,6 +278,10 @@ class Gameplay {
     float eye[3] = {};
     float quat[4] = {0.0f, 0.0f, 0.0f, 1.0f};
     bool has_quat = false;
+    // Preserve all three authored Hmx::Matrix3 rows.  GH2 converts the raw
+    // matrix to a quaternion during CamShotFrame::Interp; reconstructing m.x
+    // from normalized look/up first silently discards authored scale/skew.
+    float source_x[3] = {1.0f, 0.0f, 0.0f};
     float forward[3] = {0.0f, 1.0f, 0.0f};
     float up[3] = {0.0f, 0.0f, 1.0f};
     bool has_basis = false;
@@ -297,6 +321,8 @@ class Gameplay {
     bool has_zoom_fov = false;
     bool parent_first_frame = false;
     bool has_parent_first_frame = false;
+    float selection_weight = 1.0f;
+    bool selection_used = false;
     std::string category;
     float shot_filter = 0.9f;
     bool has_shot_filter = false;
@@ -309,6 +335,8 @@ class Gameplay {
     bool has_use_depth_of_field = false;
     float path_frame = -1.0f;
     bool has_path_frame = false;
+    float path_ease = 0.0f;
+    bool has_legacy_path_ease = false;
     float legacy_path_frame_ignored = -1.0f;
     bool has_legacy_path_frame_ignored = false;
     std::string source_ref;
@@ -374,6 +402,7 @@ class Gameplay {
     bool has_source_frame_mapping = false;
     bool source_frame_null_frame = false;
     float generated_source_position[3] = {};
+    float generated_source_x[3] = {1.0f, 0.0f, 0.0f};
     float generated_source_forward[3] = {0.0f, 1.0f, 0.0f};
     float generated_source_up[3] = {0.0f, 0.0f, 1.0f};
     bool has_generated_source_rows = false;
@@ -388,6 +417,16 @@ class Gameplay {
     std::string parent_source_object;
     bool use_parent_rotation = false;
     bool camshot_refs_decoded = false;
+    // Compiled GH1 cam_paths exists/else policy. Empty for stock GH2 shots.
+    std::string camera_target_fallback;
+    std::string camera_parent_fallback;
+    bool has_gh1_helper = false;
+    float gh1_helper_filter = 0.0f;
+    bool gh1_helper_target = false;
+    bool gh1_helper_parent = false;
+    std::array<float, 3> gh1_helper_shake{};
+    bool has_gh1_crowd_region = false;
+    int gh1_crowd_region = -1;
     std::string distance;
     std::string facing;
     std::string solo = "ok";
@@ -803,6 +842,14 @@ class Gameplay {
     HandClipChoice chord;
     bool source_has_chord_split = false;
   };
+  struct SourceVenueAnimTaskPayload {
+    VenueAnimFilter filter;
+    std::string event_name;
+    bool persistent = false;
+    bool shot_scoped = false;
+    bool polled = false;
+  };
+  using SourceVenueAnimTask = SourceAnimTask<SourceVenueAnimTaskPayload>;
   struct ActiveVenueAnimFilter {
     std::string event_name;
     std::vector<VenueAnimFilter> filters;
@@ -810,6 +857,7 @@ class Gameplay {
     bool persistent = true;
     bool shot_scoped = false;
     bool polled = false;
+    std::map<std::string, SourceVenueAnimTask::Ptr> source_tasks;
   };
 
   Gameplay() = default;
@@ -856,6 +904,18 @@ class Gameplay {
     authored_song_midi_path_.clear();
     authored_song_audio_path_.clear();
     authored_song_rig_.reset();
+  }
+  // Manage Band backing-performer preferences are role substitutions shared
+  // by Career and Quickplay. Empty values preserve each song's authored cast.
+  void set_backing_band_preferences(std::string bassist, std::string drummer,
+                                    std::string keyboardist,
+                                    std::string male_singer,
+                                    std::string female_singer) {
+    preferred_bassist_ = std::move(bassist);
+    preferred_drummer_ = std::move(drummer);
+    preferred_keyboardist_ = std::move(keyboardist);
+    preferred_male_singer_ = std::move(male_singer);
+    preferred_female_singer_ = std::move(female_singer);
   }
   // Character-select hands gameplay the exact variant routes generated from
   // the source archives. Empty strings clear the selection and restore the
@@ -944,6 +1004,23 @@ class Gameplay {
   // Song is finished when the audio clock passes the chart duration.
   bool is_finished() const;
   double song_time() const { return song_time_; }
+  double highway_song_time() const {
+    return track_intro_active_ ? calibrated_presentation_time(
+        ghogx::camera::intro_song_seconds(intro_presentation_time_, intro_camera_seconds_),
+        audio_offset_ms_) : song_time_;
+  }
+  // The venue/song-card/highway opening has its own clock. Song audio, notes,
+  // scoring, and gameplay MIDI remain at zero until this presentation ends.
+  double intro_presentation_time() const {
+    return intro_presentation_time_;
+  }
+  void set_calibration_offsets_ms(int audio_offset_ms,
+                                  int video_input_offset_ms) {
+    audio_offset_ms_ = std::clamp(audio_offset_ms, -500, 500);
+    sync_offset_ms_ = std::clamp(video_input_offset_ms, -500, 500);
+  }
+  int audio_offset_ms() const { return audio_offset_ms_; }
+  int video_input_offset_ms() const { return sync_offset_ms_; }
   void set_sync_offset_ms(int offset_ms) {
     sync_offset_ms_ = std::clamp(offset_ms, -500, 500);
   }
@@ -1055,11 +1132,13 @@ class Gameplay {
   bool   failed() const { return failed_; }
   bool   track_intro_active() const { return track_intro_active_; }
   double track_intro_elapsed() const {
-    return std::max(0.0, song_time_ - intro_camera_seconds_);
+    return ghogx::camera::intro_track_elapsed(
+        track_intro_active_ ? intro_presentation_time_ :
+            intro_camera_seconds_ + std::max(0.0, audio_master_time_),
+        intro_camera_seconds_, track_extend_sec_);
   }
   bool venue_intro_active() const {
-    return track_intro_active_ && intro_camera_seconds_ > 0.0 &&
-           song_time_ < intro_camera_seconds_;
+    return track_intro_active_ && track_intro_elapsed() < 0.0;
   }
   int    difficulty()const { return difficulty_; }
 
@@ -1175,6 +1254,8 @@ class Gameplay {
   void update_active_venue_light_anims();
   void update_active_venue_particles();
   void update_active_venue_anim_filters();
+  void poll_venue_presentation_tasks();
+  void rebase_venue_presentation_tasks(double elapsed_intro);
   bool apply_lighting_event(const std::string& event_name,
                             bool persistent = true);
   bool apply_lighting_event_visibility(const std::string& event_name,
@@ -1341,12 +1422,18 @@ class Gameplay {
       std::vector<ghogx::character::CharClipCatalogEntry> clip_catalog;
       std::map<std::string, ghogx::character::CharClipGroup> groups;
       std::map<std::string, ghogx::character::CharClip> decoded_clips;
+      std::vector<std::shared_ptr<const ghogx::character::Gh2ClipSetBinding>>
+          clip_bindings;
       ghogx::character::CharClipPlayer player;
       ghogx::DataNode saved_node;
       bool saved_node_valid = false;
       std::string starved_handler;
       float beat_scale = 1.0f;
       size_t source_order = 0;
+      std::string target;
+      std::string weight_owner;
+      std::string weight_prop;
+      float weight = 1.0f;
     };
     std::string role;
     std::string character_name;
@@ -1364,6 +1451,11 @@ class Gameplay {
     std::unique_ptr<ghogx::character::CharacterTypeScriptInstance>
         type_script;
     std::map<std::string, AuthoredDriver> authored_drivers;
+    std::map<std::string,
+             std::unique_ptr<ghogx::character::SourceCharServoCharacter>>
+        source_servos;
+    bool source_servo_runtime = false;
+    bool source_servo_runtime_reported = false;
     std::vector<CharacterWorldFxRuntime> world_fxes;
     bool type_script_solo_active = false;
     bool type_script_peak_active = false;
@@ -1503,6 +1595,12 @@ class Gameplay {
                                              0.0f, 1.0f, 0.0f, 0.0f,
                                              0.0f, 0.0f, 1.0f, 0.0f,
                                              0.0f, 0.0f, 0.0f, 1.0f};
+    // Character root LOCAL composed with the venue/stage placement above.
+    // Camera targets and renderer consume this; CharWalk continues to own the
+    // parent placement in world_transform.
+    std::array<float, 16> effective_world_transform = {
+        1.0f, 0.0f, 0.0f, 0.0f, 0.0f, 1.0f, 0.0f, 0.0f,
+        0.0f, 0.0f, 1.0f, 0.0f, 0.0f, 0.0f, 0.0f, 1.0f};
   };
   std::vector<Performer> performers_;
   ghogx::DataNode handle_performer_driver_message(
@@ -1517,11 +1615,17 @@ class Gameplay {
   std::string last_performer_lighting_key_;
 
   std::optional<QuickplayRig> quickplay_rig_;
+  std::string preferred_bassist_;
+  std::string preferred_drummer_;
+  std::string preferred_keyboardist_;
+  std::string preferred_male_singer_;
+  std::string preferred_female_singer_;
   std::string highway_surface_ref_;
   std::optional<ghogx::character::FaceFxAnimation> facefx_animation_;
   bool world_init_attempted_ = false;
   std::vector<CameraKey> camera_keys_;
   std::vector<CameraKey> regular_camera_keys_;
+  bool gh1_arena_spot_route_active_ = false;
   size_t guitarist0_charwalk_object_count_ = 0;
   CameraKey source_intro_camera_previous_;
   bool has_source_intro_camera_previous_ = false;
@@ -1535,6 +1639,7 @@ class Gameplay {
   double pending_regular_camera_local_frame_ = 0.0;
   double active_regular_camera_start_ = 0.0;
   double intro_camera_seconds_ = 0.0;
+  double track_extend_sec_ = -2.0; // overwritten by required ui/gen/game.dtb property
   std::map<std::string, std::pair<int, int>> camera_duration_bars_;
   int camera_bars_left_ = 0;
   uint32_t last_camera_bar_ = UINT32_MAX;
@@ -1549,6 +1654,7 @@ class Gameplay {
   size_t camera_normal_category_cursor_ = 0;
   CameraManagerFreeCamState camera_manager_free_cam_;
   CameraResultBuilderState camera_result_builder_state_;
+  ghogx::camera::Gh1CameraHelper gh1_camera_helper_;
   int active_force_char_lod_ = -1;
   bool source_game_lost_camera_dispatched_ = false;
   bool source_game_won_message_dispatched_ = false;
@@ -1825,6 +1931,9 @@ class Gameplay {
     std::vector<std::array<float, 16>> placement_worlds;
     std::vector<PlacementRef> placement_refs;
     size_t animation_ordinal = 0;
+    bool gh1_promoted = false;
+    size_t gh1_promoted_ordinal = 0;
+    bool gh1_transform_logged = false;
     float source_character_height = 0.0f;
     float fullness_fraction = 1.0f;
     double next_animation_proof_log_time = 0.0;
@@ -1901,6 +2010,7 @@ class Gameplay {
   size_t next_bass_cue_idx_ = 0;
   size_t next_venue_cue_idx_ = 0;
   size_t next_section_venue_event_idx_ = 0;
+  size_t next_music_start_event_idx_ = 0;
 
   struct ActiveSustain {
     uint32_t mask = 0;
@@ -1911,7 +2021,10 @@ class Gameplay {
   };
   std::vector<ActiveSustain> active_sustains_;
 
+  double   audio_master_time_ = 0.0;
+  double   intro_presentation_time_ = 0.0;
   double   song_time_      = 0.0;
+  int      audio_offset_ms_ = 0;
   int      sync_offset_ms_ = 0;
   int      difficulty_     = 3;
   // Index of the next unprocessed note in chart_.notes[difficulty_].

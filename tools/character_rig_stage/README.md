@@ -1,5 +1,17 @@
 # Singer finger-rig staging
 
+## Shipping pipeline (2026-09-05)
+
+The singers now use the automated **native MILO** finger graft and skin-weight
+transfer, not the manual Blender staging workflow below. It generates both
+GH2 defaults and GH1 alternates in `DLC/core.singers`, preserving source body
+proportions and NPC assets. See [the pipeline and proof report](../../docs/PLAYABLE_SINGER_FINGERS.md).
+
+`milo_rig_export` now preserves the source's **signed floating-point skin
+weights**. These fields must not pass through Color32/unsigned byte conversion.
+
+## Legacy manual Blender workflow
+
 This pipeline prepares a singer model for manual finger weight painting without
 changing the singer's proportions. It uses a guitarist only as a factual donor
 for the left/right finger hierarchy and bind orientations.

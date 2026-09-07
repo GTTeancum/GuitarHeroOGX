@@ -9,6 +9,7 @@
 #include "ui/pss_video_player_win32.h"
 #include "ui/screen_loader.h"
 #include "ui/screen_manager.h"
+#include "ui/soundcheck_panel.h"
 #include "ui/song_intro_overlay.h"
 #include "ui/ui_classes.h"
 
@@ -17,6 +18,7 @@
 #include "character/char_clip.h"
 #include "character/char_renderer.h"
 #include "game/gameplay.h"
+#include "game/highway_renderer.h"
 #include "hud/hud_renderer.h"
 #include "milo_scene/milo_scene.h"
 #include "render/milo_scene_renderer.h"
@@ -106,6 +108,144 @@ IDirect3DTexture9* upload_overlay_texture(IDirect3DDevice9* dev,
   texture->UnlockRect(0);
   return texture;
 }
+
+const char* venue_preview_filename(Symbol venue) {
+  static const std::unordered_map<std::string, const char*> names = {
+      {"big", "red-octane-gh2.bmp"},
+      {"arena", "the-arena.bmp"},
+      {"fest", "vans-warped-tour.bmp"},
+      {"theatre", "rock-city-theater.bmp"},
+      {"stone", "stonehenge.bmp"},
+      {"small1", "rat-cellar.bmp"},
+      {"small2", "blackout-bar.bmp"},
+      {"battle", "high-school.bmp"},
+      {"gh1_big_club", "red-octane-gh1.bmp"},
+      {"gh1_arena", "the-garden.bmp"},
+      {"gh1_theatre", "republik-theater.bmp"},
+      {"gh1_fest", "toxic-summer-tour.bmp"},
+      {"gh1_basement", "the-basement.bmp"},
+      {"gh1_small_club", "freak-pit.bmp"},
+  };
+  const auto found = names.find(venue.c_str());
+  return found == names.end() ? nullptr : found->second;
+}
+
+std::filesystem::path venue_preview_path(const std::string& hdr,
+                                         Symbol venue) {
+  const char* filename = venue_preview_filename(venue);
+  if (!filename) return {};
+  std::vector<std::filesystem::path> roots;
+  if (const char* configured = std::getenv("GHOGX_VENUE_PREVIEW_DIR"))
+    if (*configured) roots.emplace_back(configured);
+  const std::filesystem::path hdr_dir =
+      std::filesystem::path(hdr).parent_path();
+  roots.push_back(hdr_dir / "venue-previews");
+  roots.push_back(hdr_dir / "venue_previews");
+  roots.push_back(hdr_dir.parent_path() / "venue-previews");
+  roots.push_back(std::filesystem::current_path() / "venue-previews");
+  roots.push_back(std::filesystem::current_path() / "proofs" /
+                  "manage-band-20260906" / "venue-preview-approved");
+  wchar_t executable[MAX_PATH] = {};
+  const DWORD length = GetModuleFileNameW(nullptr, executable, MAX_PATH);
+  if (length > 0 && length < MAX_PATH)
+    roots.push_back(std::filesystem::path(executable).parent_path() /
+                    "venue-previews");
+  for (const auto& root : roots) {
+    const auto candidate = root / filename;
+    std::error_code error;
+    if (std::filesystem::is_regular_file(candidate, error) && !error)
+      return candidate;
+  }
+  return {};
+}
+
+class VenuePreviewOverlay {
+ public:
+  ~VenuePreviewOverlay() {
+    if (texture_) texture_->Release();
+  }
+
+  void draw(IDirect3DDevice9* dev, int width, int height,
+            const std::string& hdr, Symbol venue) {
+    if (!dev || width <= 0 || height <= 0 || !venue.valid()) return;
+    const std::filesystem::path path = venue_preview_path(hdr, venue);
+    const std::string key = path.string();
+    if (key != loaded_path_) {
+      loaded_path_ = key;
+      if (texture_) {
+        texture_->Release();
+        texture_ = nullptr;
+      }
+      if (!key.empty()) {
+        const asset::Image image = asset::load_bmp_file(key);
+        texture_ = upload_overlay_texture(dev, image);
+      }
+      if (!texture_)
+        std::fprintf(stderr,
+                     "[manage-band] venue preview unavailable id=%s path=%s\n",
+                     venue.c_str(), key.empty() ? "<not-found>" : key.c_str());
+    }
+    if (!texture_) return;
+
+    const float sx = static_cast<float>(width) / 960.0f;
+    const float sy = static_cast<float>(height) / 720.0f;
+    const float cx = 190.0f * sx;
+    const float cy = 342.0f * sy;
+    const float image_w = 340.0f * sx;
+    const float image_h = 255.0f * sy;
+    constexpr float kRotationRadians = -3.0f * 3.14159265358979323846f / 180.0f;
+    const float cosine = std::cos(kRotationRadians);
+    const float sine = std::sin(kRotationRadians);
+    const auto vertex = [&](float local_x, float local_y, D3DCOLOR color,
+                            float u, float v) {
+      const float x = cx + local_x * cosine - local_y * sine;
+      const float y = cy + local_x * sine + local_y * cosine;
+      return OverlayVertex{x - 0.5f, y - 0.5f, 0.0f, 1.0f, color, u, v};
+    };
+    const auto quad = [&](float quad_w, float quad_h, D3DCOLOR color) {
+      const float hw = quad_w * 0.5f;
+      const float hh = quad_h * 0.5f;
+      return std::array<OverlayVertex, 4>{
+          vertex(-hw, -hh, color, 0.0f, 0.0f),
+          vertex(hw, -hh, color, 1.0f, 0.0f),
+          vertex(-hw, hh, color, 0.0f, 1.0f),
+          vertex(hw, hh, color, 1.0f, 1.0f)};
+    };
+
+    dev->BeginScene();
+    dev->SetRenderState(D3DRS_LIGHTING, FALSE);
+    dev->SetRenderState(D3DRS_ZENABLE, FALSE);
+    dev->SetRenderState(D3DRS_CULLMODE, D3DCULL_NONE);
+    dev->SetRenderState(D3DRS_ALPHABLENDENABLE, FALSE);
+    dev->SetFVF(kOverlayFvf);
+    dev->SetTexture(0, nullptr);
+    dev->SetTextureStageState(0, D3DTSS_COLOROP, D3DTOP_SELECTARG1);
+    dev->SetTextureStageState(0, D3DTSS_COLORARG1, D3DTA_DIFFUSE);
+    const auto border = quad(image_w + 12.0f * sx, image_h + 12.0f * sy,
+                             0xff181410u);
+    dev->DrawPrimitiveUP(D3DPT_TRIANGLESTRIP, 2, border.data(),
+                         sizeof(OverlayVertex));
+    dev->SetTexture(0, texture_);
+    dev->SetSamplerState(0, D3DSAMP_MINFILTER, D3DTEXF_LINEAR);
+    dev->SetSamplerState(0, D3DSAMP_MAGFILTER, D3DTEXF_LINEAR);
+    dev->SetSamplerState(0, D3DSAMP_ADDRESSU, D3DTADDRESS_CLAMP);
+    dev->SetSamplerState(0, D3DSAMP_ADDRESSV, D3DTADDRESS_CLAMP);
+    dev->SetTextureStageState(0, D3DTSS_COLOROP, D3DTOP_MODULATE);
+    dev->SetTextureStageState(0, D3DTSS_COLORARG1, D3DTA_TEXTURE);
+    dev->SetTextureStageState(0, D3DTSS_COLORARG2, D3DTA_DIFFUSE);
+    dev->SetTextureStageState(0, D3DTSS_ALPHAOP, D3DTOP_SELECTARG1);
+    dev->SetTextureStageState(0, D3DTSS_ALPHAARG1, D3DTA_TEXTURE);
+    const auto image = quad(image_w, image_h, 0xffffffffu);
+    dev->DrawPrimitiveUP(D3DPT_TRIANGLESTRIP, 2, image.data(),
+                         sizeof(OverlayVertex));
+    dev->SetTexture(0, nullptr);
+    dev->EndScene();
+  }
+
+ private:
+  std::string loaded_path_;
+  IDirect3DTexture9* texture_ = nullptr;
+};
 
 void draw_paint_swatch(IDirect3DDevice9* dev, int width, int height,
                        int color_index, bool active) {
@@ -631,6 +771,8 @@ GuitarDisplayAttachTarget guitar_display_attach_target(Symbol panel_name,
     if (player == 1) return {"guitar_p2.view", "guitar_multi1.placer"};
     return {"guitar_p1.view", "guitar_multi0.placer"};
   }
+  if (panel_name == Symbol("manage_band_guitar_preview"))
+    return {"guitar_p1.view", "guitar_multi0.placer"};
   if (panel_name == Symbol("unlock_guitar_display_panel"))
     return {"guitar_axe.view", "guitar_axe.placer"};
   return {"guitar_single.view", ""};
@@ -641,6 +783,8 @@ std::string guitar_display_filter_name(Symbol panel_name, int player) {
     return "guitar_store.filt";
   if (panel_name == Symbol("multi_guitar_display_panel"))
     return player == 1 ? "guitar_p2.filt" : "guitar_p1.filt";
+  if (panel_name == Symbol("manage_band_guitar_preview"))
+    return "guitar_p1.filt";
   if (panel_name == Symbol("unlock_guitar_display_panel"))
     return "guitar_axe.filt";
   return {};
@@ -657,6 +801,7 @@ bool guitar_display_uses_live_proxy(Symbol panel_name) {
   // a fallback when a script does not provide live proxy objects.
   return panel_name == Symbol("guitar_display_panel") ||
          panel_name == Symbol("multi_guitar_display_panel") ||
+         panel_name == Symbol("manage_band_guitar_preview") ||
          panel_name == Symbol("store_guitar_display_panel") ||
          panel_name == Symbol("unlock_guitar_display_panel");
 }
@@ -1546,10 +1691,16 @@ bool build_live_guitar_display_scene(const std::string& hdr, const std::string& 
     Object* proxy_obj = object_value(proxy_node);
     Symbol filter_symbol = symbol_value(filter_node);
     Object* filter_obj = object_value(filter_node);
-    const std::string proxy_milo =
+    std::string proxy_milo =
         source_milo_for_screen_object(mgr, screen, proxy_name, proxy_obj);
     std::string filter_milo =
         source_milo_for_screen_object(mgr, screen, filter_symbol, filter_obj);
+    if (pn == Symbol("manage_band_guitar_preview")) {
+      if (proxy_milo.empty())
+        proxy_milo = "ui/gen/multi_sel_guitar.milo_ps2";
+      if (filter_milo.empty())
+        filter_milo = "ui/gen/multi_sel_guitar.milo_ps2";
+    }
     if (filter_milo.empty()) filter_milo = proxy_milo;
 
     DataNode env_node =
@@ -1558,6 +1709,8 @@ bool build_live_guitar_display_scene(const std::string& hdr, const std::string& 
     Object* env_obj = object_value(env_node);
     std::string env_milo =
         source_milo_for_screen_object(mgr, screen, env_name, env_obj);
+    if (pn == Symbol("manage_band_guitar_preview") && env_milo.empty())
+      env_milo = "ui/gen/multi_sel_guitar.milo_ps2";
     if (env_milo.empty()) env_milo = proxy_milo;
     if (env_milo.empty()) env_milo = filter_milo;
     if (env_name.valid() && !env_milo.empty() &&
@@ -1666,6 +1819,16 @@ bool build_live_guitar_display_scene(const std::string& hdr, const std::string& 
           // instrument over the description instead of beside the case.
           proxy_world.pos[0] = -proxy_world.pos[0];
         }
+        if (pn == Symbol("manage_band_guitar_preview")) {
+          // Manage Band owns a 40/60 presentation instead of the stock 2P
+          // guitar screen's two equal bays. Keep every guitar/bass centered in
+          // the left 40% and lift it clear of the footer.
+          proxy_world.pos[0] -= 2.5f;
+          proxy_world.pos[2] += 1.5f;
+          for (int row = 0; row < 3; ++row)
+            for (int column = 0; column < 3; ++column)
+              proxy_world.rot[row][column] *= 0.86f;
+        }
         append_proxy_transform_node(combined, proxy, proxy_local, proxy_world);
         used_live_proxy = true;
         uses_screen_proxy_camera = true;
@@ -1747,7 +1910,8 @@ bool build_live_guitar_display_scene(const std::string& hdr, const std::string& 
     }
 
     GuitarDisplayAttachTarget target;
-    if (display_parent.empty() && !used_live_proxy_main_trans) {
+    if (display_parent.empty() && !used_live_proxy_main_trans &&
+        !baked_shared_display) {
       ensure_shared_rig();
       target = guitar_display_attach_target(pn, player);
       display_parent = target.parent();
@@ -2260,6 +2424,29 @@ void apply_dynamic_character_reels(
                suppressed_source_highlights, static_source_highlights);
 }
 
+void mask_manage_band_character_select_ui(milo_scene::Scene& scene) {
+  std::unordered_set<std::string> hidden_groups = {
+      "msc_icons.grp", "sc1_highlight.grp", "sc2_highlight.grp"};
+  bool changed = true;
+  while (changed) {
+    changed = false;
+    for (const auto& group : scene.groups) {
+      if (!hidden_groups.count(group.parent) || hidden_groups.count(group.name))
+        continue;
+      hidden_groups.insert(group.name);
+      changed = true;
+    }
+  }
+  for (auto& group : scene.groups)
+    if (hidden_groups.count(group.name)) group.showing = false;
+  for (auto& mesh : scene.meshes)
+    if (hidden_groups.count(mesh.parent) ||
+        mesh.name.rfind("char_", 0) == 0 ||
+        mesh.name.rfind("sc1_highlight", 0) == 0 ||
+        mesh.name.rfind("sc2_highlight", 0) == 0)
+      mesh.showing = false;
+}
+
 // Build the renderer's scene from the current screen's panels' MILOs.
 void rebuild_scene(const std::string& hdr, const std::string& ark, ScreenManager& mgr,
                    Object* screen, const ConfigDb& db,
@@ -2269,9 +2456,18 @@ void rebuild_scene(const std::string& hdr, const std::string& ark, ScreenManager
   for (Symbol pn : screen_panel_names(screen)) {
     Object* panel = mgr.find_object(pn);
     if (!panel_showing(panel)) continue;
-    add_panel_milo(hdr, ark, mgr, db, panel_file(panel), combined, textures);
+    std::string file = panel_file(panel);
+    if (screen && screen->name() == Symbol("soundcheck_screen") &&
+        pn == Symbol("soundcheck_panel")) {
+      const Symbol backdrop =
+          symbol_value(panel->get_property(Symbol("backdrop_file")));
+      if (backdrop.valid()) file = backdrop.c_str();
+    }
+    add_panel_milo(hdr, ark, mgr, db, file, combined, textures);
   }
   apply_dynamic_character_reels(hdr, ark, mgr, screen, combined, textures);
+  if (screen && screen->name() == Symbol("manage_band_screen"))
+    mask_manage_band_character_select_ui(combined);
   // PanelDir camera/environment references may resolve through the stock
   // metacam subdirectory rather than objects serialized in the panel itself.
   // Import the referenced kind only when it is absent from the combined scene,
@@ -2368,12 +2564,43 @@ bool rebuild_guitar_display_scene(const std::string& hdr, const std::string& ark
   return visible;
 }
 
+std::string guitar_display_selection_key(ScreenManager& mgr, Object* screen,
+                                         const ConfigDb& db) {
+  std::string key;
+  if (!screen) return key;
+  for (Symbol panel_name : screen_panel_names(screen)) {
+    Object* panel = mgr.find_object(panel_name);
+    if (!panel || panel->class_name() != Symbol("GuitarDisplayPanel") ||
+        !panel_showing(panel))
+      continue;
+    for (const int player : guitar_display_active_players(panel)) {
+      Symbol guitar = symbol_value(
+          guitar_display_panel_value(panel, "guitar", player));
+      if (!guitar.valid()) continue;
+      Symbol skin = symbol_value(
+          guitar_display_panel_value(panel, "guitar_skin", player));
+      if (!skin.valid()) skin = db.first_guitar_skin(guitar);
+      key += panel_name.c_str();
+      key += ':';
+      key += std::to_string(player);
+      key += ':';
+      key += guitar.c_str();
+      key += ':';
+      key += skin.c_str();
+      key += ';';
+    }
+  }
+  return key;
+}
+
 struct MenuCharacterPreview {
   int player = 0;
   std::string panel;
   std::string outfit;
   std::string placer;
   std::string environment;
+  float layout_offset_x = 0.0f;
+  float layout_offset_z = 0.0f;
   std::string door_mesh;
   milo_scene::Xfm door_bind_local;
   bool has_door_binding = false;
@@ -2454,9 +2681,16 @@ load_authored_open_door_pose(const std::string& hdr, const std::string& ark,
 std::vector<MenuCharacterPreview> rebuild_character_display_scenes(
     const std::string& hdr, const std::string& ark, ScreenManager& mgr,
     Object* screen, const ConfigDb& db, ghogx::render::Window& window,
-    std::vector<MenuCharacterPreview> previous = {}) {
+    std::vector<MenuCharacterPreview> previous = {},
+    std::vector<MenuCharacterPreview>* inactive_cache = nullptr) {
   std::vector<MenuCharacterPreview> previews;
   if (!screen) return previews;
+  if (inactive_cache) {
+    previous.insert(previous.end(),
+                    std::make_move_iterator(inactive_cache->begin()),
+                    std::make_move_iterator(inactive_cache->end()));
+    inactive_cache->clear();
+  }
 
   for (Symbol panel_name : screen_panel_names(screen)) {
     Object* panel = mgr.find_object(panel_name);
@@ -2530,7 +2764,19 @@ std::vector<MenuCharacterPreview> rebuild_character_display_scenes(
                            Symbol(indexed_runtime_name("char_env", player)
                                       .c_str())))
               .c_str();
-      if (!reload_requested) {
+      const float layout_offset_x =
+          panel->get_property(Symbol("preview_offset_x"))
+              .as_float()
+              .value_or(0.0f);
+      const float layout_offset_z =
+          panel->get_property(Symbol("preview_offset_z"))
+              .as_float()
+              .value_or(0.0f);
+      placement_world[12] += layout_offset_x;
+      placement_world[14] += layout_offset_z;
+      const bool cacheable_manage_band =
+          panel_name == Symbol("manage_band_char_preview");
+      if (!reload_requested || cacheable_manage_band) {
         auto old = std::find_if(
             previous.begin(), previous.end(), [&](const auto& candidate) {
               return candidate.player == player &&
@@ -2540,10 +2786,18 @@ std::vector<MenuCharacterPreview> rebuild_character_display_scenes(
         if (old != previous.end()) {
           old->placer = placer;
           old->environment = environment;
+          old->layout_offset_x = layout_offset_x;
+          old->layout_offset_z = layout_offset_z;
           old->door_mesh = door_mesh;
           old->door_bind_local = door_bind_local;
           old->has_door_binding = has_door_binding;
           old->renderer->set_world_transform(placement_world);
+          panel->set_property(
+              Symbol(indexed_runtime_name("char_loaded", player).c_str()),
+              DataNode::Int(1));
+          std::fprintf(stderr,
+                       "[menu-char] cache-hit player=%d outfit=%s panel=%s\n",
+                       player, outfit.c_str(), panel_name.c_str());
           previews.push_back(std::move(*old));
           continue;
         }
@@ -2552,10 +2806,15 @@ std::vector<MenuCharacterPreview> rebuild_character_display_scenes(
       const CharacterVariant* variant = db.character_variant(outfit);
       const std::string base = "char/" + std::string(outfit.c_str()) +
                                "/og/gen/" + outfit.c_str();
-      std::string char_milo =
-          variant && !variant->ui_model_path.empty()
-              ? variant->ui_model_path
-              : base + "_ui.milo_ps2";
+      const std::string preview_model_override =
+          std::string(panel->get_property(Symbol("preview_model_path"))
+                          .as_string()
+                          .value_or(""));
+      std::string char_milo = !preview_model_override.empty()
+                                  ? preview_model_override
+                              : variant && !variant->ui_model_path.empty()
+                                  ? variant->ui_model_path
+                                  : base + "_ui.milo_ps2";
       ghogx::character::Character character;
       if (!ghogx::character::load_character(hdr, ark, char_milo, character)) {
         char_milo =
@@ -2581,6 +2840,8 @@ std::vector<MenuCharacterPreview> rebuild_character_display_scenes(
       preview.outfit = outfit.c_str();
       preview.placer = placer;
       preview.environment = environment;
+      preview.layout_offset_x = layout_offset_x;
+      preview.layout_offset_z = layout_offset_z;
       preview.door_mesh = door_mesh;
       preview.door_bind_local = door_bind_local;
       preview.has_door_binding = has_door_binding;
@@ -2689,7 +2950,13 @@ std::vector<MenuCharacterPreview> rebuild_character_display_scenes(
       preview.renderer->set_use_scene_lighting(true);
       std::string ui_anim_owner = outfit.c_str();
       std::string ui_anim_milo =
-          variant && !variant->ui_anim_path.empty()
+          panel->get_property(Symbol("preview_anim_path"))
+                      .as_string()
+                      .value_or("") != ""
+              ? std::string(panel->get_property(Symbol("preview_anim_path"))
+                                .as_string()
+                                .value_or(""))
+          : variant && !variant->ui_anim_path.empty()
               ? variant->ui_anim_path
               : "char/" + ui_anim_owner + "/anims/gen/" + ui_anim_owner +
                     "_ui.milo_ps2";
@@ -2698,13 +2965,19 @@ std::vector<MenuCharacterPreview> rebuild_character_display_scenes(
       if (!preview.ui_clip->loaded) {
         const auto catalog = ghogx::character::load_clip_catalog(
             hdr, ark, {ui_anim_milo});
-        const auto authored_idle = std::find_if(
+        auto authored_idle = std::find_if(
             catalog.begin(), catalog.end(), [](const auto& clip) {
               constexpr std::string_view suffix = "_idle_ui";
               return clip.name.size() >= suffix.size() &&
                      clip.name.compare(clip.name.size() - suffix.size(),
                                        suffix.size(), suffix) == 0;
             });
+        if (authored_idle == catalog.end()) {
+          authored_idle = std::find_if(
+              catalog.begin(), catalog.end(), [](const auto& clip) {
+                return clip.name.find("_idle_") != std::string::npos;
+              });
+        }
         const auto selected =
             authored_idle != catalog.end() ? authored_idle : catalog.begin();
         if (selected != catalog.end()) {
@@ -2842,6 +3115,19 @@ std::vector<MenuCharacterPreview> rebuild_character_display_scenes(
                    placer_milo.c_str());
       previews.push_back(std::move(preview));
     }
+  }
+  if (inactive_cache) {
+    for (auto& old : previous) {
+      if (!old.renderer || old.panel != "manage_band_char_preview") continue;
+      inactive_cache->push_back(std::move(old));
+    }
+    constexpr std::size_t kMaxManageBandCharacterCache = 24;
+    if (inactive_cache->size() > kMaxManageBandCharacterCache)
+      inactive_cache->erase(
+          inactive_cache->begin(),
+          inactive_cache->begin() +
+              static_cast<std::ptrdiff_t>(inactive_cache->size() -
+                                          kMaxManageBandCharacterCache));
   }
   return previews;
 }
@@ -3680,7 +3966,8 @@ void append_text_quads(const std::vector<MenuLabel>& labels, const MenuFont& fon
                        const std::unordered_set<std::string>& disabled,
                        std::vector<ghogx::render::MiloSceneRenderer::TextVertex>& out,
                        std::vector<ghogx::render::MiloSceneRenderer::TextTransformSpan>&
-                           transform_spans) {
+                           transform_spans,
+                       bool force_foreground_white = false) {
   using TV = ghogx::render::MiloSceneRenderer::TextVertex;
   const float capH = font.cap_height();
   // RndText::mSize scales the font's horizontal cell dimension.  Its rendered
@@ -3736,6 +4023,8 @@ void append_text_quads(const std::vector<MenuLabel>& labels, const MenuFont& fon
       // config.dtb::textentry/styles/high_score::text_color = 0.1 0.1 0.1.
       col = 0xFF1A1A1Au;
     }
+    if (force_foreground_white)
+      col = foc ? kResolvedColNormal : 0xFFFFFFFFu;
     std::string token = live_label_text(mgr, lbl);
     std::string disp = display_text_from_node(DataNode::Str(token), locale);
     disp = apply_authored_caps(std::move(disp), lbl);
@@ -4082,6 +4371,10 @@ void append_song_string(const std::string& text, const MenuFont& font, float x, 
   }
 }
 
+std::string signed_milliseconds(int value) {
+  return (value >= 0 ? "+" : "") + std::to_string(value) + " MS";
+}
+
 struct LiveMenuAnimationSource {
   ObjectDir* panel = nullptr;
   std::string milo_path;
@@ -4350,6 +4643,238 @@ void append_song_string_centered_z(
     out.push_back(a); out.push_back(b); out.push_back(c);
     out.push_back(a); out.push_back(c); out.push_back(d);
   }
+}
+
+std::vector<MenuLabel> make_soundcheck_labels(
+    const std::string& hdr, const std::string& ark, ScreenManager& mgr,
+    std::string& focused) {
+  Object* panel = mgr.find_object(Symbol("soundcheck_panel"));
+  if (!panel) return {};
+  const auto source = extract_menu_labels(
+      hdr, ark, "ui/gen/sel_diff_practice.milo_ps2");
+  const auto find_source = [&](const char* name) -> const MenuLabel* {
+    for (const MenuLabel& label : source)
+      if (label.name == name) return &label;
+    return nullptr;
+  };
+  const MenuLabel* title_source = find_source("sd_select.lbl");
+  const std::array<const MenuLabel*, 4> row_source = {
+      find_source("sd_diff1.btn"), find_source("sd_diff2.btn"),
+      find_source("sd_diff3.btn"), find_source("sd_diff4.btn")};
+  if (!title_source || std::any_of(row_source.begin(), row_source.end(),
+                                   [](const MenuLabel* value) {
+                                     return value == nullptr;
+                                   }))
+    return {};
+
+  const Symbol stage = symbol_value(panel->get_property(Symbol("stage")));
+  const int audio = int_value(
+      panel->get_property(Symbol("audio_offset_ms")), 0);
+  const int video = int_value(
+      panel->get_property(Symbol("video_input_offset_ms")), 0);
+  const int samples = int_value(
+      panel->get_property(Symbol("samples_collected")), 0);
+  const int required = int_value(
+      panel->get_property(Symbol("samples_required")), 8);
+  const int countdown = int_value(
+      panel->get_property(Symbol("countdown")), 0);
+  const std::string feedback(
+      panel->get_property(Symbol("feedback")).as_string().value_or(""));
+  std::string title;
+  std::array<std::string, 4> rows;
+  int selected = -1;
+
+  if (stage == Symbol("main")) {
+    title = "SOUNDCHECK";
+    rows = {"GUIDED SETUP", "FINE TUNE", "TEST SETUP", "SAVE & RETURN"};
+    selected = int_value(panel->get_property(Symbol("main_selection")), 0);
+  } else if (stage == Symbol("audio_measure")) {
+    title = "AUDIO\nCHECK";
+    rows = {"LISTEN & STRUM", std::to_string(samples) + " / " +
+                                   std::to_string(required) + " HITS",
+            countdown > 0 ? "COUNT  " + std::to_string(countdown)
+                          : "FOLLOW THE CLICK",
+            feedback.empty() ? "" : "GREEN TO RETRY"};
+    selected = feedback.empty() ? -1 : 3;
+  } else if (stage == Symbol("audio_result")) {
+    title = "AUDIO\nSET";
+    rows = {"AUDIO  " + signed_milliseconds(audio), "VIDEO / INPUT NEXT",
+            "GREEN TO CONTINUE", "RED TO RETURN"};
+    selected = 2;
+  } else if (stage == Symbol("video_measure")) {
+    title = "VIDEO / INPUT\nCHECK";
+    rows = {"WATCH THE TARGET", std::to_string(samples) + " / " +
+                                      std::to_string(required) + " HITS",
+            countdown > 0 ? "COUNT  " + std::to_string(countdown)
+                          : "STRUM ON THE GEM",
+            feedback.empty() ? "" : "GREEN TO RETRY"};
+    selected = feedback.empty() ? -1 : 3;
+  } else if (stage == Symbol("results")) {
+    const int spread = std::max(
+        int_value(panel->get_property(Symbol("audio_spread_ms")), 0),
+        int_value(panel->get_property(Symbol("video_spread_ms")), 0));
+    title = "SOUNDCHECK\nCOMPLETE";
+    rows = {"AUDIO  " + signed_milliseconds(audio),
+            "VIDEO  " + signed_milliseconds(video),
+            "SPREAD  " + std::to_string(spread) + " MS", "PLAY & FINE TUNE"};
+    selected = 3;
+  } else if (stage == Symbol("fine_tune")) {
+    const bool adjusting =
+        node_bool(panel->get_property(Symbol("fine_adjusting")));
+    title = "FINE\nTUNE";
+    rows = {"AUDIO  " + signed_milliseconds(audio),
+            "VIDEO  " + signed_milliseconds(video), "PLAY & FINE TUNE",
+            "RESET TO ZERO"};
+    selected = int_value(panel->get_property(Symbol("fine_selection")), 0);
+    if (adjusting && selected >= 0 && selected < 2)
+      rows[static_cast<std::size_t>(selected)] =
+          "<  " + rows[static_cast<std::size_t>(selected)] + "  >";
+  } else if (stage == Symbol("combined_test")) {
+    title = "PLAY TO\nFINE TUNE";
+    rows = {countdown > 0 ? "GET READY" : "KEEP PLAYING",
+            std::to_string(samples) + " / " + std::to_string(required) +
+                " NOTES",
+            feedback.empty() ? "STRUM EACH GREEN NOTE" : feedback,
+            "RED TO RETURN"};
+  } else if (stage == Symbol("adaptive_result")) {
+    const int spread = int_value(
+        panel->get_property(Symbol("video_spread_ms")), 0);
+    title = "FINE TUNE\nCOMPLETE";
+    rows = {"VIDEO  " + signed_milliseconds(video),
+            feedback.empty() ? "TIMING LEARNED" : feedback,
+            "SPREAD  " + std::to_string(spread) + " MS",
+            "GREEN TO KEEP"};
+    selected = 3;
+  }
+
+  std::vector<MenuLabel> labels;
+  MenuLabel title_label = *title_source;
+  title_label.name = "soundcheck_title.lbl";
+  title_label.text = title;
+  title_label.runtime_owner.clear();
+  title_label.parent.clear();
+  title_label.visibility_ancestors.clear();
+  title_label.has_showing = false;
+  labels.push_back(std::move(title_label));
+  for (int i = 0; i < 4; ++i) {
+    if (rows[static_cast<std::size_t>(i)].empty()) continue;
+    MenuLabel row = *row_source[static_cast<std::size_t>(i)];
+    row.name = "soundcheck_row" + std::to_string(i) + ".btn";
+    row.text = rows[static_cast<std::size_t>(i)];
+    row.runtime_owner.clear();
+    row.parent.clear();
+    row.visibility_ancestors.clear();
+    row.has_showing = false;
+    if (i == selected) focused = row.name;
+    labels.push_back(std::move(row));
+  }
+  return labels;
+}
+
+std::vector<MenuLabel> make_manage_band_labels(
+    const std::string& hdr, const std::string& ark, ScreenManager& mgr,
+    std::string& focused) {
+  Object* panel = mgr.find_object(Symbol("manage_band_preferences_panel"));
+  if (!panel) return {};
+  const auto authored_heading =
+      extract_menu_labels(hdr, ark, "ui/gen/multi_sel_character.milo_ps2");
+  const auto row_source = std::find_if(
+      authored_heading.begin(), authored_heading.end(),
+      [](const MenuLabel& label) { return label.name == "sc2_player.lbl"; });
+  if (row_source == authored_heading.end()) return {};
+
+  std::vector<MenuLabel> labels;
+  const auto heading = std::find_if(
+      authored_heading.begin(), authored_heading.end(),
+      [](const MenuLabel& label) { return label.name == "msg_label0.lbl"; });
+  if (heading != authored_heading.end()) {
+    MenuLabel title = *heading;
+    title.name = "manage_band_title.lbl";
+    title.text = "MANAGE BAND";
+    title.runtime_owner.clear();
+    title.parent.clear();
+    title.visibility_ancestors.clear();
+    title.has_showing = false;
+    title.type = "BandLabel";
+    title.local[9] = title.world[9] = -50.0f;
+    title.local[11] = title.world[11] = 200.0f;
+    title.text_tail.valid = true;
+    title.text_tail.fit_text = 2;
+    title.text_tail.alignment = 33;
+    title.text_tail.height = 72.0f;
+    title.text_tail.text_size = 40.0f;
+    title.text_tail.width = 820.0f;
+    title.text_tail.width_bound = 820.0f;
+    title.text_tail.color = {0.08f, 0.055f, 0.035f, 1.0f};
+    labels.push_back(std::move(title));
+  }
+  constexpr int selected_row = 2;
+  constexpr int visible_rows = 7;
+  for (int row_index = 0; row_index < visible_rows; ++row_index) {
+    const std::string property = "row_text_" + std::to_string(row_index);
+    const std::string text_value =
+        std::string(panel->get_property(Symbol(property.c_str()))
+                        .as_string()
+                        .value_or(""));
+    if (text_value.empty()) continue;
+    const std::size_t break_at = text_value.find('\n');
+    const std::array<std::string, 2> lines = {
+        text_value.substr(0, break_at),
+        break_at == std::string::npos ? std::string()
+                                      : text_value.substr(break_at + 1)};
+    // Seven entries occupy the usable column while retaining one uniform,
+    // readable font size.
+    // The font remains large; only the excessive line gaps are removed.
+    const float slot_z = 112.0f - 38.0f * row_index;
+    for (int line_index = 0; line_index < 2; ++line_index) {
+      if (lines[static_cast<std::size_t>(line_index)].empty()) continue;
+      MenuLabel row = *row_source;
+      row.name = "manage_band_row" + std::to_string(row_index) + "_" +
+                 std::to_string(line_index) + ".btn";
+      row.type = "BandLabel";
+      row.text = lines[static_cast<std::size_t>(line_index)];
+      row.runtime_owner.clear();
+      row.parent.clear();
+      row.visibility_ancestors.clear();
+      row.has_showing = false;
+      row.local[9] = row.world[9] = -50.0f;
+      row.local[10] = row.world[10] = 0.0f;
+      row.local[11] = row.world[11] =
+          slot_z - 27.0f * static_cast<float>(line_index);
+      // Keep every reel choice at one uniform size. Per-line fitting made long
+      // venue/finish names visibly smaller than their neighbors; 32 world
+      // units fits the longest current authored label inside the 60% bay.
+      row.text_tail.fit_text = 1;
+      row.text_tail.alignment = 33;
+      row.text_tail.height = 42.0f;
+      row.text_tail.text_size = 32.0f;
+      row.text_tail.width = 820.0f;
+      row.text_tail.width_bound = 820.0f;
+      row.text_tail.color =
+          row_index == selected_row
+              ? std::array<float, 4>{0.9f, 0.9f, 0.9f, 1.0f}
+              : std::array<float, 4>{0.447f, 0.169f, 0.137f, 1.0f};
+      if (row_index == selected_row && line_index == 0) focused = row.name;
+      labels.push_back(std::move(row));
+    }
+  }
+  return labels;
+}
+
+ghogx::chart::Chart make_soundcheck_chart() {
+  ghogx::chart::Chart chart;
+  chart.ticks_per_beat = 480;
+  chart.tempo_map.push_back({0, 500000});
+  constexpr uint32_t kFirstTargetTick = 2880;  // 3.0s at 120 BPM.
+  constexpr uint32_t kTargetStepTick = 720;    // 0.75s.
+  constexpr int kSoundcheckTargetLane = 0;     // Green only.
+  for (int i = 0; i < 24; ++i) {
+    const uint32_t tick =
+        kFirstTargetTick + static_cast<uint32_t>(i) * kTargetStepTick;
+    chart.notes[3].push_back(
+        {tick, tick + 60u, kSoundcheckTargetLane, false, false, 0, false});
+  }
+  return chart;
 }
 
 ghogx::render::Mat4 footer_view_projection(
@@ -6221,7 +6746,13 @@ std::vector<MenuLabel> gather_labels(const std::string& hdr, const std::string& 
     std::string file = panel_file(panel);
     if (file.empty()) continue;
     const std::string milo_path = "ui/gen/" + file + "_ps2";
-    auto labels = extract_menu_labels(hdr, ark, milo_path);
+    auto labels =
+        screen && ((screen->name() == Symbol("soundcheck_screen") &&
+                    pn == Symbol("soundcheck_panel")) ||
+                   (screen->name() == Symbol("manage_band_screen") &&
+                    pn == Symbol("manage_band_panel")))
+            ? std::vector<MenuLabel>{}
+            : extract_menu_labels(hdr, ark, milo_path);
     milo_scene::Scene hierarchy;
     milo_scene::load_scene(hdr, ark, milo_path, hierarchy);
     annotate_label_transform_hierarchy(
@@ -6490,6 +7021,19 @@ void focus_move(ScreenManager& mgr, const std::vector<MenuLabel>& labels,
   Object* component = component_name.valid()
                           ? mgr.resolve_object(component_name)
                           : nullptr;
+  if (panel->class_name() == Symbol("SoundcheckPanel") ||
+      panel->class_name() == Symbol("ManageBandPanel")) {
+    mgr.set_global(Symbol("button"),
+                   DataNode::Sym(Symbol(dir > 0 ? "kPad_DDown"
+                                                : "kPad_DUp")));
+    mgr.set_global(Symbol("player_num"), DataNode::Int(0));
+    panel->handle_property(Symbol("BUTTON_DOWN_MSG"), DataArray());
+    // Stock sfx.dta maps menu movement through SCROLL_MSG to button_toggle.
+    // These native panels are not UILists, so route the stock scroll sound
+    // explicitly after their selection changes.
+    mgr.handle_property(Symbol("SCROLL_MSG"), DataArray());
+    return;
+  }
   if (component &&
       component->class_name() == Symbol("BandTextEntry")) {
     DataArray args;
@@ -6634,7 +7178,7 @@ void rebuild_text(const std::string& hdr, const std::string& ark, ScreenManager&
     if (!panel_showing(panel)) continue;
     std::string file = panel_file(panel);
     if (file.empty()) continue;
-    if (file == "chooseprof.milo" || file == "manage_band.milo")
+    if (file == "chooseprof.milo")
       foreground_panel_meshes.insert("notebook_cover.mesh");
     if (file == "multi_char_outfit1.milo" ||
         file == "multi_char_outfit2.milo") {
@@ -6672,7 +7216,16 @@ void rebuild_text(const std::string& hdr, const std::string& ark, ScreenManager&
         foreground_panel_meshes.insert(mesh);
     }
     const std::string milo_path = "ui/gen/" + file + "_ps2";
-    auto labels = extract_menu_labels(hdr, ark, milo_path);
+    // Soundcheck reuses the complete stock Practice difficulty presentation,
+    // but supplies its own stage-dependent copy through exact clones of the
+    // authored labels below.  Do not also draw the original difficulty copy.
+    auto labels =
+        screen && ((screen->name() == Symbol("soundcheck_screen") &&
+                    pn == Symbol("soundcheck_panel")) ||
+                   (screen->name() == Symbol("manage_band_screen") &&
+                    pn == Symbol("manage_band_panel")))
+            ? std::vector<MenuLabel>{}
+            : extract_menu_labels(hdr, ark, milo_path);
     for (auto& label : labels) label.runtime_owner = pn.c_str();
     milo_scene::Scene label_hierarchy;
     milo_scene::load_scene(hdr, ark, milo_path, label_hierarchy);
@@ -6766,6 +7319,37 @@ void rebuild_text(const std::string& hdr, const std::string& ark, ScreenManager&
   if (screen && screen->name() == Symbol("endgame_stats_screen")) {
     append_endgame_stats_list(hdr, ark, mgr, locale, receipt_font,
                               label_verts["receipt"]);
+  }
+  if (screen && screen->name() == Symbol("soundcheck_screen")) {
+    std::string soundcheck_focused;
+    const auto soundcheck_labels =
+        make_soundcheck_labels(hdr, ark, mgr, soundcheck_focused);
+    std::unordered_set<std::string> soundcheck_fonts;
+    for (const MenuLabel& label : soundcheck_labels)
+      soundcheck_fonts.insert(normalized_label_font(label.font));
+    for (const std::string& family : soundcheck_fonts) {
+      if (const MenuFont* source_font = fonts.get(family)) {
+        append_text_quads(soundcheck_labels, *source_font, family, mgr,
+                          locale, soundcheck_focused, disabled,
+                          label_verts[family],
+                          label_transform_spans[family], true);
+      }
+    }
+  }
+  if (screen && screen->name() == Symbol("manage_band_screen")) {
+    std::string manage_focused;
+    const auto manage_labels =
+        make_manage_band_labels(hdr, ark, mgr, manage_focused);
+    std::unordered_set<std::string> manage_fonts;
+    for (const MenuLabel& label : manage_labels)
+      manage_fonts.insert(normalized_label_font(label.font));
+    for (const std::string& family : manage_fonts) {
+      if (const MenuFont* source_font = fonts.get(family)) {
+        append_text_quads(manage_labels, *source_font, family, mgr, locale,
+                          manage_focused, disabled, label_verts[family],
+                          label_transform_spans[family]);
+      }
+    }
   }
   if (screen && screen->name() == Symbol("practice_sel_section_screen"))
     configure_practice_section_selection_mesh(hdr, ark, mgr, renderer);
@@ -6895,6 +7479,11 @@ int run_menu_mode(const std::string& hdr, const std::string& ark,
                   const std::string& screenshot_path, int screenshot_frame,
                   int max_frames, int window_width, int window_height,
                   float fixed_dt, const MenuRunOptions& options) {
+  const char* legacy_start = std::getenv("GHOGX_MENU_START_SCREEN");
+  const std::string requested_start_screen =
+      !options.start_screen.empty()
+          ? options.start_screen
+          : (legacy_start ? std::string(legacy_start) : std::string{});
   // 1. Boot the menu logic engine: classes, all screens (verbatim), game-side.
   register_ui_classes();
   ScreenManager mgr;
@@ -6927,9 +7516,7 @@ int run_menu_mode(const std::string& hdr, const std::string& ark,
   // TRANSITION_COMPLETE_MSG starts their task. The same state is restored
   // below after init.dtb, which may reset campaign defaults.
   const bool seed_unlock_venue_widgets =
-      std::getenv("GHOGX_MENU_START_SCREEN") &&
-      std::strcmp(std::getenv("GHOGX_MENU_START_SCREEN"),
-                  "unlock_venue_screen") == 0 &&
+      requested_start_screen == "unlock_venue_screen" &&
       std::getenv("GHOGX_MENU_SEED_UNLOCK_VENUE");
   if (seed_unlock_venue_widgets) {
     if (Object* campaign = mgr.resolve_object(Symbol("campaign")))
@@ -7043,8 +7630,8 @@ int run_menu_mode(const std::string& hdr, const std::string& ark,
                               one_arg(DataNode::Sym(Symbol("TRUE"))));
     }
   }
-  if (const char* start = std::getenv("GHOGX_MENU_START_SCREEN")) {
-    Symbol start_screen(start);
+  if (!requested_start_screen.empty()) {
+    Symbol start_screen(requested_start_screen);
     if (mgr.find_object(start_screen)) {
       if (std::getenv("GHOGX_MENU_SEED_WON_CAMPAIGN")) {
         if (Object* campaign = mgr.resolve_object(Symbol("campaign")))
@@ -7146,6 +7733,53 @@ int run_menu_mode(const std::string& hdr, const std::string& ark,
                      "[menu] seeded stock unlock venue campaign status=1\n");
       }
       mgr.goto_screen(start_screen);
+      if (start_screen == Symbol("manage_band_screen")) {
+        const char* venue_id =
+            std::getenv("GHOGX_MANAGE_BAND_PROOF_VENUE");
+        const char* venue_index =
+            std::getenv("GHOGX_MANAGE_BAND_PROOF_VENUE_INDEX");
+        if (venue_id || venue_index) {
+          if (Object* panel =
+                  mgr.find_object(Symbol("manage_band_preferences_panel"))) {
+            DataArray args;
+            if (venue_id) {
+              args.push(DataNode::Sym(Symbol(venue_id)));
+              panel->handle_property(Symbol("debug_open_venue"), args);
+            } else {
+              args.push(DataNode::Int(8));
+              args.push(DataNode::Int(std::max(0, std::atoi(venue_index))));
+              panel->handle_property(Symbol("debug_open_category"), args);
+            }
+            std::fprintf(stderr,
+                         "[manage-band] proof opened venue submenu id=%s "
+                         "index=%s\n",
+                         venue_id ? venue_id : "-",
+                         venue_index ? venue_index : "-");
+          }
+        }
+      }
+      if (start_screen == Symbol("soundcheck_screen")) {
+        if (Object* soundcheck =
+                mgr.find_object(Symbol("soundcheck_panel"))) {
+          if (const char* offsets =
+                  std::getenv("GHOGX_SOUNDCHECK_PROOF_OFFSETS")) {
+            int audio_ms = 0;
+            int video_ms = 0;
+            if (std::sscanf(offsets, "%d,%d", &audio_ms, &video_ms) == 2) {
+              DataArray args;
+              args.push(DataNode::Int(audio_ms));
+              args.push(DataNode::Int(video_ms));
+              soundcheck->handle_property(Symbol("debug_set_offsets"), args);
+            }
+          }
+          if (const char* stage =
+                  std::getenv("GHOGX_SOUNDCHECK_PROOF_STAGE")) {
+            soundcheck->handle_property(
+                Symbol("debug_set_stage"),
+                one_arg(DataNode::Sym(Symbol(stage))));
+          }
+        }
+      }
       // A direct-start outfit proof represents the live highlighted cursor,
       // not a confirmed choice. Screen entry intentionally normalizes each
       // player to outfit zero, so restore the requested diagnostic cursor only
@@ -7246,7 +7880,8 @@ int run_menu_mode(const std::string& hdr, const std::string& ark,
         highlight_seeded_outfit(1, "GHOGX_MENU_SEED_CHARACTER_P2",
                                 "GHOGX_MENU_SEED_OUTFIT_P2");
       }
-      std::fprintf(stderr, "[menu] capture start screen = %s\n", start);
+      std::fprintf(stderr, "[menu] capture start screen = %s\n",
+                   requested_start_screen.c_str());
     }
   }
   if (const char* store_cash = std::getenv("GHOGX_MENU_SEED_STORE_CASH")) {
@@ -7290,11 +7925,14 @@ int run_menu_mode(const std::string& hdr, const std::string& ark,
   ghogx::render::MiloSceneRenderer outgoing_renderer(*win);
   ghogx::render::MiloSceneRenderer outgoing_guitar_renderer(*win);
   std::vector<MenuCharacterPreview> character_previews;
+  std::vector<MenuCharacterPreview> manage_band_character_cache;
   std::vector<MenuCharacterPreview> outgoing_character_previews;
   std::vector<LiveMenuAnimationSource> outgoing_menu_animation_sources;
   bool outgoing_transition_visible = false;
   bool outgoing_guitar_visible = false;
   ghogx::game::Gameplay gameplay;
+  ghogx::chart::Chart soundcheck_chart = make_soundcheck_chart();
+  std::unique_ptr<ghogx::game::HighwayRenderer> soundcheck_highway;
   SongIntroOverlay song_intro_overlay(*win);
   // GH2 remains the visual/gameplay owner even when songs, venues, or
   // characters are mounted from an independent content archive.
@@ -7302,11 +7940,14 @@ int run_menu_mode(const std::string& hdr, const std::string& ark,
   gameplay.set_auxiliary_asset_paths(options.auxiliary_asset_archives);
   ghogx::hud::HudRenderer gameplay_hud;
   YouRockOverlay you_rock_overlay;
+  VenuePreviewOverlay venue_preview_overlay;
   auto* d3d = static_cast<IDirect3DDevice9*>(win->device_ptr());
   const bool hud_ready = gameplay_hud.load(d3d, hdr, ark);
   const bool hide_gameplay_hud =
       std::getenv("GHOGX_HIDE_GAMEPLAY_HUD") != nullptr ||
       std::getenv("GHOGX_DEBUG_VENUE_ONLY_CAPTURE") != nullptr;
+  const bool hide_song_intro_overlay =
+      std::getenv("GHOGX_HIDE_SONG_INTRO_OVERLAY") != nullptr;
   const MenuFont* rockletters_font = fonts.get("rockletters");
   const MenuFont* impact_font = fonts.get("impact");
   if (rockletters_font || impact_font)
@@ -7321,7 +7962,7 @@ int run_menu_mode(const std::string& hdr, const std::string& ark,
     Paused,
     YouRock
   };
-  const bool explicit_start_screen = std::getenv("GHOGX_MENU_START_SCREEN") != nullptr;
+  const bool explicit_start_screen = !requested_start_screen.empty();
   const bool disable_live_input =
       std::getenv("GHOGX_MENU_DISABLE_LIVE_INPUT") != nullptr;
   RuntimePhase phase =
@@ -7496,15 +8137,18 @@ int run_menu_mode(const std::string& hdr, const std::string& ark,
   rebuild_scene(hdr, ark, mgr, shown, db, renderer);
   bool guitar_visible =
       rebuild_guitar_display_scene(hdr, ark, mgr, shown, db, guitar_renderer);
+  std::string guitar_selection_key =
+      guitar_display_selection_key(mgr, shown, db);
   character_previews =
-      rebuild_character_display_scenes(hdr, ark, mgr, shown, db, *win);
+      rebuild_character_display_scenes(hdr, ark, mgr, shown, db, *win, {},
+                                       &manage_band_character_cache);
   if (!character_previews.empty()) mgr.update(0.0f);
   apply_loading_source_anims(hdr, ark, mgr, shown, renderer);
   rebuild_text(hdr, ark, mgr, shown, renderer, fonts, db, locale);
   auto live_menu_animation_sources =
       collect_live_menu_animation_sources(hdr, ark, mgr, shown);
   auto draw_menu_layers =
-      [](ghogx::render::MiloSceneRenderer& scene_renderer,
+      [&win](ghogx::render::MiloSceneRenderer& scene_renderer,
          ghogx::render::MiloSceneRenderer& live_guitar_renderer,
          bool live_guitar_visible,
          std::vector<MenuCharacterPreview>& live_characters,
@@ -7539,13 +8183,24 @@ int run_menu_mode(const std::string& hdr, const std::string& ark,
           if (!live_guitar_visible) {
             for (auto& character : live_characters) {
               std::array<float, 16> live_placer{};
-              if (scene_renderer.current_scene_node_world(character.placer,
-                                                          live_placer)) {
+              if (character.panel != "manage_band_char_preview" &&
+                  scene_renderer.current_scene_node_world(character.placer,
+                                                           live_placer)) {
                 character.renderer->set_world_transform(live_placer);
               }
               if (!character.environment.empty())
                 scene_renderer.apply_environment_lighting_state(
                     character.environment);
+              if (character.panel == "manage_band_char_preview") {
+                // Moving the stock P1 preview into the 40% bay crosses source
+                // character-select geometry that still writes depth even when
+                // its visible card meshes are suppressed. Manage Band owns a
+                // foreground preview layer, so begin it with a clean depth
+                // buffer while preserving the already-drawn backdrop color.
+                auto* device = static_cast<IDirect3DDevice9*>(win->device_ptr());
+                if (device)
+                  device->Clear(0, nullptr, D3DCLEAR_ZBUFFER, 0, 1.0f, 0);
+              }
               character.renderer->draw_over_scene(scene_renderer.camera());
             }
           }
@@ -7557,6 +8212,64 @@ int run_menu_mode(const std::string& hdr, const std::string& ark,
             scene_renderer.draw_over_scene(scene_renderer.camera());
         }
       };
+  auto draw_soundcheck_layers = [&]() {
+    renderer.draw_scene_only();
+    Object* panel = mgr.find_object(Symbol("soundcheck_panel"));
+    const bool show_highway =
+        panel && node_bool(panel->get_property(Symbol("show_highway")));
+    // Keep entry into Soundcheck immediate. The timing-only GH2 asset profile
+    // is loaded on demand and excludes gameplay effects that this view cannot
+    // display.
+    if (show_highway && !soundcheck_highway) {
+      soundcheck_highway =
+          std::make_unique<ghogx::game::HighwayRenderer>(*win);
+      soundcheck_highway->set_surface_quad_underlay(true);
+      const auto load_begin = std::chrono::steady_clock::now();
+      if (!soundcheck_highway->load_textures(hdr, ark, std::string(), true)) {
+        std::fprintf(stderr,
+                     "[soundcheck] note highway texture load failed\n");
+        soundcheck_highway.reset();
+      }
+      const auto load_ms = std::chrono::duration_cast<std::chrono::milliseconds>(
+          std::chrono::steady_clock::now() - load_begin);
+      std::fprintf(stderr,
+                   "[soundcheck] timing highway load_ms=%lld profile=reduced\n",
+                   static_cast<long long>(load_ms.count()));
+    }
+    if (show_highway && soundcheck_highway) {
+        D3DVIEWPORT9 previous{};
+        if (SUCCEEDED(d3d->GetViewport(&previous))) {
+          const int backbuffer_w = win->bb_width();
+          const int backbuffer_h = win->bb_height();
+          D3DVIEWPORT9 viewport{};
+          // Soundcheck is a gameplay timing test, so render the GH2 highway at
+          // its normal full-frame 4:3 scale. A nested viewport reduced both
+          // the board and its source fretboard texture to an unreadable icon.
+          viewport.X = 0;
+          viewport.Y = 0;
+          viewport.Width = static_cast<DWORD>(std::max(1, backbuffer_w));
+          viewport.Height = static_cast<DWORD>(std::max(1, backbuffer_h));
+          viewport.MinZ = 0.0f;
+          viewport.MaxZ = 1.0f;
+          d3d->SetViewport(&viewport);
+          const int elapsed_ms = int_value(
+              panel->get_property(Symbol("highway_time_ms")), 0);
+          // Do not loop at 12 seconds: the adaptive run spans 16 visible notes
+          // past that boundary. Wrapping there hid notes 14-16 until the board
+          // made another full pass.
+          const double highway_time =
+              std::max(0, elapsed_ms) / 1000.0;
+          const float flashes[5] = {};
+          soundcheck_highway->draw_over_scene(
+              highway_time, soundcheck_chart, 3, 0, flashes, 2.0f,
+              nullptr, nullptr, false, false, 0.0f, nullptr, nullptr,
+              nullptr, nullptr, 1, 0.0f, 1.0f, 0.0f, 0.0f,
+              /*track_intro_active=*/false, 0.0);
+          d3d->SetViewport(&previous);
+        }
+    }
+    renderer.draw_text_over_scene();
+  };
   auto draw_live_paint_swatches = [&]() {
     if (!shown) return;
     for (Symbol panel_name : screen_panel_names(shown)) {
@@ -7820,6 +8533,26 @@ int run_menu_mode(const std::string& hdr, const std::string& ark,
         }
       }
     };
+    if (s->name() == Symbol("soundcheck_screen")) {
+      Object* panel = mgr.find_object(Symbol("soundcheck_panel"));
+      if (!panel) return "soundcheck";
+      std::string key = "soundcheck:";
+      key += symbol_value(panel->get_property(Symbol("stage"))).c_str();
+      for (const char* property : {
+               "main_selection", "fine_selection", "fine_adjusting",
+               "audio_offset_ms", "video_input_offset_ms",
+               "samples_collected", "countdown", "audio_spread_ms",
+               "video_spread_ms"}) {
+        key += ":";
+        key += std::to_string(
+            int_value(panel->get_property(Symbol(property)), 0));
+      }
+      key += ":";
+      key += panel->get_property(Symbol("feedback"))
+                 .as_string()
+                 .value_or("");
+      return key;
+    }
     if (s->name() == Symbol("credits_screen")) {
       std::string key = list_state_key(Symbol("credits.lst"), 0);
       live_widget_state(key);
@@ -7946,6 +8679,28 @@ int run_menu_mode(const std::string& hdr, const std::string& ark,
                           ->handle_property(Symbol("get_quickplay"), DataArray())
                           .as_int()
                           .value_or(0) != 0;
+    const auto manage_preference = [&](const char* key) {
+      Object* campaign = mgr.resolve_object(Symbol("campaign"));
+      if (!campaign) return Symbol();
+      DataArray args;
+      args.push(DataNode::Sym(Symbol(key)));
+      return symbol_value(
+          campaign->handle_property(Symbol("get_manage_preference"), args));
+    };
+    const Symbol preferred_bassist =
+        manage_preference("preferred_bassist");
+    const Symbol preferred_drummer =
+        manage_preference("preferred_drummer");
+    const Symbol preferred_keyboardist =
+        manage_preference("preferred_keyboardist");
+    const Symbol preferred_male_singer =
+        manage_preference("preferred_male_singer");
+    const Symbol preferred_female_singer =
+        manage_preference("preferred_female_singer");
+    gameplay.set_backing_band_preferences(
+        preferred_bassist.c_str(), preferred_drummer.c_str(),
+        preferred_keyboardist.c_str(), preferred_male_singer.c_str(),
+        preferred_female_singer.c_str());
     Symbol song = game_config
                       ? symbol_value(game_config->get_property(Symbol("song")))
                       : Symbol();
@@ -8008,27 +8763,56 @@ int run_menu_mode(const std::string& hdr, const std::string& ark,
     }
     gameplay.set_selected_venue(selected_venue.c_str());
     gameplay.set_intro_camera_category(encore ? "INTRO_ENCORE" : "INTRO");
-    const Symbol selected_guitar =
+    const Symbol selected_outfit =
+        player0_config
+            ? symbol_value(
+                  player0_config->get_property(Symbol("character_outfit")))
+            : Symbol();
+    const CharacterVariant* selected_character_variant =
+        db.character_variant(selected_outfit);
+    Symbol selected_guitar =
         player0_config
             ? symbol_value(
                   player0_config->handle_property(Symbol("get_guitar"),
                                                   DataArray()))
             : Symbol();
-    const Symbol selected_bass =
+    bool selected_guitar_from_character = false;
+    if (!selected_guitar.valid() && selected_character_variant &&
+        selected_character_variant->preferred_guitar.valid() &&
+        db.guitar(selected_character_variant->preferred_guitar)) {
+      selected_guitar = selected_character_variant->preferred_guitar;
+      selected_guitar_from_character = true;
+    }
+    Symbol selected_bass =
         player1_config
             ? symbol_value(
                   player1_config->handle_property(Symbol("get_guitar"),
                                                   DataArray()))
             : Symbol();
+    const Symbol preferred_npc_bass = manage_preference("favorite_bass");
+    const Symbol preferred_npc_bass_skin =
+        manage_preference("favorite_bass_skin");
+    if (!selected_bass.valid() && preferred_npc_bass.valid() &&
+        db.guitar(preferred_npc_bass))
+      selected_bass = preferred_npc_bass;
     const auto resolve_skin =
-        [&](Symbol instrument, Object* player)
+        [&](Symbol instrument, Object* player,
+            const CharacterVariant* character_variant,
+            bool use_character_preference)
             -> std::tuple<Symbol, Symbol, int, int> {
       if (!instrument.valid()) return {};
-      Symbol skin =
-          player
+      Symbol skin = use_character_preference && character_variant
+                        ? character_variant->preferred_guitar_skin
+                        : Symbol();
+      if (!skin.valid()) {
+        skin = player && !use_character_preference
               ? symbol_value(player->handle_property(
                     Symbol("get_guitar_skin"), DataArray()))
               : Symbol();
+      }
+      if (!skin.valid() && instrument == preferred_npc_bass &&
+          db.guitar_for_skin(preferred_npc_bass_skin) == instrument)
+        skin = preferred_npc_bass_skin;
       if (!skin.valid()) skin = db.first_guitar_skin(instrument);
       int paint_primary = int_value(
           db.guitar_skin_field(instrument, skin, Symbol("paint_primary")),
@@ -8036,7 +8820,14 @@ int run_menu_mode(const std::string& hdr, const std::string& ark,
       int paint_secondary = int_value(
           db.guitar_skin_field(instrument, skin, Symbol("paint_secondary")),
           -1);
-      if (paint_primary >= 0 && player) {
+      if (use_character_preference && character_variant) {
+        if (character_variant->preferred_guitar_paint_primary >= 0)
+          paint_primary =
+              character_variant->preferred_guitar_paint_primary;
+        if (character_variant->preferred_guitar_paint_secondary >= 0)
+          paint_secondary =
+              character_variant->preferred_guitar_paint_secondary;
+      } else if (paint_primary >= 0 && player) {
         const int stored_primary = int_value(
             player->handle_property(Symbol("get_guitar_paint_primary"),
                                     DataArray()),
@@ -8059,11 +8850,13 @@ int run_menu_mode(const std::string& hdr, const std::string& ark,
     const auto [selected_guitar_outfit, selected_guitar_mat,
                 selected_guitar_paint_primary,
                 selected_guitar_paint_secondary] =
-        resolve_skin(selected_guitar, player0_config);
+        resolve_skin(selected_guitar, player0_config,
+                     selected_character_variant,
+                     selected_guitar_from_character);
     const auto [selected_bass_outfit, selected_bass_mat,
                 selected_bass_paint_primary,
                 selected_bass_paint_secondary] =
-        resolve_skin(selected_bass, player1_config);
+        resolve_skin(selected_bass, player1_config, nullptr, false);
     gameplay.set_selected_instruments(
         selected_guitar.valid() ? selected_guitar.c_str() : "",
         selected_guitar_outfit.valid() ? selected_guitar_outfit.c_str() : "",
@@ -8099,13 +8892,7 @@ int run_menu_mode(const std::string& hdr, const std::string& ark,
         loaded_song.c_str(), quickplay ? "quickplay" : "career",
         selected_venue.valid() ? selected_venue.c_str() : "<song-quickplay>",
         encore ? "INTRO_ENCORE" : "INTRO");
-    const Symbol selected_outfit =
-        player0_config
-            ? symbol_value(
-                  player0_config->get_property(Symbol("character_outfit")))
-            : Symbol();
-    if (const CharacterVariant* variant =
-            db.character_variant(selected_outfit)) {
+    if (const CharacterVariant* variant = selected_character_variant) {
       gameplay.set_selected_character_variant(
           variant->selection.c_str(), variant->model_path,
           variant->main_anim_path, variant->strum_anim_path,
@@ -8119,6 +8906,38 @@ int run_menu_mode(const std::string& hdr, const std::string& ark,
           "source=%s model=%s\n",
           variant->character.c_str(), variant->selection.c_str(),
           variant->source_game.c_str(), variant->model_path.c_str());
+    } else if (selected_outfit.valid()) {
+      // Native GH2 outfits come from LOAD_CHARACTERS rather than the add-on
+      // CharacterVariant table. They still own the selected performer and its
+      // authored track surface. Previously this branch cleared the selection,
+      // allowing the song's quickplay demo rig to replace both with an
+      // unrelated character (and therefore the wrong fretboard).
+      const Symbol selected_character =
+          player0_config
+              ? symbol_value(
+                    player0_config->get_property(Symbol("character")))
+              : Symbol();
+      const std::vector<Symbol> native_outfits =
+          db.native_character_outfits(selected_character);
+      const bool native_outfit =
+          std::find(native_outfits.begin(), native_outfits.end(),
+                    selected_outfit) != native_outfits.end();
+      if (native_outfit) {
+        const std::string selection = selected_outfit.c_str();
+        const std::string model_path =
+            "char/" + selection + "/og/gen/" + selection +
+            ".milo_ps2";
+        gameplay.set_selected_character_variant(
+            selection, model_path, {}, {}, {}, {});
+        std::fprintf(
+            stderr,
+            "[flow] selected native character handoff: character=%s "
+            "outfit=%s model=%s surface=resolve_from_character\n",
+            selected_character.valid() ? selected_character.c_str() : "-",
+            selected_outfit.c_str(), model_path.c_str());
+      } else {
+        gameplay.set_selected_character_variant({}, {}, {}, {}, {}, {});
+      }
     } else {
       gameplay.set_selected_character_variant({}, {}, {}, {}, {}, {});
     }
@@ -8144,32 +8963,64 @@ int run_menu_mode(const std::string& hdr, const std::string& ark,
     } else {
       gameplay.set_selected_bassist_character_variant({}, {}, {}, {}, {});
     }
-    int sync_offset_ms = 0;
+    int audio_offset_ms = 0;
+    int video_input_offset_ms = 0;
     if (Object* runtime_options = mgr.resolve_object(Symbol("options"))) {
-      sync_offset_ms = runtime_options
-                           ->handle_property(Symbol("get_sync_offset"),
-                                             DataArray())
-                           .as_int()
-                           .value_or(0);
+      audio_offset_ms =
+          runtime_options
+              ->handle_property(Symbol("get_audio_offset"), DataArray())
+              .as_int()
+              .value_or(0);
+      video_input_offset_ms =
+          runtime_options
+              ->handle_property(Symbol("get_video_input_offset"), DataArray())
+              .as_int()
+              .value_or(0);
     }
-    gameplay.set_sync_offset_ms(sync_offset_ms);
+    gameplay.set_calibration_offsets_ms(audio_offset_ms,
+                                        video_input_offset_ms);
     std::fprintf(stderr,
-                 "[flow] gameplay calibration: sync_offset_ms=%d "
-                 "audio_master=1 judgement_clock=audio+offset\n",
-                 gameplay.sync_offset_ms());
+                 "[flow] gameplay calibration: audio_offset_ms=%d "
+                 "video_input_offset_ms=%d audio_master=1 "
+                 "presentation=audio-audio_offset "
+                 "judgement=presentation+video_input_offset\n",
+                 gameplay.audio_offset_ms(),
+                 gameplay.video_input_offset_ms());
     if (!gameplay.load_song(gameplay_hdr, gameplay_ark, loaded_song,
                             loaded_difficulty)) {
       std::fprintf(stderr, "[flow] gameplay load failed: %s diff=%d\n",
                    loaded_song.c_str(), loaded_difficulty);
       return false;
     }
+    const int intro_song_index = db.song_index(song);
+    const std::string intro_title =
+        intro_song_index >= 0
+            ? display_text_from_node(
+                  db.song_field(static_cast<std::size_t>(intro_song_index),
+                                Symbol("name")),
+                  locale)
+            : std::string{};
+    const std::string intro_artist =
+        intro_song_index >= 0
+            ? display_text_from_node(
+                  db.song_field(static_cast<std::size_t>(intro_song_index),
+                                Symbol("artist")),
+                  locale)
+            : std::string{};
+    song_intro_overlay.reset(hdr, ark, gameplay_hdr, gameplay_ark,
+                             loaded_song, intro_title, intro_artist);
+    if (!song_intro_overlay.prepare()) {
+      std::fprintf(stderr,
+                   "[flow] song intro overlay preparation failed: song=%s "
+                   "title='%s' artist='%s'\n",
+                   loaded_song.c_str(), intro_title.c_str(),
+                   intro_artist.c_str());
+    }
     if (!gameplay.prepare_world(*win)) {
       std::fprintf(stderr, "[flow] gameplay world preparation failed: %s\n",
                    loaded_song.c_str());
       return false;
     }
-    song_intro_overlay.reset(hdr, ark, gameplay_hdr, gameplay_ark,
-                             loaded_song);
     // Full-loop proof still enters through the shipped menu/loading route, but
     // may replay the already-loaded chart/world state near the song ending so
     // gameplay exit and the stock post-show chain can be verified without a
@@ -8256,7 +9107,8 @@ int run_menu_mode(const std::string& hdr, const std::string& ark,
   };
   auto draw_gameplay = [&](bool show_you_rock) {
     gameplay.draw(*win);
-    song_intro_overlay.draw(gameplay.song_time());
+    if (!hide_song_intro_overlay)
+      song_intro_overlay.draw(gameplay.intro_presentation_time());
     if (hud_ready && !hide_gameplay_hud) {
       ghogx::hud::HudState state;
       state.score = gameplay.score();
@@ -8602,12 +9454,37 @@ int run_menu_mode(const std::string& hdr, const std::string& ark,
 
     // Input (live controller/keyboard) -> focus nav + the real menu scripts.
     bool visual_dirty = false;
-    if (!disable_live_input && win->action_pressed(Action::Down)) {
+    Object* soundcheck_input_panel =
+        shown && shown->name() == Symbol("soundcheck_screen")
+            ? mgr.find_object(Symbol("soundcheck_panel"))
+            : nullptr;
+    const Symbol soundcheck_stage =
+        soundcheck_input_panel
+            ? symbol_value(
+                  soundcheck_input_panel->get_property(Symbol("stage")))
+            : Symbol();
+    const bool soundcheck_timing_capture =
+        soundcheck_stage == Symbol("audio_measure") ||
+        soundcheck_stage == Symbol("video_measure") ||
+        soundcheck_stage == Symbol("combined_test");
+    const uint32_t menu_guitar_edge =
+        !disable_live_input ? win->guitar_input_edge() : 0;
+    const bool live_strum = (menu_guitar_edge & (1u << 5)) != 0;
+    if (route_soundcheck_guitar_edge(soundcheck_input_panel,
+                                     menu_guitar_edge)) {
+      visual_dirty = true;
+    }
+    // An XInput guitar exposes its strum bar through the same vertical axis
+    // used for ordinary menu navigation. During a timing pass it is a hit,
+    // never a focus move.
+    if (!disable_live_input && !(soundcheck_timing_capture && live_strum) &&
+        win->action_pressed(Action::Down)) {
       focus_move(mgr, cur_labels, cur_disabled, +1, quickplay_song_count(db),
                  credit_count);
       visual_dirty = true;
     }
-    if (!disable_live_input && win->action_pressed(Action::Up)) {
+    if (!disable_live_input && !(soundcheck_timing_capture && live_strum) &&
+        win->action_pressed(Action::Up)) {
       focus_move(mgr, cur_labels, cur_disabled, -1, quickplay_song_count(db),
                  credit_count);
       visual_dirty = true;
@@ -8632,12 +9509,22 @@ int run_menu_mode(const std::string& hdr, const std::string& ark,
         win->action_pressed(Action::Start) &&
         finish_focused_text_entry(mgr);
     if (text_entry_start) visual_dirty = true;
+    const bool soundcheck_measurement_failed =
+        soundcheck_input_panel &&
+        node_bool(soundcheck_input_panel->get_property(
+            Symbol("measurement_failed")));
     if (!pause_start && !text_entry_start && !disable_live_input &&
+        (!soundcheck_timing_capture || soundcheck_measurement_failed) &&
         win->action_pressed(Action::Confirm)) {
       do_confirm(mgr);
       visual_dirty = true;
     }
-    if (!disable_live_input && win->action_pressed(Action::Back)) {
+    // Red is a playable fret. Do not let a red-fret edge abort a timing pass;
+    // controller B / keyboard Escape still retain the normal Back route.
+    const bool red_fret_edge = (menu_guitar_edge & (1u << 1)) != 0;
+    if (!disable_live_input &&
+        !(soundcheck_timing_capture && red_fret_edge) &&
+        win->action_pressed(Action::Back)) {
       do_back(mgr);
       visual_dirty = true;
     }
@@ -8656,6 +9543,15 @@ int run_menu_mode(const std::string& hdr, const std::string& ark,
       } else if (a == "confirm") {
         do_confirm(mgr);
         visual_dirty = true;
+      } else if (a == "strum") {
+        Object* screen = mgr.current_screen();
+        if (screen && screen->name() == Symbol("soundcheck_screen")) {
+          if (Object* panel =
+                  mgr.find_object(Symbol("soundcheck_panel"))) {
+            visual_dirty =
+                route_soundcheck_guitar_edge(panel, 1u << 5) || visual_dirty;
+          }
+        }
       } else if (a == "confirm2") {
         do_confirm(mgr, 1);
         visual_dirty = true;
@@ -8779,8 +9675,10 @@ int run_menu_mode(const std::string& hdr, const std::string& ark,
       rebuild_scene(hdr, ark, mgr, shown, db, renderer);
       guitar_visible =
       rebuild_guitar_display_scene(hdr, ark, mgr, shown, db, guitar_renderer);
+      guitar_selection_key = guitar_display_selection_key(mgr, shown, db);
       character_previews =
-          rebuild_character_display_scenes(hdr, ark, mgr, shown, db, *win);
+          rebuild_character_display_scenes(hdr, ark, mgr, shown, db, *win, {},
+                                           &manage_band_character_cache);
       if (!character_previews.empty()) mgr.update(0.0f);
       apply_loading_source_anims(hdr, ark, mgr, shown, renderer);
       rebuild_text(hdr, ark, mgr, shown, renderer, fonts, db, locale);
@@ -8790,17 +9688,36 @@ int run_menu_mode(const std::string& hdr, const std::string& ark,
     } else if (visual_dirty) {
       cur_labels = gather_labels(hdr, ark, mgr, shown);
       cur_disabled = compute_disabled(mgr);
-      rebuild_scene(hdr, ark, mgr, shown, db, renderer);
-      guitar_visible =
-          rebuild_guitar_display_scene(hdr, ark, mgr, shown, db, guitar_renderer);
+      const bool manage_band =
+          shown && shown->name() == Symbol("manage_band_screen");
+      if (!manage_band) {
+        rebuild_scene(hdr, ark, mgr, shown, db, renderer);
+        apply_loading_source_anims(hdr, ark, mgr, shown, renderer);
+        live_menu_animation_sources =
+            collect_live_menu_animation_sources(hdr, ark, mgr, shown);
+      } else {
+        std::fprintf(stderr,
+                     "[manage-band] cache-hit static backdrop and source "
+                     "animations\n");
+      }
+      const std::string next_guitar_key =
+          guitar_display_selection_key(mgr, shown, db);
+      if (next_guitar_key != guitar_selection_key) {
+        guitar_visible = rebuild_guitar_display_scene(
+            hdr, ark, mgr, shown, db, guitar_renderer);
+        guitar_selection_key = next_guitar_key;
+      } else if (manage_band) {
+        std::fprintf(stderr,
+                     "[manage-band] cache-hit guitar preview key=%s\n",
+                     guitar_selection_key.empty() ? "<hidden>"
+                                                  : guitar_selection_key.c_str());
+      }
       character_previews =
           rebuild_character_display_scenes(hdr, ark, mgr, shown, db, *win,
-                                           std::move(character_previews));
+                                           std::move(character_previews),
+                                           &manage_band_character_cache);
       if (!character_previews.empty()) mgr.update(0.0f);
-      apply_loading_source_anims(hdr, ark, mgr, shown, renderer);
       rebuild_text(hdr, ark, mgr, shown, renderer, fonts, db, locale);
-      live_menu_animation_sources =
-          collect_live_menu_animation_sources(hdr, ark, mgr, shown);
       last_focus = focus_name();
     } else if (focus_name() != last_focus) {
       last_focus = focus_name();
@@ -8878,10 +9795,21 @@ int run_menu_mode(const std::string& hdr, const std::string& ark,
       draw_menu_layers(renderer, guitar_renderer, guitar_visible,
                        character_previews,
                        /*clear_target=*/false);
+    } else if (shown && shown->name() == Symbol("soundcheck_screen")) {
+      draw_soundcheck_layers();
     } else {
       draw_menu_layers(renderer, guitar_renderer, guitar_visible,
                        character_previews,
                        /*clear_target=*/true);
+    }
+    if (shown && shown->name() == Symbol("manage_band_screen")) {
+      if (Object* panel =
+              mgr.find_object(Symbol("manage_band_preferences_panel"))) {
+        const Symbol venue =
+            symbol_value(panel->get_property(Symbol("preview_venue")));
+        venue_preview_overlay.draw(d3d, win->bb_width(), win->bb_height(), hdr,
+                                   venue);
+      }
     }
     draw_live_paint_swatches();
 

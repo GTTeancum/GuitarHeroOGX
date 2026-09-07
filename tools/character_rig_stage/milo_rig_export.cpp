@@ -50,13 +50,6 @@ void write_floats(std::ostream& out, const std::array<float, N>& values) {
     out << ']';
 }
 
-float source_weight(float value) {
-    // GH2 rev-28 PostLoad consumes the serialized Hmx::Color32 slot exactly
-    // this way: multiply, truncate, retain the low byte, and normalize.
-    const int packed = static_cast<int>(value * 255.0f);
-    return static_cast<float>(packed & 0xff) / 255.0f;
-}
-
 struct NodeRow {
     std::string name;
     std::string parent;
@@ -130,14 +123,31 @@ int main(int argc, char** argv) {
                 write_floats(out, mesh.bone_slots[slot].offset);
                 out << '}';
             }
+            out << "],\"local\":";
+            write_floats(out, mesh.transformable.local);
+            out << ",\"world\":";
+            write_floats(out, mesh.transformable.world);
+            out << ",\"material\":" << json_string(mesh.material);
+            out << ",\"positions\":[";
+            for (size_t v = 0; v < mesh.vertices.size(); ++v) {
+                if (v) out << ',';
+                write_floats(out, mesh.vertices[v].position);
+            }
+            out << "],\"faces\":[";
+            for (size_t f = 0; f < mesh.faces.size(); ++f) {
+                if (f) out << ',';
+                out << '[' << mesh.faces[f][0] << ',' << mesh.faces[f][1]
+                    << ',' << mesh.faces[f][2] << ']';
+            }
             out << "],\"weights\":[";
             for (size_t vertex_index = 0; vertex_index < mesh.vertices.size();
                  ++vertex_index) {
                 if (vertex_index) out << ',';
                 std::array<float, 4> weights{};
                 for (size_t slot = 0; slot < weights.size(); ++slot)
-                    weights[slot] = source_weight(
-                        mesh.vertices[vertex_index].color_or_weights[slot]);
+                    // GH1/GH2 skinned four-float payload stays signed. Only
+                    // unskinned vertex colors take the Hmx::Color32 path.
+                    weights[slot] = mesh.vertices[vertex_index].color_or_weights[slot];
                 if (mesh.has_bones &&
                     (weights[0] || weights[1] || weights[2] || weights[3]))
                     ++weighted_vertices;

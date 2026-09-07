@@ -23,6 +23,8 @@ static void usage() {
         "Usage:\n"
         "  milo_tool info    <file>\n"
         "  milo_tool list    <file>\n"
+        "  milo_tool strings <file> <entry>  bounded printable runs, not schema decoding\n"
+        "  milo_tool extract-entry <file> <entry> --out <file>\n"
         "  milo_tool extract <file> --out <dir>\n"
         "  milo_tool verify  <file>\n");
     std::exit(2);
@@ -69,6 +71,59 @@ int main(int argc, char** argv) {
         }
 
         auto payload = gh::milo::inflate_payload(bytes, h);
+        if (sub == "extract-entry") {
+            if (argc != 6 || std::strcmp(argv[4], "--out") != 0) usage();
+            const fs::path output(argv[5]);
+            if (fs::exists(output)) {
+                std::fprintf(stderr, "refusing to overwrite: %s\n", argv[5]);
+                return 1;
+            }
+            const auto d = gh::milo::parse_directory(payload);
+            for (const auto& e : d.entries) {
+                if (e.name != argv[3]) continue;
+                if (!output.parent_path().empty()) fs::create_directories(output.parent_path());
+                std::ofstream stream(output, std::ios::binary);
+                if (!stream) throw std::runtime_error("cannot create entry output");
+                stream.write(reinterpret_cast<const char*>(e.body_bytes.data()),
+                             static_cast<std::streamsize>(e.body_bytes.size()));
+                stream.close();
+                if (!stream) throw std::runtime_error("entry output write failed");
+                std::printf("extracted %s: %zu bytes\n", e.name.c_str(), e.body_bytes.size());
+                return 0;
+            }
+            std::fprintf(stderr, "entry not found: %s\n", argv[3]);
+            return 1;
+        }
+        if (sub == "strings") {
+            if (argc != 4) usage();
+            const auto d = gh::milo::parse_directory(payload);
+            for (const auto& e : d.entries) {
+                if (e.name != argv[3]) continue;
+                std::printf("%s %s bytes=%zu (printable runs; not decoded fields)\n",
+                            e.type.c_str(), e.name.c_str(), e.body_bytes.size());
+                size_t emitted = 0;
+                for (size_t i = 0; i < e.body_bytes.size();) {
+                    const size_t start = i;
+                    while (i < e.body_bytes.size() && e.body_bytes[i] >= 32 &&
+                           e.body_bytes[i] <= 126) ++i;
+                    const size_t count = i - start;
+                    if (count >= 4) {
+                        if (emitted++ == 64) {
+                            std::printf("printable-run limit reached\n");
+                            break;
+                        }
+                        std::printf("0x%zx %.*s%s\n", start,
+                                    static_cast<int>(count < 160 ? count : 160),
+                                    reinterpret_cast<const char*>(e.body_bytes.data() + start),
+                                    count > 160 ? "..." : "");
+                    }
+                    if (i < e.body_bytes.size()) ++i;
+                }
+                return 0;
+            }
+            std::fprintf(stderr, "entry not found: %s\n", argv[3]);
+            return 1;
+        }
         if (sub == "list") {
             std::printf("decompressed payload: %zu bytes\n", payload.size());
             auto d = gh::milo::parse_directory(payload);

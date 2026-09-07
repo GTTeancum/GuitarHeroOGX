@@ -1,0 +1,40 @@
+{
+  "schema_version": 1,
+  "id": "rb2.duke_of_gravity",
+  "name": "The Duke of Gravity",
+  "version": "0.2.0",
+  "source_game": "rb2_wii",
+  "source_prefab": "guitar32",
+  "content_root": "content",
+  "content_index": "content-index.json",
+  "files": [
+    "char/rb2_duke_of_gravity/og/gen/rb2_duke_of_gravity.milo_ps2",
+    "ui/image/dlc/rb2_duke_of_gravity/portrait.bmp_ps2"
+  ],
+  "characters": [
+    {
+      "id": "rb2_duke_of_gravity",
+      "label": "The Duke of Gravity",
+      "description": "Rock Band 2 Wii preset guitar32, converted from its authored prefab data.",
+      "portrait": "ui/image/dlc/rb2_duke_of_gravity/portrait.bmp_ps2",
+      "preferred_guitar": "stratocaster02",
+      "preferred_guitar_finish": "stratocaster02_paint",
+      "preferred_guitar_paint_primary": 0,
+      "preferred_guitar_paint_secondary": 4,
+      "outfits": [
+        {
+          "selection": "rb2_duke_of_gravity_default",
+          "source": "rb2_wii",
+          "label": "The Duke of Gravity",
+          "description": "",
+          "model": "char/rb2_duke_of_gravity/og/gen/rb2_duke_of_gravity.milo_ps2",
+          "ui_model": "char/rb2_duke_of_gravity/og/gen/rb2_duke_of_gravity.milo_ps2",
+          "ui_anim": "char/classic/anims/gen/classic_ui.milo_ps2",
+          "main_anim": "char/classic/anims/gen/classic_main.milo_ps2",
+          "strum_anim": "char/classic/anims/gen/classic_strum.milo_ps2",
+          "fret_anim": "char/classic/anims/gen/classic_fret.milo_ps2"
+        }
+      ]
+    }
+  ]
+}
