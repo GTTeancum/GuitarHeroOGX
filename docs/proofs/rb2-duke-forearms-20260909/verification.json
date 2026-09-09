@@ -1,0 +1,21 @@
+{
+  "status": "forearm defect reproduced; no candidate installed",
+  "model_sha256": "7d9def55825ffcc2cd0691ce165083cc05e8d79f6b9292163129f17aad81faef",
+  "native_run": {
+    "exit_code": 0,
+    "hits": 30,
+    "misses": 0,
+    "input": "Shout at the Devil expert chart, 30:42 seconds"
+  },
+  "mixed_bind_inventory": {
+    "total_slots": 345,
+    "source_hand_connected_slots": 110,
+    "target_rebased_slots": 235
+  },
+  "rejected_trials": [
+    "Rebasing 110 hand-connected offsets to current target bind produced extreme finger distortion.",
+    "Retaining all 345 donor offsets broke head placement."
+  ],
+  "scope": "Fresh headless playing run, not an approved forearm fix",
+  "visual_review": "Sampled native frames; not every-frame inspection"
+}
