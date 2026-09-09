@@ -1,5 +1,5 @@
 {
-  "status": "forearms and stretched left hand repaired; installed as DLC 0.2.1",
+  "status": "user accepted forearm and left-hand repair; installed as DLC 0.2.1",
   "model_sha256": "71ef19b9ea8a106cd00a969c005e6837c5c52061863108d3711ebf18f45f8333",
   "source_donor_sha256": "962bd3773d530e086c575f89f955c0309b74cdac6bb947d4be20bd53f4f0ef57",
   "runtime_sha256": "335ff5fe0e43918b69e057dd08948e39758ebde0da9e143570acff2589e93d5e",
@@ -45,7 +45,7 @@
     "exit_code": 0,
     "misses": 0
   },
-  "visual_review": "Individual full-body and close-up gameplay frames, including 60, 180, 300, 420, 540, 654; higher-resolution native Manage Band capture. Not every frame; user acceptance not claimed.",
+  "visual_review": "Individual full-body and close-up gameplay frames, including 60, 180, 300, 420, 540, 654; higher-resolution native Manage Band capture. Not every frame.",
   "preserved_material_texture_bodies": 32,
   "rebased_slots": 345,
   "preserved_controller_entries": 17,
@@ -80,5 +80,10 @@
     "non_texture_payload_unchanged": true,
     "texture_headers_and_alpha_unchanged": true,
     "output_sha256": "71ef19b9ea8a106cd00a969c005e6837c5c52061863108d3711ebf18f45f8333"
+  },
+  "user_acceptance": {
+    "date": "2026-09-09",
+    "message": "Passed.",
+    "implementation_commit": "6332526c"
   }
 }

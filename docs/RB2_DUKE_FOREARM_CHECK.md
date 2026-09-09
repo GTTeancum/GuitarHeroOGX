@@ -1,6 +1,10 @@
 # Duke forearm check — 2026-09-09
 
-## Fixed and installed: DLC 0.2.1
+## Accepted and installed: DLC 0.2.1
+
+The user accepted the corrected forearms and left hand on 2026-09-09 with
+“Passed.” Implementation and proof are committed in `6332526c`. The canonical
+process is [RB2 character conversion](../rb2_wii/RB2_CHARACTER_CONVERSION.md).
 
 This result supersedes the failed rerun below. Both forearms now remain connected
 in sampled native gameplay and Manage Band captures. The final headless playing
