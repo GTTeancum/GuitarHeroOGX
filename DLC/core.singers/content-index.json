@@ -22,16 +22,6 @@
       "sha256": "f00368d803532962b21f9b1cf2bc3f3e848abe77a9af8f551a559ad841ba3b11"
     },
     {
-      "path": "ui/image/dlc/core_singers/female_singer.bmp_ps2",
-      "size": 32800,
-      "sha256": "348b85d9b12ee9a043f9d1a1da750efe064be75eb443b6fd046c58680e6117d4"
-    },
-    {
-      "path": "ui/image/dlc/core_singers/male_singer.bmp_ps2",
-      "size": 32800,
-      "sha256": "2aaefbb791ebf2d9d543bc447b5363ff8d7488006bfc98f9a8b13fcc6c05912e"
-    },
-    {
       "path": "char/playable_singers/retarget/alterna/alterna.milo_ps2",
       "size": 854897,
       "sha256": "67289febec8db9b856ed4390ed225d71f8079cfe2d5d11652d5eb0463d07d535"
@@ -80,6 +70,16 @@
       "path": "char/playable_singers/retarget/classic/classic_fret.milo_ps2",
       "size": 9861,
       "sha256": "afd9a1247cda6eff92d46ea05d4083f83cd1c639f776eaad8ccfb89206fd44d8"
+    },
+    {
+      "path": "ui/image/dlc/core_singers/female_singer.bmp_ps2",
+      "size": 32800,
+      "sha256": "a4f245e2e6fa5736fd28e961412d74b66b31d7b5d3f3116888de41425f771d96"
+    },
+    {
+      "path": "ui/image/dlc/core_singers/male_singer.bmp_ps2",
+      "size": 32800,
+      "sha256": "a1a2c474e330cfdad58d4db457dcf1dbb3bfd3e56420c61dd3868822b8329260"
     }
   ]
 }

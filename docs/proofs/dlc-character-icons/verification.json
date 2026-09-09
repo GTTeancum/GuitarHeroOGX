@@ -1,0 +1,12 @@
+{
+  "date": "2026-09-09",
+  "characters": ["gh3_midori", "rb2_duke_of_gravity", "rb2_penelope_mcqueen", "female_singer", "male_singer"],
+  "screens": ["sel_character_new_screen", "multi_sel_character_screen"],
+  "native_captures_reviewed": 10,
+  "portrait_registration_checks_passed": 10,
+  "bitmap_dimensions": [64, 128],
+  "bitmap_bytes_each": 32800,
+  "user_visual_acceptance": "Absolutely perfect. Commit and push",
+  "generation": "built-in image_gen",
+  "host_input_used": false
+}

@@ -32,7 +32,13 @@ def main() -> int:
         help=("encode dark line art as alpha over a transparent paper field; "
               "GH2's selector materials supply the authored black tint"),
     )
+    parser.add_argument(
+        "--stock-frame", type=Path,
+        help="decoded stock 64x128 portrait; retain its outer card alpha",
+    )
     args = parser.parse_args()
+    if args.stock_frame and (not args.silhouette_alpha or not args.content_rect):
+        parser.error("--stock-frame requires --silhouette-alpha and --content-rect")
 
     if args.width <= 0 or args.height <= 0 or args.width > 65535 or args.height > 65535:
         raise SystemExit("dimensions must be in 1..65535")
@@ -61,11 +67,22 @@ def main() -> int:
         "<BBiBHHHH", 1, 32, 3, 0, args.width, args.height,
         args.width * 4, 0
     ) + bytes(17)
+    frame = Image.open(args.stock_frame).convert("RGBA") if args.stock_frame else None
+    if frame and frame.size != image.size:
+        parser.error("stock frame dimensions must match the output")
     payload = bytearray()
-    for red, green, blue, alpha in image.getdata():
+    for index, (red, green, blue, alpha) in enumerate(image.getdata()):
         if args.silhouette_alpha:
             luminance = (red * 54 + green * 183 + blue * 19) // 256
             alpha = min(alpha, max(0, min(255, (235 - luminance) * 3)))
+            red = green = blue = 255
+        if frame:
+            x, y = index % args.width, index // args.width
+            if left <= x < right and top <= y < bottom:
+                # Retail selector ink peaks at 0.8 alpha, not fully opaque.
+                alpha = round(alpha * 204 / 255)
+            else:
+                alpha = frame.getpixel((x, y))[3]
             red = green = blue = 255
         payload.extend((red, green, blue, min(128, (alpha + 1) // 2)))
 

@@ -10,7 +10,8 @@
     "char/gh3_midori/anims/gen/gh3_midori_main.milo_ps2",
     "char/gh3_midori/anims/gen/gh3_midori_strum.milo_ps2",
     "char/gh3_midori/anims/gen/gh3_midori_ui.milo_ps2",
-    "char/gh3_midori_1/og/gen/gh3_midori_1.milo_ps2"
+    "char/gh3_midori_1/og/gen/gh3_midori_1.milo_ps2",
+    "ui/image/dlc/gh3_midori/portrait.bmp_ps2"
   ],
   "characters": [
     {
@@ -29,7 +30,8 @@
           "animation_source_model": "char/gh3_midori_1/og/gen/gh3_midori_1.milo_ps2",
           "retarget_animation": false
         }
-      ]
+      ],
+      "portrait": "ui/image/dlc/gh3_midori/portrait.bmp_ps2"
     }
   ]
 }
