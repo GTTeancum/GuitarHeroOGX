@@ -35,3 +35,32 @@ clips; the body bank is also a UI placeholder. Full action coverage, loop seams,
 complete hand-call mapping and retail GH2 compatibility remain unverified. Local
 native gameplay approval does not establish retail compatibility. Retired donor
 rig scripts in this repository are not part of this pipeline.
+
+## Required animation-call review for future conversions
+
+Rig compatibility and a playing clip do not establish animation-call compatibility.
+Audit every converted character against the target bank inventory:
+
+```powershell
+python tools/audit_gh2_character_calls.py --stock-hdr "path/to/GEN/main.hdr" --stock-ark "path/to/GEN/main_0.ark" --package "path/to/DLC/package" --character gh3_midori --stock-character rock1 --recipe tools/gh3_ps2_recipes/midori_1.json --output "call-inventory.json"
+```
+
+This reads stock banks directly from the archive and all outfit bank references
+from the candidate manifest. It checks named clips, groups, missing/empty/dangling
+group members and duplicate names, and records recipe aliases. Exit 1 indicates
+incomplete inventory; exit 0 means name coverage only, never full compatibility.
+The report always leaves full compatibility unproven. Stock alternative clip names
+are a conservative inventory: required dispatch contracts must be distinguished
+from optional variants rather than filling every name with the same idle clip.
+
+For each required target action, establish the corresponding source action,
+correct group membership and filtering, tempo, looping and transition behavior,
+events, bone masks and layer ownership. Then exercise real GH2 dispatch and review
+the resulting motion. Unsupported source-only animations may be dropped; required
+GH2 actions cannot silently fall back to idle and count as completed mappings.
+This applies to subsequent Neversoft conversions as well as Midori.
+
+The 2026-09-08 installed Midori audit FAILS completeness: main 1/113, UI 1/2,
+fret 9/25 and strum 4/17 stock clip names covered; 29 main groups missing,
+including star_power, solo, intro, win and lose. Installation was authorized for
+the reviewed visual candidate; it did not establish complete animation mapping.
