@@ -158,6 +158,7 @@ class CharacterTypeScriptInstance {
   // An empty event is a successful no-op.
   bool run_clip_event(std::string_view event, std::string* error = nullptr);
   void set_timeline_beats(float task_beat, float next_event_beat);
+  void set_win_campaign_song(bool won);
 
   // Messages emitted before a live driver is bound are retained in source
   // order. Query messages are not queued because replaying a query would

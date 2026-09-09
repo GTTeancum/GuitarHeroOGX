@@ -22,6 +22,7 @@
 #include <limits>
 #include <map>
 #include <set>
+#include <sstream>
 #include <stdexcept>
 #include <string>
 #include <utility>
@@ -1337,6 +1338,8 @@ void add_channel_context(
     const std::string& channel) {
     const std::string base = channel_base_name(channel);
     const std::string type = channel_suffix(channel);
+    // These channels are allocated by CharClipSet::move_self, not CharBone.
+    if (base == "bone_facing" || base == "bone_facing_delta") return;
     ChannelContext& context = contexts[base];
     if (type == ".pos") context.position = true;
     else if (type == ".scale") context.scale = true;
@@ -1551,7 +1554,8 @@ void usage() {
            "--out <GH2.milo_ps2> --manifest <manifest.tsv>\n"
         << "  milo_convert_tool build-clipset-from-acp <acp-dir> "
            "--name <dir-name> --role <role> --out <GH2.milo_ps2> "
-           "[--move-self 0|1] [--control-root-pelvis-parent]\n"
+           "[--move-self 0|1] [--control-root-pelvis-parent] "
+           "[--group name=clip,clip ...] [--transitions links.tsv]\n"
         << "  milo_convert_tool build-character-from-meshbundle "
            "<meshbundle> --name <dir-name> --out <GH2.milo_ps2> "
            "[--main-anim <milo>] [--strum-anim <milo>] "
@@ -4686,6 +4690,8 @@ int main(int argc, char** argv) {
             std::string role_name;
             int move_self_override = -1;
             bool control_root_pelvis_parent = false;
+            std::vector<std::string> explicit_groups;
+            fs::path transition_path;
             for (int i = 3; i < argc; ++i) {
                 const std::string arg = argv[i];
                 if (arg == "--name" && i + 1 < argc) name = argv[++i];
@@ -4698,6 +4704,10 @@ int main(int argc, char** argv) {
                         parse_bool_arg(argv[++i], "--move-self") ? 1 : 0;
                 else if (arg == "--control-root-pelvis-parent")
                     control_root_pelvis_parent = true;
+                else if (arg == "--group" && i + 1 < argc)
+                    explicit_groups.push_back(argv[++i]);
+                else if (arg == "--transitions" && i + 1 < argc)
+                    transition_path = argv[++i];
                 else usage();
             }
             if (output.empty() || name.empty() || role_name.empty())
@@ -4723,6 +4733,42 @@ int main(int argc, char** argv) {
             for (const auto& path : paths)
                 sources.push_back(
                     gh::acp::parse(gh::acp::read_file(path.string())));
+
+            std::map<std::string, std::vector<gh::milo_object::CharClipTransition5>> transitions;
+            if (!transition_path.empty()) {
+                std::ifstream file(transition_path);
+                if (!file) throw std::runtime_error("Cannot open transition table");
+                std::map<std::string, const gh::acp::File*> by_name;
+                for (const auto& source : sources) by_name.emplace(source.object_name, &source);
+                std::string line;
+                while (std::getline(file, line)) {
+                    if (line.empty() || line[0] == '#') continue;
+                    std::istringstream row(line);
+                    std::string from, to, extra;
+                    float current, next;
+                    if (!(row >> from >> to >> current >> next) || (row >> extra) ||
+                        !std::isfinite(current) || !std::isfinite(next) ||
+                        !by_name.count(from) || !by_name.count(to))
+                        throw std::runtime_error("Invalid transition row: " + line);
+                    const auto* a = by_name.at(from);
+                    const auto* b = by_name.at(to);
+                    if (current < a->start_beat || current > a->end_beat + 1e-5f ||
+                        next < b->start_beat || next > b->end_beat + 1e-5f)
+                        throw std::runtime_error("Transition outside clip interval: " + line);
+                    auto& edges = transitions[from];
+                    auto edge = std::find_if(edges.begin(), edges.end(),
+                        [&](const auto& value) { return value.clip == to; });
+                    if (edge == edges.end()) {
+                        edges.push_back({to, {}});
+                        edge = edges.end() - 1;
+                    }
+                    edge->nodes.push_back({current, next});
+                }
+                for (auto& [name, edges] : transitions)
+                    for (auto& edge : edges)
+                        std::sort(edge.nodes.begin(), edge.nodes.end(),
+                            [](const auto& a, const auto& b) { return a.current_beat < b.current_beat; });
+            }
 
             gh::milo::Directory directory;
             directory.dir_version = 24;
@@ -4752,7 +4798,7 @@ int main(int argc, char** argv) {
                 const auto clip =
                     gh::milo_convert::
                         convert_gh1_acp_to_gh2_char_clip_samples10(
-                            source);
+                            source, transitions[source.object_name]);
                 for (const auto& channel : clip.full.channels)
                     add_channel_context(contexts, channel);
                 for (const auto& channel : clip.one.channels)
@@ -4780,7 +4826,33 @@ int main(int argc, char** argv) {
                 add_generated_parent_contexts(
                     contexts, role, base, control_root_pelvis_parent);
 
-            if (role == gh::milo_convert::Gh2ClipSetRole::GuitarMain)
+            if (!explicit_groups.empty()) {
+                std::set<std::string> group_names;
+                for (const auto& spec : explicit_groups) {
+                    const auto equals = spec.find('=');
+                    if (equals == std::string::npos || equals == 0)
+                        throw std::runtime_error("--group expects name=clip,clip");
+                    const auto group_name = spec.substr(0, equals);
+                    if (!group_names.insert(group_name).second)
+                        throw std::runtime_error("duplicate explicit group: " + group_name);
+                    gh::milo_object::CharClipGroup1 group;
+                    group.which = 0;
+                    std::istringstream members(spec.substr(equals + 1));
+                    std::string member;
+                    while (std::getline(members, member, ',')) {
+                        if (member.empty() || std::none_of(sources.begin(), sources.end(),
+                                [&](const auto& clip) { return clip.object_name == member; }))
+                            throw std::runtime_error("unresolved explicit group member: " + member);
+                        if (std::find(group.clips.begin(), group.clips.end(), member) != group.clips.end())
+                            throw std::runtime_error("duplicate explicit group member: " + member);
+                        group.clips.push_back(member);
+                    }
+                    if (group.clips.empty())
+                        throw std::runtime_error("empty explicit group: " + group_name);
+                    directory.entries.push_back(make_entry("CharClipGroup", group_name,
+                        gh::milo_object::serialize_char_clip_group1(group)));
+                }
+            } else if (role == gh::milo_convert::Gh2ClipSetRole::GuitarMain)
                 add_generated_guitar_clip_groups(directory, sources);
 
             gh::milo_object::CharClipFilter0 filter;

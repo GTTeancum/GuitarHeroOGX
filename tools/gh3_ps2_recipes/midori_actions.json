@@ -1,0 +1,6391 @@
+{
+  "status": "Native guitarist action template, validated with sampled in-game proof; retail PS2 execution unverified",
+  "animations": [
+    {
+      "role": "strum",
+      "source": "gh3_hnd_guit_strum_mido_norm_l01_d.ska.ps2",
+      "aliases": [
+        "strum_long_01"
+      ],
+      "frames": {}
+    },
+    {
+      "role": "strum",
+      "source": "gh3_hnd_guit_strum_mido_norm_s01_d.ska.ps2",
+      "aliases": [
+        "strum_short_01"
+      ],
+      "frames": {}
+    },
+    {
+      "role": "strum",
+      "source": "gh3_hnd_guit_strum_mido_norm_m01_d.ska.ps2",
+      "aliases": [
+        "strum_pick_01"
+      ],
+      "frames": {}
+    },
+    {
+      "role": "strum",
+      "source": "gh3_hnd_guit_strum_mido_nostrum_d.ska.ps2",
+      "aliases": [
+        "strum_open"
+      ],
+      "frames": {}
+    },
+    {
+      "role": "main",
+      "source": "anims/band/guitarist/midori/gh3_guit_mido_a_med_idle01.ska.ps2",
+      "overlays": [
+        "anims/band/guitarist/midori/face/gh3_guitarist_midori_idle.ska.ps2",
+        "anims/band/guitarist/midori/gh3_guitarist_midori_acc01.ska.ps2"
+      ],
+      "aliases": [
+        "stand_medium_01"
+      ],
+      "frames": {
+        "bone_pos_guitar": [
+          [
+            -0.0023188470919120064,
+            -0.026812720535710297,
+            0.999637784882921,
+            0.0
+          ],
+          [
+            0.014270873105849834,
+            0.9995377871253365,
+            0.026843142315614747,
+            0.0
+          ],
+          [
+            -0.999895477101957,
+            0.01432794912237424,
+            -0.0019351343585441644,
+            0.0
+          ],
+          [
+            2.7383887498403934,
+            -0.39533297422010005,
+            -1.8582408838139055,
+            1.0
+          ]
+        ],
+        "bone_fret": [
+          [
+            -0.0438017242542429,
+            -0.027337565069763165,
+            0.9986661436578314,
+            0.0
+          ],
+          [
+            0.01827396331545994,
+            0.9994363752821196,
+            0.02816014963873453,
+            0.0
+          ],
+          [
+            -0.9988731006574799,
+            0.019483051583029945,
+            -0.04327747085854901,
+            0.0
+          ],
+          [
+            0.0,
+            0.0,
+            0.0,
+            1.0
+          ]
+        ]
+      },
+      "isolate": [
+        "bone_fret_hand",
+        "bone_strum_hand"
+      ],
+      "model": true,
+      "settings": {
+        "stand_medium_01": {
+          "flags": 0,
+          "play_flags": 512
+        }
+      }
+    },
+    {
+      "role": "main",
+      "source": "anims/band/guitarist/midori/gh3_guit_mido_a_med_idle02.ska.ps2",
+      "overlays": [
+        "anims/band/guitarist/midori/face/gh3_guitarist_midori_idle.ska.ps2",
+        "anims/band/guitarist/midori/gh3_guitarist_midori_acc01.ska.ps2"
+      ],
+      "aliases": [
+        "stand_medium_02"
+      ],
+      "frames": {
+        "bone_pos_guitar": [
+          [
+            -0.0023188470919120064,
+            -0.026812720535710297,
+            0.999637784882921,
+            0.0
+          ],
+          [
+            0.014270873105849834,
+            0.9995377871253365,
+            0.026843142315614747,
+            0.0
+          ],
+          [
+            -0.999895477101957,
+            0.01432794912237424,
+            -0.0019351343585441644,
+            0.0
+          ],
+          [
+            2.7383887498403934,
+            -0.39533297422010005,
+            -1.8582408838139055,
+            1.0
+          ]
+        ],
+        "bone_fret": [
+          [
+            -0.0438017242542429,
+            -0.027337565069763165,
+            0.9986661436578314,
+            0.0
+          ],
+          [
+            0.01827396331545994,
+            0.9994363752821196,
+            0.02816014963873453,
+            0.0
+          ],
+          [
+            -0.9988731006574799,
+            0.019483051583029945,
+            -0.04327747085854901,
+            0.0
+          ],
+          [
+            0.0,
+            0.0,
+            0.0,
+            1.0
+          ]
+        ]
+      },
+      "isolate": [
+        "bone_fret_hand",
+        "bone_strum_hand"
+      ],
+      "model": false,
+      "settings": {
+        "stand_medium_02": {
+          "flags": 12582913,
+          "play_flags": 512
+        }
+      }
+    },
+    {
+      "role": "main",
+      "source": "anims/band/guitarist/midori/gh3_guit_mido_a_med_idle03.ska.ps2",
+      "overlays": [
+        "anims/band/guitarist/midori/face/gh3_guitarist_midori_idle.ska.ps2",
+        "anims/band/guitarist/midori/gh3_guitarist_midori_acc01.ska.ps2"
+      ],
+      "aliases": [
+        "stand_medium_03"
+      ],
+      "frames": {
+        "bone_pos_guitar": [
+          [
+            -0.0023188470919120064,
+            -0.026812720535710297,
+            0.999637784882921,
+            0.0
+          ],
+          [
+            0.014270873105849834,
+            0.9995377871253365,
+            0.026843142315614747,
+            0.0
+          ],
+          [
+            -0.999895477101957,
+            0.01432794912237424,
+            -0.0019351343585441644,
+            0.0
+          ],
+          [
+            2.7383887498403934,
+            -0.39533297422010005,
+            -1.8582408838139055,
+            1.0
+          ]
+        ],
+        "bone_fret": [
+          [
+            -0.0438017242542429,
+            -0.027337565069763165,
+            0.9986661436578314,
+            0.0
+          ],
+          [
+            0.01827396331545994,
+            0.9994363752821196,
+            0.02816014963873453,
+            0.0
+          ],
+          [
+            -0.9988731006574799,
+            0.019483051583029945,
+            -0.04327747085854901,
+            0.0
+          ],
+          [
+            0.0,
+            0.0,
+            0.0,
+            1.0
+          ]
+        ]
+      },
+      "isolate": [
+        "bone_fret_hand",
+        "bone_strum_hand"
+      ],
+      "model": false,
+      "settings": {
+        "stand_medium_03": {
+          "flags": 12582913,
+          "play_flags": 512
+        }
+      }
+    },
+    {
+      "role": "main",
+      "source": "anims/band/guitarist/midori/gh3_guit_mido_a_med_idle04.ska.ps2",
+      "overlays": [
+        "anims/band/guitarist/midori/face/gh3_guitarist_midori_idle.ska.ps2",
+        "anims/band/guitarist/midori/gh3_guitarist_midori_acc01.ska.ps2"
+      ],
+      "aliases": [
+        "stand_medium_04"
+      ],
+      "frames": {
+        "bone_pos_guitar": [
+          [
+            -0.0023188470919120064,
+            -0.026812720535710297,
+            0.999637784882921,
+            0.0
+          ],
+          [
+            0.014270873105849834,
+            0.9995377871253365,
+            0.026843142315614747,
+            0.0
+          ],
+          [
+            -0.999895477101957,
+            0.01432794912237424,
+            -0.0019351343585441644,
+            0.0
+          ],
+          [
+            2.7383887498403934,
+            -0.39533297422010005,
+            -1.8582408838139055,
+            1.0
+          ]
+        ],
+        "bone_fret": [
+          [
+            -0.0438017242542429,
+            -0.027337565069763165,
+            0.9986661436578314,
+            0.0
+          ],
+          [
+            0.01827396331545994,
+            0.9994363752821196,
+            0.02816014963873453,
+            0.0
+          ],
+          [
+            -0.9988731006574799,
+            0.019483051583029945,
+            -0.04327747085854901,
+            0.0
+          ],
+          [
+            0.0,
+            0.0,
+            0.0,
+            1.0
+          ]
+        ]
+      },
+      "isolate": [
+        "bone_fret_hand",
+        "bone_strum_hand"
+      ],
+      "model": false,
+      "settings": {
+        "stand_medium_04": {
+          "flags": 12582913,
+          "play_flags": 512
+        }
+      }
+    },
+    {
+      "role": "main",
+      "source": "anims/band/guitarist/midori/gh3_guit_mido_a_med_idle05.ska.ps2",
+      "overlays": [
+        "anims/band/guitarist/midori/face/gh3_guitarist_midori_idle.ska.ps2",
+        "anims/band/guitarist/midori/gh3_guitarist_midori_acc01.ska.ps2"
+      ],
+      "aliases": [
+        "stand_medium_05"
+      ],
+      "frames": {
+        "bone_pos_guitar": [
+          [
+            -0.0023188470919120064,
+            -0.026812720535710297,
+            0.999637784882921,
+            0.0
+          ],
+          [
+            0.014270873105849834,
+            0.9995377871253365,
+            0.026843142315614747,
+            0.0
+          ],
+          [
+            -0.999895477101957,
+            0.01432794912237424,
+            -0.0019351343585441644,
+            0.0
+          ],
+          [
+            2.7383887498403934,
+            -0.39533297422010005,
+            -1.8582408838139055,
+            1.0
+          ]
+        ],
+        "bone_fret": [
+          [
+            -0.0438017242542429,
+            -0.027337565069763165,
+            0.9986661436578314,
+            0.0
+          ],
+          [
+            0.01827396331545994,
+            0.9994363752821196,
+            0.02816014963873453,
+            0.0
+          ],
+          [
+            -0.9988731006574799,
+            0.019483051583029945,
+            -0.04327747085854901,
+            0.0
+          ],
+          [
+            0.0,
+            0.0,
+            0.0,
+            1.0
+          ]
+        ]
+      },
+      "isolate": [
+        "bone_fret_hand",
+        "bone_strum_hand"
+      ],
+      "model": false,
+      "settings": {
+        "stand_medium_05": {
+          "flags": 12582913,
+          "play_flags": 512
+        }
+      }
+    },
+    {
+      "role": "main",
+      "source": "anims/band/guitarist/midori/gh3_guit_mido_a_med_idle06.ska.ps2",
+      "overlays": [
+        "anims/band/guitarist/midori/face/gh3_guitarist_midori_idle.ska.ps2",
+        "anims/band/guitarist/midori/gh3_guitarist_midori_acc01.ska.ps2"
+      ],
+      "aliases": [
+        "stand_medium_06"
+      ],
+      "frames": {
+        "bone_pos_guitar": [
+          [
+            -0.0023188470919120064,
+            -0.026812720535710297,
+            0.999637784882921,
+            0.0
+          ],
+          [
+            0.014270873105849834,
+            0.9995377871253365,
+            0.026843142315614747,
+            0.0
+          ],
+          [
+            -0.999895477101957,
+            0.01432794912237424,
+            -0.0019351343585441644,
+            0.0
+          ],
+          [
+            2.7383887498403934,
+            -0.39533297422010005,
+            -1.8582408838139055,
+            1.0
+          ]
+        ],
+        "bone_fret": [
+          [
+            -0.0438017242542429,
+            -0.027337565069763165,
+            0.9986661436578314,
+            0.0
+          ],
+          [
+            0.01827396331545994,
+            0.9994363752821196,
+            0.02816014963873453,
+            0.0
+          ],
+          [
+            -0.9988731006574799,
+            0.019483051583029945,
+            -0.04327747085854901,
+            0.0
+          ],
+          [
+            0.0,
+            0.0,
+            0.0,
+            1.0
+          ]
+        ]
+      },
+      "isolate": [
+        "bone_fret_hand",
+        "bone_strum_hand"
+      ],
+      "model": false,
+      "settings": {
+        "stand_medium_06": {
+          "flags": 12582913,
+          "play_flags": 512
+        }
+      }
+    },
+    {
+      "role": "main",
+      "source": "anims/band/guitarist/midori/gh3_guit_mido_a_med_break01.ska.ps2",
+      "overlays": [
+        "anims/band/guitarist/midori/face/gh3_guitarist_midori_idle.ska.ps2",
+        "anims/band/guitarist/midori/gh3_guitarist_midori_acc01.ska.ps2"
+      ],
+      "aliases": [
+        "idle_medium_01"
+      ],
+      "frames": {
+        "bone_pos_guitar": [
+          [
+            -0.0023188470919120064,
+            -0.026812720535710297,
+            0.999637784882921,
+            0.0
+          ],
+          [
+            0.014270873105849834,
+            0.9995377871253365,
+            0.026843142315614747,
+            0.0
+          ],
+          [
+            -0.999895477101957,
+            0.01432794912237424,
+            -0.0019351343585441644,
+            0.0
+          ],
+          [
+            2.7383887498403934,
+            -0.39533297422010005,
+            -1.8582408838139055,
+            1.0
+          ]
+        ],
+        "bone_fret": [
+          [
+            -0.0438017242542429,
+            -0.027337565069763165,
+            0.9986661436578314,
+            0.0
+          ],
+          [
+            0.01827396331545994,
+            0.9994363752821196,
+            0.02816014963873453,
+            0.0
+          ],
+          [
+            -0.9988731006574799,
+            0.019483051583029945,
+            -0.04327747085854901,
+            0.0
+          ],
+          [
+            0.0,
+            0.0,
+            0.0,
+            1.0
+          ]
+        ]
+      },
+      "isolate": [
+        "bone_fret_hand",
+        "bone_strum_hand"
+      ],
+      "model": false,
+      "settings": {
+        "idle_medium_01": {
+          "flags": 12582913,
+          "play_flags": 512
+        }
+      }
+    },
+    {
+      "role": "main",
+      "source": "anims/band/guitarist/midori/gh3_guit_mido_a_med_break02.ska.ps2",
+      "overlays": [
+        "anims/band/guitarist/midori/face/gh3_guitarist_midori_idle.ska.ps2",
+        "anims/band/guitarist/midori/gh3_guitarist_midori_acc01.ska.ps2"
+      ],
+      "aliases": [
+        "idle_medium_02"
+      ],
+      "frames": {
+        "bone_pos_guitar": [
+          [
+            -0.0023188470919120064,
+            -0.026812720535710297,
+            0.999637784882921,
+            0.0
+          ],
+          [
+            0.014270873105849834,
+            0.9995377871253365,
+            0.026843142315614747,
+            0.0
+          ],
+          [
+            -0.999895477101957,
+            0.01432794912237424,
+            -0.0019351343585441644,
+            0.0
+          ],
+          [
+            2.7383887498403934,
+            -0.39533297422010005,
+            -1.8582408838139055,
+            1.0
+          ]
+        ],
+        "bone_fret": [
+          [
+            -0.0438017242542429,
+            -0.027337565069763165,
+            0.9986661436578314,
+            0.0
+          ],
+          [
+            0.01827396331545994,
+            0.9994363752821196,
+            0.02816014963873453,
+            0.0
+          ],
+          [
+            -0.9988731006574799,
+            0.019483051583029945,
+            -0.04327747085854901,
+            0.0
+          ],
+          [
+            0.0,
+            0.0,
+            0.0,
+            1.0
+          ]
+        ]
+      },
+      "isolate": [
+        "bone_fret_hand",
+        "bone_strum_hand"
+      ],
+      "model": false,
+      "settings": {
+        "idle_medium_02": {
+          "flags": 12582912,
+          "play_flags": 512
+        }
+      }
+    },
+    {
+      "role": "main",
+      "source": "anims/band/guitarist/midori/gh3_guit_mido_a_med_solo01.ska.ps2",
+      "overlays": [
+        "anims/band/guitarist/midori/face/gh3_guitarist_midori_idle.ska.ps2",
+        "anims/band/guitarist/midori/gh3_guitarist_midori_acc01.ska.ps2"
+      ],
+      "aliases": [
+        "solo_medium_01"
+      ],
+      "frames": {
+        "bone_pos_guitar": [
+          [
+            -0.0023188470919120064,
+            -0.026812720535710297,
+            0.999637784882921,
+            0.0
+          ],
+          [
+            0.014270873105849834,
+            0.9995377871253365,
+            0.026843142315614747,
+            0.0
+          ],
+          [
+            -0.999895477101957,
+            0.01432794912237424,
+            -0.0019351343585441644,
+            0.0
+          ],
+          [
+            2.7383887498403934,
+            -0.39533297422010005,
+            -1.8582408838139055,
+            1.0
+          ]
+        ],
+        "bone_fret": [
+          [
+            -0.0438017242542429,
+            -0.027337565069763165,
+            0.9986661436578314,
+            0.0
+          ],
+          [
+            0.01827396331545994,
+            0.9994363752821196,
+            0.02816014963873453,
+            0.0
+          ],
+          [
+            -0.9988731006574799,
+            0.019483051583029945,
+            -0.04327747085854901,
+            0.0
+          ],
+          [
+            0.0,
+            0.0,
+            0.0,
+            1.0
+          ]
+        ]
+      },
+      "isolate": [
+        "bone_fret_hand",
+        "bone_strum_hand"
+      ],
+      "model": false,
+      "settings": {
+        "solo_medium_01": {
+          "flags": 0,
+          "play_flags": 512
+        }
+      }
+    },
+    {
+      "role": "main",
+      "source": "anims/band/guitarist/midori/gh3_guit_mido_a_med_solo02.ska.ps2",
+      "overlays": [
+        "anims/band/guitarist/midori/face/gh3_guitarist_midori_idle.ska.ps2",
+        "anims/band/guitarist/midori/gh3_guitarist_midori_acc01.ska.ps2"
+      ],
+      "aliases": [
+        "solo_medium_02"
+      ],
+      "frames": {
+        "bone_pos_guitar": [
+          [
+            -0.0023188470919120064,
+            -0.026812720535710297,
+            0.999637784882921,
+            0.0
+          ],
+          [
+            0.014270873105849834,
+            0.9995377871253365,
+            0.026843142315614747,
+            0.0
+          ],
+          [
+            -0.999895477101957,
+            0.01432794912237424,
+            -0.0019351343585441644,
+            0.0
+          ],
+          [
+            2.7383887498403934,
+            -0.39533297422010005,
+            -1.8582408838139055,
+            1.0
+          ]
+        ],
+        "bone_fret": [
+          [
+            -0.0438017242542429,
+            -0.027337565069763165,
+            0.9986661436578314,
+            0.0
+          ],
+          [
+            0.01827396331545994,
+            0.9994363752821196,
+            0.02816014963873453,
+            0.0
+          ],
+          [
+            -0.9988731006574799,
+            0.019483051583029945,
+            -0.04327747085854901,
+            0.0
+          ],
+          [
+            0.0,
+            0.0,
+            0.0,
+            1.0
+          ]
+        ]
+      },
+      "isolate": [
+        "bone_fret_hand",
+        "bone_strum_hand"
+      ],
+      "model": false,
+      "settings": {
+        "solo_medium_02": {
+          "flags": 0,
+          "play_flags": 512
+        }
+      }
+    },
+    {
+      "role": "main",
+      "source": "anims/band/guitarist/midori/gh3_guit_mido_a_med_special01.ska.ps2",
+      "overlays": [
+        "anims/band/guitarist/midori/face/gh3_guitarist_midori_idle.ska.ps2",
+        "anims/band/guitarist/midori/gh3_guitarist_midori_acc01.ska.ps2"
+      ],
+      "aliases": [
+        "extreme_medium_01"
+      ],
+      "frames": {
+        "bone_pos_guitar": [
+          [
+            -0.0023188470919120064,
+            -0.026812720535710297,
+            0.999637784882921,
+            0.0
+          ],
+          [
+            0.014270873105849834,
+            0.9995377871253365,
+            0.026843142315614747,
+            0.0
+          ],
+          [
+            -0.999895477101957,
+            0.01432794912237424,
+            -0.0019351343585441644,
+            0.0
+          ],
+          [
+            2.7383887498403934,
+            -0.39533297422010005,
+            -1.8582408838139055,
+            1.0
+          ]
+        ],
+        "bone_fret": [
+          [
+            -0.0438017242542429,
+            -0.027337565069763165,
+            0.9986661436578314,
+            0.0
+          ],
+          [
+            0.01827396331545994,
+            0.9994363752821196,
+            0.02816014963873453,
+            0.0
+          ],
+          [
+            -0.9988731006574799,
+            0.019483051583029945,
+            -0.04327747085854901,
+            0.0
+          ],
+          [
+            0.0,
+            0.0,
+            0.0,
+            1.0
+          ]
+        ]
+      },
+      "isolate": [
+        "bone_fret_hand",
+        "bone_strum_hand"
+      ],
+      "model": false,
+      "settings": {
+        "extreme_medium_01": {
+          "flags": 12582913,
+          "play_flags": 512
+        }
+      }
+    },
+    {
+      "role": "main",
+      "source": "anims/band/guitarist/midori/gh3_guit_mido_a_med_special02.ska.ps2",
+      "overlays": [
+        "anims/band/guitarist/midori/face/gh3_guitarist_midori_idle.ska.ps2",
+        "anims/band/guitarist/midori/gh3_guitarist_midori_acc01.ska.ps2"
+      ],
+      "aliases": [
+        "extreme_medium_02"
+      ],
+      "frames": {
+        "bone_pos_guitar": [
+          [
+            -0.0023188470919120064,
+            -0.026812720535710297,
+            0.999637784882921,
+            0.0
+          ],
+          [
+            0.014270873105849834,
+            0.9995377871253365,
+            0.026843142315614747,
+            0.0
+          ],
+          [
+            -0.999895477101957,
+            0.01432794912237424,
+            -0.0019351343585441644,
+            0.0
+          ],
+          [
+            2.7383887498403934,
+            -0.39533297422010005,
+            -1.8582408838139055,
+            1.0
+          ]
+        ],
+        "bone_fret": [
+          [
+            -0.0438017242542429,
+            -0.027337565069763165,
+            0.9986661436578314,
+            0.0
+          ],
+          [
+            0.01827396331545994,
+            0.9994363752821196,
+            0.02816014963873453,
+            0.0
+          ],
+          [
+            -0.9988731006574799,
+            0.019483051583029945,
+            -0.04327747085854901,
+            0.0
+          ],
+          [
+            0.0,
+            0.0,
+            0.0,
+            1.0
+          ]
+        ]
+      },
+      "isolate": [
+        "bone_fret_hand",
+        "bone_strum_hand"
+      ],
+      "model": false,
+      "settings": {
+        "extreme_medium_02": {
+          "flags": 12582915,
+          "play_flags": 512
+        }
+      }
+    },
+    {
+      "role": "main",
+      "source": "anims/band/guitarist/midori/gh3_guit_mido_a_fst_idle01.ska.ps2",
+      "overlays": [
+        "anims/band/guitarist/midori/face/gh3_guitarist_midori_idle.ska.ps2",
+        "anims/band/guitarist/midori/gh3_guitarist_midori_acc01.ska.ps2"
+      ],
+      "aliases": [
+        "stand_fast_01"
+      ],
+      "frames": {
+        "bone_pos_guitar": [
+          [
+            -0.0023188470919120064,
+            -0.026812720535710297,
+            0.999637784882921,
+            0.0
+          ],
+          [
+            0.014270873105849834,
+            0.9995377871253365,
+            0.026843142315614747,
+            0.0
+          ],
+          [
+            -0.999895477101957,
+            0.01432794912237424,
+            -0.0019351343585441644,
+            0.0
+          ],
+          [
+            2.7383887498403934,
+            -0.39533297422010005,
+            -1.8582408838139055,
+            1.0
+          ]
+        ],
+        "bone_fret": [
+          [
+            -0.0438017242542429,
+            -0.027337565069763165,
+            0.9986661436578314,
+            0.0
+          ],
+          [
+            0.01827396331545994,
+            0.9994363752821196,
+            0.02816014963873453,
+            0.0
+          ],
+          [
+            -0.9988731006574799,
+            0.019483051583029945,
+            -0.04327747085854901,
+            0.0
+          ],
+          [
+            0.0,
+            0.0,
+            0.0,
+            1.0
+          ]
+        ]
+      },
+      "isolate": [
+        "bone_fret_hand",
+        "bone_strum_hand"
+      ],
+      "model": false,
+      "settings": {
+        "stand_fast_01": {
+          "flags": 12582915,
+          "play_flags": 512
+        }
+      }
+    },
+    {
+      "role": "main",
+      "source": "anims/band/guitarist/midori/gh3_guit_mido_a_fst_idle02.ska.ps2",
+      "overlays": [
+        "anims/band/guitarist/midori/face/gh3_guitarist_midori_idle.ska.ps2",
+        "anims/band/guitarist/midori/gh3_guitarist_midori_acc01.ska.ps2"
+      ],
+      "aliases": [
+        "stand_fast_02"
+      ],
+      "frames": {
+        "bone_pos_guitar": [
+          [
+            -0.0023188470919120064,
+            -0.026812720535710297,
+            0.999637784882921,
+            0.0
+          ],
+          [
+            0.014270873105849834,
+            0.9995377871253365,
+            0.026843142315614747,
+            0.0
+          ],
+          [
+            -0.999895477101957,
+            0.01432794912237424,
+            -0.0019351343585441644,
+            0.0
+          ],
+          [
+            2.7383887498403934,
+            -0.39533297422010005,
+            -1.8582408838139055,
+            1.0
+          ]
+        ],
+        "bone_fret": [
+          [
+            -0.0438017242542429,
+            -0.027337565069763165,
+            0.9986661436578314,
+            0.0
+          ],
+          [
+            0.01827396331545994,
+            0.9994363752821196,
+            0.02816014963873453,
+            0.0
+          ],
+          [
+            -0.9988731006574799,
+            0.019483051583029945,
+            -0.04327747085854901,
+            0.0
+          ],
+          [
+            0.0,
+            0.0,
+            0.0,
+            1.0
+          ]
+        ]
+      },
+      "isolate": [
+        "bone_fret_hand",
+        "bone_strum_hand"
+      ],
+      "model": false,
+      "settings": {
+        "stand_fast_02": {
+          "flags": 12582915,
+          "play_flags": 512
+        }
+      }
+    },
+    {
+      "role": "main",
+      "source": "anims/band/guitarist/midori/gh3_guit_mido_a_fst_idle03.ska.ps2",
+      "overlays": [
+        "anims/band/guitarist/midori/face/gh3_guitarist_midori_idle.ska.ps2",
+        "anims/band/guitarist/midori/gh3_guitarist_midori_acc01.ska.ps2"
+      ],
+      "aliases": [
+        "stand_fast_03"
+      ],
+      "frames": {
+        "bone_pos_guitar": [
+          [
+            -0.0023188470919120064,
+            -0.026812720535710297,
+            0.999637784882921,
+            0.0
+          ],
+          [
+            0.014270873105849834,
+            0.9995377871253365,
+            0.026843142315614747,
+            0.0
+          ],
+          [
+            -0.999895477101957,
+            0.01432794912237424,
+            -0.0019351343585441644,
+            0.0
+          ],
+          [
+            2.7383887498403934,
+            -0.39533297422010005,
+            -1.8582408838139055,
+            1.0
+          ]
+        ],
+        "bone_fret": [
+          [
+            -0.0438017242542429,
+            -0.027337565069763165,
+            0.9986661436578314,
+            0.0
+          ],
+          [
+            0.01827396331545994,
+            0.9994363752821196,
+            0.02816014963873453,
+            0.0
+          ],
+          [
+            -0.9988731006574799,
+            0.019483051583029945,
+            -0.04327747085854901,
+            0.0
+          ],
+          [
+            0.0,
+            0.0,
+            0.0,
+            1.0
+          ]
+        ]
+      },
+      "isolate": [
+        "bone_fret_hand",
+        "bone_strum_hand"
+      ],
+      "model": false,
+      "settings": {
+        "stand_fast_03": {
+          "flags": 12582915,
+          "play_flags": 512
+        }
+      }
+    },
+    {
+      "role": "main",
+      "source": "anims/band/guitarist/midori/gh3_guit_mido_a_fst_idle04.ska.ps2",
+      "overlays": [
+        "anims/band/guitarist/midori/face/gh3_guitarist_midori_idle.ska.ps2",
+        "anims/band/guitarist/midori/gh3_guitarist_midori_acc01.ska.ps2"
+      ],
+      "aliases": [
+        "stand_fast_04"
+      ],
+      "frames": {
+        "bone_pos_guitar": [
+          [
+            -0.0023188470919120064,
+            -0.026812720535710297,
+            0.999637784882921,
+            0.0
+          ],
+          [
+            0.014270873105849834,
+            0.9995377871253365,
+            0.026843142315614747,
+            0.0
+          ],
+          [
+            -0.999895477101957,
+            0.01432794912237424,
+            -0.0019351343585441644,
+            0.0
+          ],
+          [
+            2.7383887498403934,
+            -0.39533297422010005,
+            -1.8582408838139055,
+            1.0
+          ]
+        ],
+        "bone_fret": [
+          [
+            -0.0438017242542429,
+            -0.027337565069763165,
+            0.9986661436578314,
+            0.0
+          ],
+          [
+            0.01827396331545994,
+            0.9994363752821196,
+            0.02816014963873453,
+            0.0
+          ],
+          [
+            -0.9988731006574799,
+            0.019483051583029945,
+            -0.04327747085854901,
+            0.0
+          ],
+          [
+            0.0,
+            0.0,
+            0.0,
+            1.0
+          ]
+        ]
+      },
+      "isolate": [
+        "bone_fret_hand",
+        "bone_strum_hand"
+      ],
+      "model": false,
+      "settings": {
+        "stand_fast_04": {
+          "flags": 12582914,
+          "play_flags": 512
+        }
+      }
+    },
+    {
+      "role": "main",
+      "source": "anims/band/guitarist/midori/gh3_guit_mido_a_fst_idle05.ska.ps2",
+      "overlays": [
+        "anims/band/guitarist/midori/face/gh3_guitarist_midori_idle.ska.ps2",
+        "anims/band/guitarist/midori/gh3_guitarist_midori_acc01.ska.ps2"
+      ],
+      "aliases": [
+        "stand_fast_05"
+      ],
+      "frames": {
+        "bone_pos_guitar": [
+          [
+            -0.0023188470919120064,
+            -0.026812720535710297,
+            0.999637784882921,
+            0.0
+          ],
+          [
+            0.014270873105849834,
+            0.9995377871253365,
+            0.026843142315614747,
+            0.0
+          ],
+          [
+            -0.999895477101957,
+            0.01432794912237424,
+            -0.0019351343585441644,
+            0.0
+          ],
+          [
+            2.7383887498403934,
+            -0.39533297422010005,
+            -1.8582408838139055,
+            1.0
+          ]
+        ],
+        "bone_fret": [
+          [
+            -0.0438017242542429,
+            -0.027337565069763165,
+            0.9986661436578314,
+            0.0
+          ],
+          [
+            0.01827396331545994,
+            0.9994363752821196,
+            0.02816014963873453,
+            0.0
+          ],
+          [
+            -0.9988731006574799,
+            0.019483051583029945,
+            -0.04327747085854901,
+            0.0
+          ],
+          [
+            0.0,
+            0.0,
+            0.0,
+            1.0
+          ]
+        ]
+      },
+      "isolate": [
+        "bone_fret_hand",
+        "bone_strum_hand"
+      ],
+      "model": false,
+      "settings": {
+        "stand_fast_05": {
+          "flags": 12582914,
+          "play_flags": 512
+        }
+      }
+    },
+    {
+      "role": "main",
+      "source": "anims/band/guitarist/midori/gh3_guit_mido_a_fst_break01.ska.ps2",
+      "overlays": [
+        "anims/band/guitarist/midori/face/gh3_guitarist_midori_idle.ska.ps2",
+        "anims/band/guitarist/midori/gh3_guitarist_midori_acc01.ska.ps2"
+      ],
+      "aliases": [
+        "idle_fast_01"
+      ],
+      "frames": {
+        "bone_pos_guitar": [
+          [
+            -0.0023188470919120064,
+            -0.026812720535710297,
+            0.999637784882921,
+            0.0
+          ],
+          [
+            0.014270873105849834,
+            0.9995377871253365,
+            0.026843142315614747,
+            0.0
+          ],
+          [
+            -0.999895477101957,
+            0.01432794912237424,
+            -0.0019351343585441644,
+            0.0
+          ],
+          [
+            2.7383887498403934,
+            -0.39533297422010005,
+            -1.8582408838139055,
+            1.0
+          ]
+        ],
+        "bone_fret": [
+          [
+            -0.0438017242542429,
+            -0.027337565069763165,
+            0.9986661436578314,
+            0.0
+          ],
+          [
+            0.01827396331545994,
+            0.9994363752821196,
+            0.02816014963873453,
+            0.0
+          ],
+          [
+            -0.9988731006574799,
+            0.019483051583029945,
+            -0.04327747085854901,
+            0.0
+          ],
+          [
+            0.0,
+            0.0,
+            0.0,
+            1.0
+          ]
+        ]
+      },
+      "isolate": [
+        "bone_fret_hand",
+        "bone_strum_hand"
+      ],
+      "model": false,
+      "settings": {
+        "idle_fast_01": {
+          "flags": 12582914,
+          "play_flags": 512
+        }
+      }
+    },
+    {
+      "role": "main",
+      "source": "anims/band/guitarist/midori/gh3_guit_mido_a_fst_break02.ska.ps2",
+      "overlays": [
+        "anims/band/guitarist/midori/face/gh3_guitarist_midori_idle.ska.ps2",
+        "anims/band/guitarist/midori/gh3_guitarist_midori_acc01.ska.ps2"
+      ],
+      "aliases": [
+        "idle_fast_02"
+      ],
+      "frames": {
+        "bone_pos_guitar": [
+          [
+            -0.0023188470919120064,
+            -0.026812720535710297,
+            0.999637784882921,
+            0.0
+          ],
+          [
+            0.014270873105849834,
+            0.9995377871253365,
+            0.026843142315614747,
+            0.0
+          ],
+          [
+            -0.999895477101957,
+            0.01432794912237424,
+            -0.0019351343585441644,
+            0.0
+          ],
+          [
+            2.7383887498403934,
+            -0.39533297422010005,
+            -1.8582408838139055,
+            1.0
+          ]
+        ],
+        "bone_fret": [
+          [
+            -0.0438017242542429,
+            -0.027337565069763165,
+            0.9986661436578314,
+            0.0
+          ],
+          [
+            0.01827396331545994,
+            0.9994363752821196,
+            0.02816014963873453,
+            0.0
+          ],
+          [
+            -0.9988731006574799,
+            0.019483051583029945,
+            -0.04327747085854901,
+            0.0
+          ],
+          [
+            0.0,
+            0.0,
+            0.0,
+            1.0
+          ]
+        ]
+      },
+      "isolate": [
+        "bone_fret_hand",
+        "bone_strum_hand"
+      ],
+      "model": false,
+      "settings": {
+        "idle_fast_02": {
+          "flags": 4194304,
+          "play_flags": 512
+        }
+      }
+    },
+    {
+      "role": "main",
+      "source": "anims/band/guitarist/midori/gh3_guit_mido_a_fst_solo01.ska.ps2",
+      "overlays": [
+        "anims/band/guitarist/midori/face/gh3_guitarist_midori_idle.ska.ps2",
+        "anims/band/guitarist/midori/gh3_guitarist_midori_acc01.ska.ps2"
+      ],
+      "aliases": [
+        "solo_fast_01"
+      ],
+      "frames": {
+        "bone_pos_guitar": [
+          [
+            -0.0023188470919120064,
+            -0.026812720535710297,
+            0.999637784882921,
+            0.0
+          ],
+          [
+            0.014270873105849834,
+            0.9995377871253365,
+            0.026843142315614747,
+            0.0
+          ],
+          [
+            -0.999895477101957,
+            0.01432794912237424,
+            -0.0019351343585441644,
+            0.0
+          ],
+          [
+            2.7383887498403934,
+            -0.39533297422010005,
+            -1.8582408838139055,
+            1.0
+          ]
+        ],
+        "bone_fret": [
+          [
+            -0.0438017242542429,
+            -0.027337565069763165,
+            0.9986661436578314,
+            0.0
+          ],
+          [
+            0.01827396331545994,
+            0.9994363752821196,
+            0.02816014963873453,
+            0.0
+          ],
+          [
+            -0.9988731006574799,
+            0.019483051583029945,
+            -0.04327747085854901,
+            0.0
+          ],
+          [
+            0.0,
+            0.0,
+            0.0,
+            1.0
+          ]
+        ]
+      },
+      "isolate": [
+        "bone_fret_hand",
+        "bone_strum_hand"
+      ],
+      "model": false,
+      "settings": {
+        "solo_fast_01": {
+          "flags": 0,
+          "play_flags": 512
+        }
+      }
+    },
+    {
+      "role": "main",
+      "source": "anims/band/guitarist/midori/gh3_guit_mido_a_fst_solo02.ska.ps2",
+      "overlays": [
+        "anims/band/guitarist/midori/face/gh3_guitarist_midori_idle.ska.ps2",
+        "anims/band/guitarist/midori/gh3_guitarist_midori_acc01.ska.ps2"
+      ],
+      "aliases": [
+        "solo_fast_02"
+      ],
+      "frames": {
+        "bone_pos_guitar": [
+          [
+            -0.0023188470919120064,
+            -0.026812720535710297,
+            0.999637784882921,
+            0.0
+          ],
+          [
+            0.014270873105849834,
+            0.9995377871253365,
+            0.026843142315614747,
+            0.0
+          ],
+          [
+            -0.999895477101957,
+            0.01432794912237424,
+            -0.0019351343585441644,
+            0.0
+          ],
+          [
+            2.7383887498403934,
+            -0.39533297422010005,
+            -1.8582408838139055,
+            1.0
+          ]
+        ],
+        "bone_fret": [
+          [
+            -0.0438017242542429,
+            -0.027337565069763165,
+            0.9986661436578314,
+            0.0
+          ],
+          [
+            0.01827396331545994,
+            0.9994363752821196,
+            0.02816014963873453,
+            0.0
+          ],
+          [
+            -0.9988731006574799,
+            0.019483051583029945,
+            -0.04327747085854901,
+            0.0
+          ],
+          [
+            0.0,
+            0.0,
+            0.0,
+            1.0
+          ]
+        ]
+      },
+      "isolate": [
+        "bone_fret_hand",
+        "bone_strum_hand"
+      ],
+      "model": false,
+      "settings": {
+        "solo_fast_02": {
+          "flags": 0,
+          "play_flags": 512
+        }
+      }
+    },
+    {
+      "role": "main",
+      "source": "anims/band/guitarist/midori/gh3_guit_mido_a_fst_special01.ska.ps2",
+      "overlays": [
+        "anims/band/guitarist/midori/face/gh3_guitarist_midori_idle.ska.ps2",
+        "anims/band/guitarist/midori/gh3_guitarist_midori_acc01.ska.ps2"
+      ],
+      "aliases": [
+        "extreme_fast_01"
+      ],
+      "frames": {
+        "bone_pos_guitar": [
+          [
+            -0.0023188470919120064,
+            -0.026812720535710297,
+            0.999637784882921,
+            0.0
+          ],
+          [
+            0.014270873105849834,
+            0.9995377871253365,
+            0.026843142315614747,
+            0.0
+          ],
+          [
+            -0.999895477101957,
+            0.01432794912237424,
+            -0.0019351343585441644,
+            0.0
+          ],
+          [
+            2.7383887498403934,
+            -0.39533297422010005,
+            -1.8582408838139055,
+            1.0
+          ]
+        ],
+        "bone_fret": [
+          [
+            -0.0438017242542429,
+            -0.027337565069763165,
+            0.9986661436578314,
+            0.0
+          ],
+          [
+            0.01827396331545994,
+            0.9994363752821196,
+            0.02816014963873453,
+            0.0
+          ],
+          [
+            -0.9988731006574799,
+            0.019483051583029945,
+            -0.04327747085854901,
+            0.0
+          ],
+          [
+            0.0,
+            0.0,
+            0.0,
+            1.0
+          ]
+        ]
+      },
+      "isolate": [
+        "bone_fret_hand",
+        "bone_strum_hand"
+      ],
+      "model": false,
+      "settings": {
+        "extreme_fast_01": {
+          "flags": 12582914,
+          "play_flags": 512
+        }
+      }
+    },
+    {
+      "role": "main",
+      "source": "anims/band/guitarist/midori/gh3_guit_mido_a_fst_special02.ska.ps2",
+      "overlays": [
+        "anims/band/guitarist/midori/face/gh3_guitarist_midori_idle.ska.ps2",
+        "anims/band/guitarist/midori/gh3_guitarist_midori_acc01.ska.ps2"
+      ],
+      "aliases": [
+        "extreme_fast_02"
+      ],
+      "frames": {
+        "bone_pos_guitar": [
+          [
+            -0.0023188470919120064,
+            -0.026812720535710297,
+            0.999637784882921,
+            0.0
+          ],
+          [
+            0.014270873105849834,
+            0.9995377871253365,
+            0.026843142315614747,
+            0.0
+          ],
+          [
+            -0.999895477101957,
+            0.01432794912237424,
+            -0.0019351343585441644,
+            0.0
+          ],
+          [
+            2.7383887498403934,
+            -0.39533297422010005,
+            -1.8582408838139055,
+            1.0
+          ]
+        ],
+        "bone_fret": [
+          [
+            -0.0438017242542429,
+            -0.027337565069763165,
+            0.9986661436578314,
+            0.0
+          ],
+          [
+            0.01827396331545994,
+            0.9994363752821196,
+            0.02816014963873453,
+            0.0
+          ],
+          [
+            -0.9988731006574799,
+            0.019483051583029945,
+            -0.04327747085854901,
+            0.0
+          ],
+          [
+            0.0,
+            0.0,
+            0.0,
+            1.0
+          ]
+        ]
+      },
+      "isolate": [
+        "bone_fret_hand",
+        "bone_strum_hand"
+      ],
+      "model": false,
+      "settings": {
+        "extreme_fast_02": {
+          "flags": 12582914,
+          "play_flags": 512
+        }
+      }
+    },
+    {
+      "role": "main",
+      "source": "anims/band/guitarist/midori/gh3_guit_mido_a_bad_idle01.ska.ps2",
+      "overlays": [
+        "anims/band/guitarist/midori/face/gh3_guitarist_midori_idle.ska.ps2",
+        "anims/band/guitarist/midori/gh3_guitarist_midori_acc01.ska.ps2"
+      ],
+      "aliases": [
+        "stand_bad_01"
+      ],
+      "frames": {
+        "bone_pos_guitar": [
+          [
+            -0.0023188470919120064,
+            -0.026812720535710297,
+            0.999637784882921,
+            0.0
+          ],
+          [
+            0.014270873105849834,
+            0.9995377871253365,
+            0.026843142315614747,
+            0.0
+          ],
+          [
+            -0.999895477101957,
+            0.01432794912237424,
+            -0.0019351343585441644,
+            0.0
+          ],
+          [
+            2.7383887498403934,
+            -0.39533297422010005,
+            -1.8582408838139055,
+            1.0
+          ]
+        ],
+        "bone_fret": [
+          [
+            -0.0438017242542429,
+            -0.027337565069763165,
+            0.9986661436578314,
+            0.0
+          ],
+          [
+            0.01827396331545994,
+            0.9994363752821196,
+            0.02816014963873453,
+            0.0
+          ],
+          [
+            -0.9988731006574799,
+            0.019483051583029945,
+            -0.04327747085854901,
+            0.0
+          ],
+          [
+            0.0,
+            0.0,
+            0.0,
+            1.0
+          ]
+        ]
+      },
+      "isolate": [
+        "bone_fret_hand",
+        "bone_strum_hand"
+      ],
+      "model": false,
+      "settings": {
+        "stand_bad_01": {
+          "flags": 12582915,
+          "play_flags": 512
+        }
+      }
+    },
+    {
+      "role": "main",
+      "source": "anims/band/guitarist/midori/gh3_guit_mido_a_bad_idle02.ska.ps2",
+      "overlays": [
+        "anims/band/guitarist/midori/face/gh3_guitarist_midori_idle.ska.ps2",
+        "anims/band/guitarist/midori/gh3_guitarist_midori_acc01.ska.ps2"
+      ],
+      "aliases": [
+        "stand_bad_02"
+      ],
+      "frames": {
+        "bone_pos_guitar": [
+          [
+            -0.0023188470919120064,
+            -0.026812720535710297,
+            0.999637784882921,
+            0.0
+          ],
+          [
+            0.014270873105849834,
+            0.9995377871253365,
+            0.026843142315614747,
+            0.0
+          ],
+          [
+            -0.999895477101957,
+            0.01432794912237424,
+            -0.0019351343585441644,
+            0.0
+          ],
+          [
+            2.7383887498403934,
+            -0.39533297422010005,
+            -1.8582408838139055,
+            1.0
+          ]
+        ],
+        "bone_fret": [
+          [
+            -0.0438017242542429,
+            -0.027337565069763165,
+            0.9986661436578314,
+            0.0
+          ],
+          [
+            0.01827396331545994,
+            0.9994363752821196,
+            0.02816014963873453,
+            0.0
+          ],
+          [
+            -0.9988731006574799,
+            0.019483051583029945,
+            -0.04327747085854901,
+            0.0
+          ],
+          [
+            0.0,
+            0.0,
+            0.0,
+            1.0
+          ]
+        ]
+      },
+      "isolate": [
+        "bone_fret_hand",
+        "bone_strum_hand"
+      ],
+      "model": false,
+      "settings": {
+        "stand_bad_02": {
+          "flags": 12582912,
+          "play_flags": 512
+        }
+      }
+    },
+    {
+      "role": "main",
+      "source": "anims/band/guitarist/midori/gh3_guit_mido_a_med_special01.ska.ps2",
+      "overlays": [
+        "anims/band/guitarist/midori/face/gh3_guitarist_midori_idle.ska.ps2",
+        "anims/band/guitarist/midori/gh3_guitarist_midori_acc01.ska.ps2"
+      ],
+      "aliases": [
+        "special_01"
+      ],
+      "frames": {
+        "bone_pos_guitar": [
+          [
+            -0.0023188470919120064,
+            -0.026812720535710297,
+            0.999637784882921,
+            0.0
+          ],
+          [
+            0.014270873105849834,
+            0.9995377871253365,
+            0.026843142315614747,
+            0.0
+          ],
+          [
+            -0.999895477101957,
+            0.01432794912237424,
+            -0.0019351343585441644,
+            0.0
+          ],
+          [
+            2.7383887498403934,
+            -0.39533297422010005,
+            -1.8582408838139055,
+            1.0
+          ]
+        ],
+        "bone_fret": [
+          [
+            -0.0438017242542429,
+            -0.027337565069763165,
+            0.9986661436578314,
+            0.0
+          ],
+          [
+            0.01827396331545994,
+            0.9994363752821196,
+            0.02816014963873453,
+            0.0
+          ],
+          [
+            -0.9988731006574799,
+            0.019483051583029945,
+            -0.04327747085854901,
+            0.0
+          ],
+          [
+            0.0,
+            0.0,
+            0.0,
+            1.0
+          ]
+        ]
+      },
+      "isolate": [
+        "bone_fret_hand",
+        "bone_strum_hand"
+      ],
+      "model": false,
+      "settings": {
+        "special_01": {
+          "flags": 0,
+          "play_flags": 512
+        }
+      }
+    },
+    {
+      "role": "main",
+      "source": "anims/band/guitarist/midori/gh3_guit_mido_a_med_special02.ska.ps2",
+      "overlays": [
+        "anims/band/guitarist/midori/face/gh3_guitarist_midori_idle.ska.ps2",
+        "anims/band/guitarist/midori/gh3_guitarist_midori_acc01.ska.ps2"
+      ],
+      "aliases": [
+        "special_02"
+      ],
+      "frames": {
+        "bone_pos_guitar": [
+          [
+            -0.0023188470919120064,
+            -0.026812720535710297,
+            0.999637784882921,
+            0.0
+          ],
+          [
+            0.014270873105849834,
+            0.9995377871253365,
+            0.026843142315614747,
+            0.0
+          ],
+          [
+            -0.999895477101957,
+            0.01432794912237424,
+            -0.0019351343585441644,
+            0.0
+          ],
+          [
+            2.7383887498403934,
+            -0.39533297422010005,
+            -1.8582408838139055,
+            1.0
+          ]
+        ],
+        "bone_fret": [
+          [
+            -0.0438017242542429,
+            -0.027337565069763165,
+            0.9986661436578314,
+            0.0
+          ],
+          [
+            0.01827396331545994,
+            0.9994363752821196,
+            0.02816014963873453,
+            0.0
+          ],
+          [
+            -0.9988731006574799,
+            0.019483051583029945,
+            -0.04327747085854901,
+            0.0
+          ],
+          [
+            0.0,
+            0.0,
+            0.0,
+            1.0
+          ]
+        ]
+      },
+      "isolate": [
+        "bone_fret_hand",
+        "bone_strum_hand"
+      ],
+      "model": false,
+      "settings": {
+        "special_02": {
+          "flags": 0,
+          "play_flags": 512
+        }
+      }
+    },
+    {
+      "role": "main",
+      "source": "anims/band/guitarist/midori/gh3_guit_midori_a_intro1.ska.ps2",
+      "overlays": [
+        "anims/band/guitarist/midori/face/gh3_guitarist_midori_idle.ska.ps2",
+        "anims/band/guitarist/midori/gh3_guitarist_midori_acc01.ska.ps2"
+      ],
+      "aliases": [
+        "intro_01"
+      ],
+      "frames": {
+        "bone_pos_guitar": [
+          [
+            -0.0023188470919120064,
+            -0.026812720535710297,
+            0.999637784882921,
+            0.0
+          ],
+          [
+            0.014270873105849834,
+            0.9995377871253365,
+            0.026843142315614747,
+            0.0
+          ],
+          [
+            -0.999895477101957,
+            0.01432794912237424,
+            -0.0019351343585441644,
+            0.0
+          ],
+          [
+            2.7383887498403934,
+            -0.39533297422010005,
+            -1.8582408838139055,
+            1.0
+          ]
+        ],
+        "bone_fret": [
+          [
+            -0.0438017242542429,
+            -0.027337565069763165,
+            0.9986661436578314,
+            0.0
+          ],
+          [
+            0.01827396331545994,
+            0.9994363752821196,
+            0.02816014963873453,
+            0.0
+          ],
+          [
+            -0.9988731006574799,
+            0.019483051583029945,
+            -0.04327747085854901,
+            0.0
+          ],
+          [
+            0.0,
+            0.0,
+            0.0,
+            1.0
+          ]
+        ]
+      },
+      "isolate": [
+        "bone_fret_hand",
+        "bone_strum_hand"
+      ],
+      "model": false,
+      "settings": {
+        "intro_01": {
+          "flags": 4194307,
+          "play_flags": 512
+        }
+      }
+    },
+    {
+      "role": "main",
+      "source": "anims/band/guitarist/midori/gh3_guit_midori_a_loss1.ska.ps2",
+      "overlays": [
+        "anims/band/guitarist/midori/face/gh3_guitarist_midori_idle.ska.ps2",
+        "anims/band/guitarist/midori/gh3_guitarist_midori_acc01.ska.ps2"
+      ],
+      "aliases": [
+        "lose_01"
+      ],
+      "frames": {
+        "bone_pos_guitar": [
+          [
+            -0.0023188470919120064,
+            -0.026812720535710297,
+            0.999637784882921,
+            0.0
+          ],
+          [
+            0.014270873105849834,
+            0.9995377871253365,
+            0.026843142315614747,
+            0.0
+          ],
+          [
+            -0.999895477101957,
+            0.01432794912237424,
+            -0.0019351343585441644,
+            0.0
+          ],
+          [
+            2.7383887498403934,
+            -0.39533297422010005,
+            -1.8582408838139055,
+            1.0
+          ]
+        ],
+        "bone_fret": [
+          [
+            -0.0438017242542429,
+            -0.027337565069763165,
+            0.9986661436578314,
+            0.0
+          ],
+          [
+            0.01827396331545994,
+            0.9994363752821196,
+            0.02816014963873453,
+            0.0
+          ],
+          [
+            -0.9988731006574799,
+            0.019483051583029945,
+            -0.04327747085854901,
+            0.0
+          ],
+          [
+            0.0,
+            0.0,
+            0.0,
+            1.0
+          ]
+        ]
+      },
+      "isolate": [
+        "bone_fret_hand",
+        "bone_strum_hand"
+      ],
+      "model": false,
+      "settings": {
+        "lose_01": {
+          "flags": 3,
+          "play_flags": 512
+        }
+      }
+    },
+    {
+      "role": "main",
+      "source": "anims/band/guitarist/midori/gh3_guit_midori_a_win1.ska.ps2",
+      "overlays": [
+        "anims/band/guitarist/midori/face/gh3_guitarist_midori_idle.ska.ps2",
+        "anims/band/guitarist/midori/gh3_guitarist_midori_acc01.ska.ps2"
+      ],
+      "aliases": [
+        "win_01"
+      ],
+      "frames": {
+        "bone_pos_guitar": [
+          [
+            -0.0023188470919120064,
+            -0.026812720535710297,
+            0.999637784882921,
+            0.0
+          ],
+          [
+            0.014270873105849834,
+            0.9995377871253365,
+            0.026843142315614747,
+            0.0
+          ],
+          [
+            -0.999895477101957,
+            0.01432794912237424,
+            -0.0019351343585441644,
+            0.0
+          ],
+          [
+            2.7383887498403934,
+            -0.39533297422010005,
+            -1.8582408838139055,
+            1.0
+          ]
+        ],
+        "bone_fret": [
+          [
+            -0.0438017242542429,
+            -0.027337565069763165,
+            0.9986661436578314,
+            0.0
+          ],
+          [
+            0.01827396331545994,
+            0.9994363752821196,
+            0.02816014963873453,
+            0.0
+          ],
+          [
+            -0.9988731006574799,
+            0.019483051583029945,
+            -0.04327747085854901,
+            0.0
+          ],
+          [
+            0.0,
+            0.0,
+            0.0,
+            1.0
+          ]
+        ]
+      },
+      "isolate": [
+        "bone_fret_hand",
+        "bone_strum_hand"
+      ],
+      "model": false,
+      "settings": {
+        "win_01": {
+          "flags": 4194307,
+          "play_flags": 512
+        }
+      }
+    },
+    {
+      "role": "main",
+      "source": "anims/band/guitarist/midori/gh3_guit_midori_a_intro2.ska.ps2",
+      "overlays": [
+        "anims/band/guitarist/midori/face/gh3_guitarist_midori_idle.ska.ps2",
+        "anims/band/guitarist/midori/gh3_guitarist_midori_acc01.ska.ps2"
+      ],
+      "aliases": [
+        "intro_02"
+      ],
+      "frames": {
+        "bone_pos_guitar": [
+          [
+            -0.0023188470919120064,
+            -0.026812720535710297,
+            0.999637784882921,
+            0.0
+          ],
+          [
+            0.014270873105849834,
+            0.9995377871253365,
+            0.026843142315614747,
+            0.0
+          ],
+          [
+            -0.999895477101957,
+            0.01432794912237424,
+            -0.0019351343585441644,
+            0.0
+          ],
+          [
+            2.7383887498403934,
+            -0.39533297422010005,
+            -1.8582408838139055,
+            1.0
+          ]
+        ],
+        "bone_fret": [
+          [
+            -0.0438017242542429,
+            -0.027337565069763165,
+            0.9986661436578314,
+            0.0
+          ],
+          [
+            0.01827396331545994,
+            0.9994363752821196,
+            0.02816014963873453,
+            0.0
+          ],
+          [
+            -0.9988731006574799,
+            0.019483051583029945,
+            -0.04327747085854901,
+            0.0
+          ],
+          [
+            0.0,
+            0.0,
+            0.0,
+            1.0
+          ]
+        ]
+      },
+      "isolate": [
+        "bone_fret_hand",
+        "bone_strum_hand"
+      ],
+      "model": false,
+      "settings": {
+        "intro_02": {
+          "flags": 3,
+          "play_flags": 512
+        }
+      }
+    },
+    {
+      "role": "main",
+      "source": "anims/band/guitarist/midori/gh3_guit_midori_a_loss2.ska.ps2",
+      "overlays": [
+        "anims/band/guitarist/midori/face/gh3_guitarist_midori_idle.ska.ps2",
+        "anims/band/guitarist/midori/gh3_guitarist_midori_acc01.ska.ps2"
+      ],
+      "aliases": [
+        "lose_02"
+      ],
+      "frames": {
+        "bone_pos_guitar": [
+          [
+            -0.0023188470919120064,
+            -0.026812720535710297,
+            0.999637784882921,
+            0.0
+          ],
+          [
+            0.014270873105849834,
+            0.9995377871253365,
+            0.026843142315614747,
+            0.0
+          ],
+          [
+            -0.999895477101957,
+            0.01432794912237424,
+            -0.0019351343585441644,
+            0.0
+          ],
+          [
+            2.7383887498403934,
+            -0.39533297422010005,
+            -1.8582408838139055,
+            1.0
+          ]
+        ],
+        "bone_fret": [
+          [
+            -0.0438017242542429,
+            -0.027337565069763165,
+            0.9986661436578314,
+            0.0
+          ],
+          [
+            0.01827396331545994,
+            0.9994363752821196,
+            0.02816014963873453,
+            0.0
+          ],
+          [
+            -0.9988731006574799,
+            0.019483051583029945,
+            -0.04327747085854901,
+            0.0
+          ],
+          [
+            0.0,
+            0.0,
+            0.0,
+            1.0
+          ]
+        ]
+      },
+      "isolate": [
+        "bone_fret_hand",
+        "bone_strum_hand"
+      ],
+      "model": false,
+      "settings": {
+        "lose_02": {
+          "flags": 3,
+          "play_flags": 512
+        }
+      }
+    },
+    {
+      "role": "main",
+      "source": "anims/band/guitarist/midori/gh3_guit_midori_a_win2.ska.ps2",
+      "overlays": [
+        "anims/band/guitarist/midori/face/gh3_guitarist_midori_idle.ska.ps2",
+        "anims/band/guitarist/midori/gh3_guitarist_midori_acc01.ska.ps2"
+      ],
+      "aliases": [
+        "win_02"
+      ],
+      "frames": {
+        "bone_pos_guitar": [
+          [
+            -0.0023188470919120064,
+            -0.026812720535710297,
+            0.999637784882921,
+            0.0
+          ],
+          [
+            0.014270873105849834,
+            0.9995377871253365,
+            0.026843142315614747,
+            0.0
+          ],
+          [
+            -0.999895477101957,
+            0.01432794912237424,
+            -0.0019351343585441644,
+            0.0
+          ],
+          [
+            2.7383887498403934,
+            -0.39533297422010005,
+            -1.8582408838139055,
+            1.0
+          ]
+        ],
+        "bone_fret": [
+          [
+            -0.0438017242542429,
+            -0.027337565069763165,
+            0.9986661436578314,
+            0.0
+          ],
+          [
+            0.01827396331545994,
+            0.9994363752821196,
+            0.02816014963873453,
+            0.0
+          ],
+          [
+            -0.9988731006574799,
+            0.019483051583029945,
+            -0.04327747085854901,
+            0.0
+          ],
+          [
+            0.0,
+            0.0,
+            0.0,
+            1.0
+          ]
+        ]
+      },
+      "isolate": [
+        "bone_fret_hand",
+        "bone_strum_hand"
+      ],
+      "model": false,
+      "settings": {
+        "win_02": {
+          "flags": 3,
+          "play_flags": 512
+        }
+      }
+    },
+    {
+      "role": "main",
+      "source": "anims/band/guitarist/midori/gh3_guit_midori_a_intro3.ska.ps2",
+      "overlays": [
+        "anims/band/guitarist/midori/face/gh3_guitarist_midori_idle.ska.ps2",
+        "anims/band/guitarist/midori/gh3_guitarist_midori_acc01.ska.ps2"
+      ],
+      "aliases": [
+        "intro_03"
+      ],
+      "frames": {
+        "bone_pos_guitar": [
+          [
+            -0.0023188470919120064,
+            -0.026812720535710297,
+            0.999637784882921,
+            0.0
+          ],
+          [
+            0.014270873105849834,
+            0.9995377871253365,
+            0.026843142315614747,
+            0.0
+          ],
+          [
+            -0.999895477101957,
+            0.01432794912237424,
+            -0.0019351343585441644,
+            0.0
+          ],
+          [
+            2.7383887498403934,
+            -0.39533297422010005,
+            -1.8582408838139055,
+            1.0
+          ]
+        ],
+        "bone_fret": [
+          [
+            -0.0438017242542429,
+            -0.027337565069763165,
+            0.9986661436578314,
+            0.0
+          ],
+          [
+            0.01827396331545994,
+            0.9994363752821196,
+            0.02816014963873453,
+            0.0
+          ],
+          [
+            -0.9988731006574799,
+            0.019483051583029945,
+            -0.04327747085854901,
+            0.0
+          ],
+          [
+            0.0,
+            0.0,
+            0.0,
+            1.0
+          ]
+        ]
+      },
+      "isolate": [
+        "bone_fret_hand",
+        "bone_strum_hand"
+      ],
+      "model": false,
+      "settings": {
+        "intro_03": {
+          "flags": 0,
+          "play_flags": 512
+        }
+      }
+    },
+    {
+      "role": "main",
+      "source": "anims/band/guitarist/midori/gh3_guit_midori_a_loss3.ska.ps2",
+      "overlays": [
+        "anims/band/guitarist/midori/face/gh3_guitarist_midori_idle.ska.ps2",
+        "anims/band/guitarist/midori/gh3_guitarist_midori_acc01.ska.ps2"
+      ],
+      "aliases": [
+        "lose_03"
+      ],
+      "frames": {
+        "bone_pos_guitar": [
+          [
+            -0.0023188470919120064,
+            -0.026812720535710297,
+            0.999637784882921,
+            0.0
+          ],
+          [
+            0.014270873105849834,
+            0.9995377871253365,
+            0.026843142315614747,
+            0.0
+          ],
+          [
+            -0.999895477101957,
+            0.01432794912237424,
+            -0.0019351343585441644,
+            0.0
+          ],
+          [
+            2.7383887498403934,
+            -0.39533297422010005,
+            -1.8582408838139055,
+            1.0
+          ]
+        ],
+        "bone_fret": [
+          [
+            -0.0438017242542429,
+            -0.027337565069763165,
+            0.9986661436578314,
+            0.0
+          ],
+          [
+            0.01827396331545994,
+            0.9994363752821196,
+            0.02816014963873453,
+            0.0
+          ],
+          [
+            -0.9988731006574799,
+            0.019483051583029945,
+            -0.04327747085854901,
+            0.0
+          ],
+          [
+            0.0,
+            0.0,
+            0.0,
+            1.0
+          ]
+        ]
+      },
+      "isolate": [
+        "bone_fret_hand",
+        "bone_strum_hand"
+      ],
+      "model": false,
+      "settings": {
+        "lose_03": {
+          "flags": 4194307,
+          "play_flags": 512
+        }
+      }
+    },
+    {
+      "role": "main",
+      "source": "anims/band/guitarist/midori/gh3_guit_midori_a_win3.ska.ps2",
+      "overlays": [
+        "anims/band/guitarist/midori/face/gh3_guitarist_midori_idle.ska.ps2",
+        "anims/band/guitarist/midori/gh3_guitarist_midori_acc01.ska.ps2"
+      ],
+      "aliases": [
+        "win_03"
+      ],
+      "frames": {
+        "bone_pos_guitar": [
+          [
+            -0.0023188470919120064,
+            -0.026812720535710297,
+            0.999637784882921,
+            0.0
+          ],
+          [
+            0.014270873105849834,
+            0.9995377871253365,
+            0.026843142315614747,
+            0.0
+          ],
+          [
+            -0.999895477101957,
+            0.01432794912237424,
+            -0.0019351343585441644,
+            0.0
+          ],
+          [
+            2.7383887498403934,
+            -0.39533297422010005,
+            -1.8582408838139055,
+            1.0
+          ]
+        ],
+        "bone_fret": [
+          [
+            -0.0438017242542429,
+            -0.027337565069763165,
+            0.9986661436578314,
+            0.0
+          ],
+          [
+            0.01827396331545994,
+            0.9994363752821196,
+            0.02816014963873453,
+            0.0
+          ],
+          [
+            -0.9988731006574799,
+            0.019483051583029945,
+            -0.04327747085854901,
+            0.0
+          ],
+          [
+            0.0,
+            0.0,
+            0.0,
+            1.0
+          ]
+        ]
+      },
+      "isolate": [
+        "bone_fret_hand",
+        "bone_strum_hand"
+      ],
+      "model": false,
+      "settings": {
+        "win_03": {
+          "flags": 0,
+          "play_flags": 512
+        }
+      }
+    },
+    {
+      "role": "main",
+      "source": "anims/band/guitarist/midori/gh3_guit_midori_a_win3.ska.ps2",
+      "overlays": [
+        "anims/band/guitarist/midori/face/gh3_guitarist_midori_idle.ska.ps2",
+        "anims/band/guitarist/midori/gh3_guitarist_midori_acc01.ska.ps2"
+      ],
+      "aliases": [
+        "win_final"
+      ],
+      "frames": {
+        "bone_pos_guitar": [
+          [
+            -0.0023188470919120064,
+            -0.026812720535710297,
+            0.999637784882921,
+            0.0
+          ],
+          [
+            0.014270873105849834,
+            0.9995377871253365,
+            0.026843142315614747,
+            0.0
+          ],
+          [
+            -0.999895477101957,
+            0.01432794912237424,
+            -0.0019351343585441644,
+            0.0
+          ],
+          [
+            2.7383887498403934,
+            -0.39533297422010005,
+            -1.8582408838139055,
+            1.0
+          ]
+        ],
+        "bone_fret": [
+          [
+            -0.0438017242542429,
+            -0.027337565069763165,
+            0.9986661436578314,
+            0.0
+          ],
+          [
+            0.01827396331545994,
+            0.9994363752821196,
+            0.02816014963873453,
+            0.0
+          ],
+          [
+            -0.9988731006574799,
+            0.019483051583029945,
+            -0.04327747085854901,
+            0.0
+          ],
+          [
+            0.0,
+            0.0,
+            0.0,
+            1.0
+          ]
+        ]
+      },
+      "isolate": [
+        "bone_fret_hand",
+        "bone_strum_hand"
+      ],
+      "model": false,
+      "settings": {
+        "win_final": {
+          "flags": 3,
+          "play_flags": 512
+        }
+      }
+    },
+    {
+      "role": "main",
+      "source": "anims/band/guitarist/midori/gh3_guit_mido_a_med_jump01.ska.ps2",
+      "overlays": [
+        "anims/band/guitarist/midori/face/gh3_guitarist_midori_idle.ska.ps2",
+        "anims/band/guitarist/midori/gh3_guitarist_midori_acc01.ska.ps2"
+      ],
+      "aliases": [
+        "band_jump"
+      ],
+      "frames": {
+        "bone_pos_guitar": [
+          [
+            -0.0023188470919120064,
+            -0.026812720535710297,
+            0.999637784882921,
+            0.0
+          ],
+          [
+            0.014270873105849834,
+            0.9995377871253365,
+            0.026843142315614747,
+            0.0
+          ],
+          [
+            -0.999895477101957,
+            0.01432794912237424,
+            -0.0019351343585441644,
+            0.0
+          ],
+          [
+            2.7383887498403934,
+            -0.39533297422010005,
+            -1.8582408838139055,
+            1.0
+          ]
+        ],
+        "bone_fret": [
+          [
+            -0.0438017242542429,
+            -0.027337565069763165,
+            0.9986661436578314,
+            0.0
+          ],
+          [
+            0.01827396331545994,
+            0.9994363752821196,
+            0.02816014963873453,
+            0.0
+          ],
+          [
+            -0.9988731006574799,
+            0.019483051583029945,
+            -0.04327747085854901,
+            0.0
+          ],
+          [
+            0.0,
+            0.0,
+            0.0,
+            1.0
+          ]
+        ]
+      },
+      "isolate": [
+        "bone_fret_hand",
+        "bone_strum_hand"
+      ],
+      "model": false,
+      "settings": {
+        "band_jump": {
+          "flags": 12582912,
+          "play_flags": 512
+        }
+      }
+    },
+    {
+      "role": "ui",
+      "source": "anims/band/guitarist/midori/frontend/gh3_guit_midori_tran_outtoa.ska.ps2",
+      "overlays": [
+        "anims/band/guitarist/midori/face/gh3_guitarist_midori_idle.ska.ps2",
+        "anims/band/guitarist/midori/gh3_guitarist_midori_acc01.ska.ps2"
+      ],
+      "aliases": [
+        "ui_enter"
+      ],
+      "frames": {
+        "bone_pos_guitar": [
+          [
+            -0.0023188470919120064,
+            -0.026812720535710297,
+            0.999637784882921,
+            0.0
+          ],
+          [
+            0.014270873105849834,
+            0.9995377871253365,
+            0.026843142315614747,
+            0.0
+          ],
+          [
+            -0.999895477101957,
+            0.01432794912237424,
+            -0.0019351343585441644,
+            0.0
+          ],
+          [
+            2.7383887498403934,
+            -0.39533297422010005,
+            -1.8582408838139055,
+            1.0
+          ]
+        ],
+        "bone_fret": [
+          [
+            -0.0438017242542429,
+            -0.027337565069763165,
+            0.9986661436578314,
+            0.0
+          ],
+          [
+            0.01827396331545994,
+            0.9994363752821196,
+            0.02816014963873453,
+            0.0
+          ],
+          [
+            -0.9988731006574799,
+            0.019483051583029945,
+            -0.04327747085854901,
+            0.0
+          ],
+          [
+            0.0,
+            0.0,
+            0.0,
+            1.0
+          ]
+        ]
+      },
+      "isolate": [
+        "bone_fret_hand",
+        "bone_strum_hand"
+      ],
+      "model": false,
+      "settings": {
+        "ui_enter": {
+          "flags": 0,
+          "play_flags": 512
+        }
+      }
+    },
+    {
+      "role": "ui",
+      "source": "anims/band/guitarist/midori/frontend/gh3_guit_midori_tran_out_idle.ska.ps2",
+      "overlays": [
+        "anims/band/guitarist/midori/face/gh3_guitarist_midori_idle.ska.ps2",
+        "anims/band/guitarist/midori/gh3_guitarist_midori_acc01.ska.ps2"
+      ],
+      "aliases": [
+        "ui_loop"
+      ],
+      "frames": {
+        "bone_pos_guitar": [
+          [
+            -0.0023188470919120064,
+            -0.026812720535710297,
+            0.999637784882921,
+            0.0
+          ],
+          [
+            0.014270873105849834,
+            0.9995377871253365,
+            0.026843142315614747,
+            0.0
+          ],
+          [
+            -0.999895477101957,
+            0.01432794912237424,
+            -0.0019351343585441644,
+            0.0
+          ],
+          [
+            2.7383887498403934,
+            -0.39533297422010005,
+            -1.8582408838139055,
+            1.0
+          ]
+        ],
+        "bone_fret": [
+          [
+            -0.0438017242542429,
+            -0.027337565069763165,
+            0.9986661436578314,
+            0.0
+          ],
+          [
+            0.01827396331545994,
+            0.9994363752821196,
+            0.02816014963873453,
+            0.0
+          ],
+          [
+            -0.9988731006574799,
+            0.019483051583029945,
+            -0.04327747085854901,
+            0.0
+          ],
+          [
+            0.0,
+            0.0,
+            0.0,
+            1.0
+          ]
+        ]
+      },
+      "isolate": [
+        "bone_fret_hand",
+        "bone_strum_hand"
+      ],
+      "model": false,
+      "settings": {
+        "ui_loop": {
+          "flags": 0,
+          "play_flags": 512
+        }
+      }
+    },
+    {
+      "role": "main",
+      "source": "anims/band/guitarist/midori/gh3_guit_midori_a_win1.ska.ps2",
+      "overlays": [
+        "anims/band/guitarist/midori/face/gh3_guitarist_midori_idle.ska.ps2",
+        "anims/band/guitarist/midori/gh3_guitarist_midori_acc01.ska.ps2"
+      ],
+      "aliases": [
+        "win_idle_1"
+      ],
+      "frames": {
+        "bone_pos_guitar": [
+          [
+            -0.0023188470919120064,
+            -0.026812720535710297,
+            0.999637784882921,
+            0.0
+          ],
+          [
+            0.014270873105849834,
+            0.9995377871253365,
+            0.026843142315614747,
+            0.0
+          ],
+          [
+            -0.999895477101957,
+            0.01432794912237424,
+            -0.0019351343585441644,
+            0.0
+          ],
+          [
+            2.7383887498403934,
+            -0.39533297422010005,
+            -1.8582408838139055,
+            1.0
+          ]
+        ],
+        "bone_fret": [
+          [
+            -0.0438017242542429,
+            -0.027337565069763165,
+            0.9986661436578314,
+            0.0
+          ],
+          [
+            0.01827396331545994,
+            0.9994363752821196,
+            0.02816014963873453,
+            0.0
+          ],
+          [
+            -0.9988731006574799,
+            0.019483051583029945,
+            -0.04327747085854901,
+            0.0
+          ],
+          [
+            0.0,
+            0.0,
+            0.0,
+            1.0
+          ]
+        ]
+      },
+      "isolate": [
+        "bone_fret_hand",
+        "bone_strum_hand"
+      ],
+      "model": false,
+      "settings": {
+        "win_idle_1": {
+          "flags": 0,
+          "play_flags": 512
+        }
+      },
+      "hold_last_frame": true
+    },
+    {
+      "role": "main",
+      "source": "anims/band/guitarist/midori/gh3_guit_midori_a_loss1.ska.ps2",
+      "overlays": [
+        "anims/band/guitarist/midori/face/gh3_guitarist_midori_idle.ska.ps2",
+        "anims/band/guitarist/midori/gh3_guitarist_midori_acc01.ska.ps2"
+      ],
+      "aliases": [
+        "lose_idle_1"
+      ],
+      "frames": {
+        "bone_pos_guitar": [
+          [
+            -0.0023188470919120064,
+            -0.026812720535710297,
+            0.999637784882921,
+            0.0
+          ],
+          [
+            0.014270873105849834,
+            0.9995377871253365,
+            0.026843142315614747,
+            0.0
+          ],
+          [
+            -0.999895477101957,
+            0.01432794912237424,
+            -0.0019351343585441644,
+            0.0
+          ],
+          [
+            2.7383887498403934,
+            -0.39533297422010005,
+            -1.8582408838139055,
+            1.0
+          ]
+        ],
+        "bone_fret": [
+          [
+            -0.0438017242542429,
+            -0.027337565069763165,
+            0.9986661436578314,
+            0.0
+          ],
+          [
+            0.01827396331545994,
+            0.9994363752821196,
+            0.02816014963873453,
+            0.0
+          ],
+          [
+            -0.9988731006574799,
+            0.019483051583029945,
+            -0.04327747085854901,
+            0.0
+          ],
+          [
+            0.0,
+            0.0,
+            0.0,
+            1.0
+          ]
+        ]
+      },
+      "isolate": [
+        "bone_fret_hand",
+        "bone_strum_hand"
+      ],
+      "model": false,
+      "settings": {
+        "lose_idle_1": {
+          "flags": 0,
+          "play_flags": 512
+        }
+      },
+      "hold_last_frame": true
+    },
+    {
+      "role": "strum",
+      "source": "anims/band/guitarist/midori/hands/gh3_hnd_guit_strum_mido_norm_s02_d.ska.ps2",
+      "aliases": [
+        "strum_short_02"
+      ],
+      "frames": {}
+    },
+    {
+      "role": "strum",
+      "source": "anims/band/guitarist/midori/hands/gh3_hnd_guit_strum_mido_norm_s03_d.ska.ps2",
+      "aliases": [
+        "strum_short_03"
+      ],
+      "frames": {}
+    },
+    {
+      "role": "strum",
+      "source": "anims/band/guitarist/midori/hands/gh3_hnd_guit_strum_mido_norm_s04_d.ska.ps2",
+      "aliases": [
+        "strum_short_04"
+      ],
+      "frames": {}
+    },
+    {
+      "role": "strum",
+      "source": "anims/band/guitarist/midori/hands/gh3_hnd_guit_strum_mido_norm_m02_d.ska.ps2",
+      "aliases": [
+        "strum_pick_02"
+      ],
+      "frames": {}
+    },
+    {
+      "role": "strum",
+      "source": "anims/band/guitarist/midori/hands/gh3_hnd_guit_strum_mido_norm_l02_d.ska.ps2",
+      "aliases": [
+        "strum_long_02"
+      ],
+      "frames": {}
+    },
+    {
+      "role": "strum",
+      "source": "anims/band/guitarist/midori/hands/gh3_hnd_guit_strum_mido_norm_l01_d.ska.ps2",
+      "aliases": [
+        "strum_long_03"
+      ],
+      "frames": {}
+    },
+    {
+      "role": "strum",
+      "source": "anims/band/guitarist/midori/hands/gh3_hnd_guit_strum_mido_norm_l02_d.ska.ps2",
+      "aliases": [
+        "strum_long_04"
+      ],
+      "frames": {}
+    },
+    {
+      "role": "fret",
+      "source": "gh3_hnd_guit_chord_mid_empty_d.ska.ps2",
+      "aliases": [
+        "finger_open"
+      ],
+      "frames": {
+        "bone_fret": [
+          [
+            -0.0438017242542429,
+            -0.027337565069763165,
+            0.9986661436578314,
+            0.0
+          ],
+          [
+            0.01827396331545994,
+            0.9994363752821196,
+            0.02816014963873453,
+            0.0
+          ],
+          [
+            -0.9988731006574799,
+            0.019483051583029945,
+            -0.04327747085854901,
+            0.0
+          ],
+          [
+            0.0,
+            0.0,
+            0.0,
+            1.0
+          ]
+        ]
+      }
+    },
+    {
+      "role": "fret",
+      "source": "gh3_hnd_guit_chord_mid_empty_d.ska.ps2",
+      "aliases": [
+        "finger_hold_index"
+      ],
+      "frames": {
+        "bone_fret": [
+          [
+            -0.0438017242542429,
+            -0.027337565069763165,
+            0.9986661436578314,
+            0.0
+          ],
+          [
+            0.01827396331545994,
+            0.9994363752821196,
+            0.02816014963873453,
+            0.0
+          ],
+          [
+            -0.9988731006574799,
+            0.019483051583029945,
+            -0.04327747085854901,
+            0.0
+          ],
+          [
+            0.0,
+            0.0,
+            0.0,
+            1.0
+          ]
+        ]
+      },
+      "pose_layers": [
+        {
+          "source": "anims/band/guitarist/midori/hands/gh3_hnd_guit_chord_mid_roll3_1_d.ska.ps2",
+          "bones": [
+            "bone_L-index01",
+            "bone_L-index02",
+            "bone_L-index03"
+          ]
+        }
+      ]
+    },
+    {
+      "role": "fret",
+      "source": "gh3_hnd_guit_chord_mid_empty_d.ska.ps2",
+      "aliases": [
+        "finger_hold_middle"
+      ],
+      "frames": {
+        "bone_fret": [
+          [
+            -0.0438017242542429,
+            -0.027337565069763165,
+            0.9986661436578314,
+            0.0
+          ],
+          [
+            0.01827396331545994,
+            0.9994363752821196,
+            0.02816014963873453,
+            0.0
+          ],
+          [
+            -0.9988731006574799,
+            0.019483051583029945,
+            -0.04327747085854901,
+            0.0
+          ],
+          [
+            0.0,
+            0.0,
+            0.0,
+            1.0
+          ]
+        ]
+      },
+      "pose_layers": [
+        {
+          "source": "anims/band/guitarist/midori/hands/gh3_hnd_guit_chord_mid_roll3_2_d.ska.ps2",
+          "bones": [
+            "bone_L-middlefinger01",
+            "bone_L-middlefinger02",
+            "bone_L-middlefinger03"
+          ]
+        }
+      ]
+    },
+    {
+      "role": "fret",
+      "source": "gh3_hnd_guit_chord_mid_empty_d.ska.ps2",
+      "aliases": [
+        "finger_hold_ring"
+      ],
+      "frames": {
+        "bone_fret": [
+          [
+            -0.0438017242542429,
+            -0.027337565069763165,
+            0.9986661436578314,
+            0.0
+          ],
+          [
+            0.01827396331545994,
+            0.9994363752821196,
+            0.02816014963873453,
+            0.0
+          ],
+          [
+            -0.9988731006574799,
+            0.019483051583029945,
+            -0.04327747085854901,
+            0.0
+          ],
+          [
+            0.0,
+            0.0,
+            0.0,
+            1.0
+          ]
+        ]
+      },
+      "pose_layers": [
+        {
+          "source": "anims/band/guitarist/midori/hands/gh3_hnd_guit_chord_mid_roll3_3_d.ska.ps2",
+          "bones": [
+            "bone_L-ringfinger01",
+            "bone_L-ringfinger02",
+            "bone_L-ringfinger03"
+          ]
+        }
+      ]
+    },
+    {
+      "role": "fret",
+      "source": "gh3_hnd_guit_chord_mid_empty_d.ska.ps2",
+      "aliases": [
+        "finger_hold_pinky"
+      ],
+      "frames": {
+        "bone_fret": [
+          [
+            -0.0438017242542429,
+            -0.027337565069763165,
+            0.9986661436578314,
+            0.0
+          ],
+          [
+            0.01827396331545994,
+            0.9994363752821196,
+            0.02816014963873453,
+            0.0
+          ],
+          [
+            -0.9988731006574799,
+            0.019483051583029945,
+            -0.04327747085854901,
+            0.0
+          ],
+          [
+            0.0,
+            0.0,
+            0.0,
+            1.0
+          ]
+        ]
+      },
+      "pose_layers": [
+        {
+          "source": "anims/band/guitarist/midori/hands/gh3_hnd_guit_chord_mid_roll3_4_d.ska.ps2",
+          "bones": [
+            "bone_L-pinky01",
+            "bone_L-pinky02",
+            "bone_L-pinky03"
+          ]
+        }
+      ]
+    },
+    {
+      "role": "fret",
+      "source": "gh3_hnd_guit_chord_mid_empty_d.ska.ps2",
+      "aliases": [
+        "finger_vibrato_index"
+      ],
+      "frames": {
+        "bone_fret": [
+          [
+            -0.0438017242542429,
+            -0.027337565069763165,
+            0.9986661436578314,
+            0.0
+          ],
+          [
+            0.01827396331545994,
+            0.9994363752821196,
+            0.02816014963873453,
+            0.0
+          ],
+          [
+            -0.9988731006574799,
+            0.019483051583029945,
+            -0.04327747085854901,
+            0.0
+          ],
+          [
+            0.0,
+            0.0,
+            0.0,
+            1.0
+          ]
+        ]
+      },
+      "pose_layers": [
+        {
+          "source": "anims/band/guitarist/midori/hands/gh3_hnd_guit_chord_mid_roll3_1_d.ska.ps2",
+          "bones": [
+            "bone_L-index01",
+            "bone_L-index02",
+            "bone_L-index03"
+          ]
+        },
+        {
+          "source": "anims/band/guitarist/midori/hands/gh3_hnd_guit_chord_mid_bar1_bend_d.ska.ps2",
+          "bones": [
+            "bone_fret_hand"
+          ],
+          "ping_pong_seconds": 0.3333333333333333
+        }
+      ]
+    },
+    {
+      "role": "fret",
+      "source": "gh3_hnd_guit_chord_mid_empty_d.ska.ps2",
+      "aliases": [
+        "finger_vibrato_middle"
+      ],
+      "frames": {
+        "bone_fret": [
+          [
+            -0.0438017242542429,
+            -0.027337565069763165,
+            0.9986661436578314,
+            0.0
+          ],
+          [
+            0.01827396331545994,
+            0.9994363752821196,
+            0.02816014963873453,
+            0.0
+          ],
+          [
+            -0.9988731006574799,
+            0.019483051583029945,
+            -0.04327747085854901,
+            0.0
+          ],
+          [
+            0.0,
+            0.0,
+            0.0,
+            1.0
+          ]
+        ]
+      },
+      "pose_layers": [
+        {
+          "source": "anims/band/guitarist/midori/hands/gh3_hnd_guit_chord_mid_roll3_2_d.ska.ps2",
+          "bones": [
+            "bone_L-middlefinger01",
+            "bone_L-middlefinger02",
+            "bone_L-middlefinger03"
+          ]
+        },
+        {
+          "source": "anims/band/guitarist/midori/hands/gh3_hnd_guit_chord_mid_bar2_bend_d.ska.ps2",
+          "bones": [
+            "bone_fret_hand"
+          ],
+          "ping_pong_seconds": 0.3333333333333333
+        }
+      ]
+    },
+    {
+      "role": "fret",
+      "source": "gh3_hnd_guit_chord_mid_empty_d.ska.ps2",
+      "aliases": [
+        "finger_vibrato_ring"
+      ],
+      "frames": {
+        "bone_fret": [
+          [
+            -0.0438017242542429,
+            -0.027337565069763165,
+            0.9986661436578314,
+            0.0
+          ],
+          [
+            0.01827396331545994,
+            0.9994363752821196,
+            0.02816014963873453,
+            0.0
+          ],
+          [
+            -0.9988731006574799,
+            0.019483051583029945,
+            -0.04327747085854901,
+            0.0
+          ],
+          [
+            0.0,
+            0.0,
+            0.0,
+            1.0
+          ]
+        ]
+      },
+      "pose_layers": [
+        {
+          "source": "anims/band/guitarist/midori/hands/gh3_hnd_guit_chord_mid_roll3_3_d.ska.ps2",
+          "bones": [
+            "bone_L-ringfinger01",
+            "bone_L-ringfinger02",
+            "bone_L-ringfinger03"
+          ]
+        },
+        {
+          "source": "anims/band/guitarist/midori/hands/gh3_hnd_guit_chord_mid_bar3_bend_d.ska.ps2",
+          "bones": [
+            "bone_fret_hand"
+          ],
+          "ping_pong_seconds": 0.3333333333333333
+        }
+      ]
+    },
+    {
+      "role": "fret",
+      "source": "gh3_hnd_guit_chord_mid_empty_d.ska.ps2",
+      "aliases": [
+        "finger_vibrato_pinky"
+      ],
+      "frames": {
+        "bone_fret": [
+          [
+            -0.0438017242542429,
+            -0.027337565069763165,
+            0.9986661436578314,
+            0.0
+          ],
+          [
+            0.01827396331545994,
+            0.9994363752821196,
+            0.02816014963873453,
+            0.0
+          ],
+          [
+            -0.9988731006574799,
+            0.019483051583029945,
+            -0.04327747085854901,
+            0.0
+          ],
+          [
+            0.0,
+            0.0,
+            0.0,
+            1.0
+          ]
+        ]
+      },
+      "pose_layers": [
+        {
+          "source": "anims/band/guitarist/midori/hands/gh3_hnd_guit_chord_mid_roll3_4_d.ska.ps2",
+          "bones": [
+            "bone_L-pinky01",
+            "bone_L-pinky02",
+            "bone_L-pinky03"
+          ]
+        },
+        {
+          "source": "anims/band/guitarist/midori/hands/gh3_hnd_guit_chord_mid_bar4_bend_d.ska.ps2",
+          "bones": [
+            "bone_fret_hand"
+          ],
+          "ping_pong_seconds": 0.3333333333333333
+        }
+      ]
+    },
+    {
+      "role": "main",
+      "source": "anims/band/guitarist/midori/gh3_guit_midori_a_wlk_loop.ska.ps2",
+      "overlays": [
+        "anims/band/guitarist/midori/face/gh3_guitarist_midori_idle.ska.ps2",
+        "anims/band/guitarist/midori/gh3_guitarist_midori_acc01.ska.ps2"
+      ],
+      "aliases": [
+        "walk_forward_medium",
+        "walk_forward_fast"
+      ],
+      "frames": {
+        "bone_pos_guitar": [
+          [
+            -0.0023188470919120064,
+            -0.026812720535710297,
+            0.999637784882921,
+            0.0
+          ],
+          [
+            0.014270873105849834,
+            0.9995377871253365,
+            0.026843142315614747,
+            0.0
+          ],
+          [
+            -0.999895477101957,
+            0.01432794912237424,
+            -0.0019351343585441644,
+            0.0
+          ],
+          [
+            2.7383887498403934,
+            -0.39533297422010005,
+            -1.8582408838139055,
+            1.0
+          ]
+        ],
+        "bone_fret": [
+          [
+            -0.0438017242542429,
+            -0.027337565069763165,
+            0.9986661436578314,
+            0.0
+          ],
+          [
+            0.01827396331545994,
+            0.9994363752821196,
+            0.02816014963873453,
+            0.0
+          ],
+          [
+            -0.9988731006574799,
+            0.019483051583029945,
+            -0.04327747085854901,
+            0.0
+          ],
+          [
+            0.0,
+            0.0,
+            0.0,
+            1.0
+          ]
+        ]
+      },
+      "isolate": [
+        "bone_fret_hand",
+        "bone_strum_hand"
+      ],
+      "model": false,
+      "settings": {
+        "walk_forward_medium": {
+          "flags": 12592129,
+          "play_flags": 512
+        },
+        "walk_forward_fast": {
+          "flags": 12592130,
+          "play_flags": 512
+        }
+      },
+      "locomotion": {
+        "turn_degrees": 0
+      }
+    },
+    {
+      "role": "main",
+      "source": "anims/band/guitarist/midori/gh3_guit_midori_a_wlk_stpl.ska.ps2",
+      "overlays": [
+        "anims/band/guitarist/midori/face/gh3_guitarist_midori_idle.ska.ps2",
+        "anims/band/guitarist/midori/gh3_guitarist_midori_acc01.ska.ps2"
+      ],
+      "aliases": [
+        "stop_forward_lf_medium",
+        "stop_forward_lf_fast"
+      ],
+      "frames": {
+        "bone_pos_guitar": [
+          [
+            -0.0023188470919120064,
+            -0.026812720535710297,
+            0.999637784882921,
+            0.0
+          ],
+          [
+            0.014270873105849834,
+            0.9995377871253365,
+            0.026843142315614747,
+            0.0
+          ],
+          [
+            -0.999895477101957,
+            0.01432794912237424,
+            -0.0019351343585441644,
+            0.0
+          ],
+          [
+            2.7383887498403934,
+            -0.39533297422010005,
+            -1.8582408838139055,
+            1.0
+          ]
+        ],
+        "bone_fret": [
+          [
+            -0.0438017242542429,
+            -0.027337565069763165,
+            0.9986661436578314,
+            0.0
+          ],
+          [
+            0.01827396331545994,
+            0.9994363752821196,
+            0.02816014963873453,
+            0.0
+          ],
+          [
+            -0.9988731006574799,
+            0.019483051583029945,
+            -0.04327747085854901,
+            0.0
+          ],
+          [
+            0.0,
+            0.0,
+            0.0,
+            1.0
+          ]
+        ]
+      },
+      "isolate": [
+        "bone_fret_hand",
+        "bone_strum_hand"
+      ],
+      "model": false,
+      "settings": {
+        "stop_forward_lf_medium": {
+          "flags": 12583937,
+          "play_flags": 512
+        },
+        "stop_forward_lf_fast": {
+          "flags": 12583938,
+          "play_flags": 512
+        }
+      },
+      "locomotion": {
+        "turn_degrees": 0
+      }
+    },
+    {
+      "role": "main",
+      "source": "anims/band/guitarist/midori/gh3_guit_midori_a_wlk_stpr.ska.ps2",
+      "overlays": [
+        "anims/band/guitarist/midori/face/gh3_guitarist_midori_idle.ska.ps2",
+        "anims/band/guitarist/midori/gh3_guitarist_midori_acc01.ska.ps2"
+      ],
+      "aliases": [
+        "stop_forward_rf_medium",
+        "stop_forward_rf_fast"
+      ],
+      "frames": {
+        "bone_pos_guitar": [
+          [
+            -0.0023188470919120064,
+            -0.026812720535710297,
+            0.999637784882921,
+            0.0
+          ],
+          [
+            0.014270873105849834,
+            0.9995377871253365,
+            0.026843142315614747,
+            0.0
+          ],
+          [
+            -0.999895477101957,
+            0.01432794912237424,
+            -0.0019351343585441644,
+            0.0
+          ],
+          [
+            2.7383887498403934,
+            -0.39533297422010005,
+            -1.8582408838139055,
+            1.0
+          ]
+        ],
+        "bone_fret": [
+          [
+            -0.0438017242542429,
+            -0.027337565069763165,
+            0.9986661436578314,
+            0.0
+          ],
+          [
+            0.01827396331545994,
+            0.9994363752821196,
+            0.02816014963873453,
+            0.0
+          ],
+          [
+            -0.9988731006574799,
+            0.019483051583029945,
+            -0.04327747085854901,
+            0.0
+          ],
+          [
+            0.0,
+            0.0,
+            0.0,
+            1.0
+          ]
+        ]
+      },
+      "isolate": [
+        "bone_fret_hand",
+        "bone_strum_hand"
+      ],
+      "model": false,
+      "settings": {
+        "stop_forward_rf_medium": {
+          "flags": 12583937,
+          "play_flags": 512
+        },
+        "stop_forward_rf_fast": {
+          "flags": 12583938,
+          "play_flags": 512
+        }
+      },
+      "locomotion": {
+        "turn_degrees": 0
+      }
+    },
+    {
+      "role": "main",
+      "source": "anims/band/guitarist/midori/gh3_guit_midori_a_bwlk_loop.ska.ps2",
+      "overlays": [
+        "anims/band/guitarist/midori/face/gh3_guitarist_midori_idle.ska.ps2",
+        "anims/band/guitarist/midori/gh3_guitarist_midori_acc01.ska.ps2"
+      ],
+      "aliases": [
+        "walk_backward_medium",
+        "walk_backward_fast"
+      ],
+      "frames": {
+        "bone_pos_guitar": [
+          [
+            -0.0023188470919120064,
+            -0.026812720535710297,
+            0.999637784882921,
+            0.0
+          ],
+          [
+            0.014270873105849834,
+            0.9995377871253365,
+            0.026843142315614747,
+            0.0
+          ],
+          [
+            -0.999895477101957,
+            0.01432794912237424,
+            -0.0019351343585441644,
+            0.0
+          ],
+          [
+            2.7383887498403934,
+            -0.39533297422010005,
+            -1.8582408838139055,
+            1.0
+          ]
+        ],
+        "bone_fret": [
+          [
+            -0.0438017242542429,
+            -0.027337565069763165,
+            0.9986661436578314,
+            0.0
+          ],
+          [
+            0.01827396331545994,
+            0.9994363752821196,
+            0.02816014963873453,
+            0.0
+          ],
+          [
+            -0.9988731006574799,
+            0.019483051583029945,
+            -0.04327747085854901,
+            0.0
+          ],
+          [
+            0.0,
+            0.0,
+            0.0,
+            1.0
+          ]
+        ]
+      },
+      "isolate": [
+        "bone_fret_hand",
+        "bone_strum_hand"
+      ],
+      "model": false,
+      "settings": {
+        "walk_backward_medium": {
+          "flags": 12593153,
+          "play_flags": 512
+        },
+        "walk_backward_fast": {
+          "flags": 12593154,
+          "play_flags": 512
+        }
+      },
+      "locomotion": {
+        "turn_degrees": 0
+      }
+    },
+    {
+      "role": "main",
+      "source": "anims/band/guitarist/midori/gh3_guit_midori_a_bwlk_stpl.ska.ps2",
+      "overlays": [
+        "anims/band/guitarist/midori/face/gh3_guitarist_midori_idle.ska.ps2",
+        "anims/band/guitarist/midori/gh3_guitarist_midori_acc01.ska.ps2"
+      ],
+      "aliases": [
+        "stop_backward_lf_medium",
+        "stop_backward_lf_fast"
+      ],
+      "frames": {
+        "bone_pos_guitar": [
+          [
+            -0.0023188470919120064,
+            -0.026812720535710297,
+            0.999637784882921,
+            0.0
+          ],
+          [
+            0.014270873105849834,
+            0.9995377871253365,
+            0.026843142315614747,
+            0.0
+          ],
+          [
+            -0.999895477101957,
+            0.01432794912237424,
+            -0.0019351343585441644,
+            0.0
+          ],
+          [
+            2.7383887498403934,
+            -0.39533297422010005,
+            -1.8582408838139055,
+            1.0
+          ]
+        ],
+        "bone_fret": [
+          [
+            -0.0438017242542429,
+            -0.027337565069763165,
+            0.9986661436578314,
+            0.0
+          ],
+          [
+            0.01827396331545994,
+            0.9994363752821196,
+            0.02816014963873453,
+            0.0
+          ],
+          [
+            -0.9988731006574799,
+            0.019483051583029945,
+            -0.04327747085854901,
+            0.0
+          ],
+          [
+            0.0,
+            0.0,
+            0.0,
+            1.0
+          ]
+        ]
+      },
+      "isolate": [
+        "bone_fret_hand",
+        "bone_strum_hand"
+      ],
+      "model": false,
+      "settings": {
+        "stop_backward_lf_medium": {
+          "flags": 12584961,
+          "play_flags": 512
+        },
+        "stop_backward_lf_fast": {
+          "flags": 12584962,
+          "play_flags": 512
+        }
+      },
+      "locomotion": {
+        "turn_degrees": 0
+      }
+    },
+    {
+      "role": "main",
+      "source": "anims/band/guitarist/midori/gh3_guit_midori_a_bwlk_stpr.ska.ps2",
+      "overlays": [
+        "anims/band/guitarist/midori/face/gh3_guitarist_midori_idle.ska.ps2",
+        "anims/band/guitarist/midori/gh3_guitarist_midori_acc01.ska.ps2"
+      ],
+      "aliases": [
+        "stop_backward_rf_medium",
+        "stop_backward_rf_fast"
+      ],
+      "frames": {
+        "bone_pos_guitar": [
+          [
+            -0.0023188470919120064,
+            -0.026812720535710297,
+            0.999637784882921,
+            0.0
+          ],
+          [
+            0.014270873105849834,
+            0.9995377871253365,
+            0.026843142315614747,
+            0.0
+          ],
+          [
+            -0.999895477101957,
+            0.01432794912237424,
+            -0.0019351343585441644,
+            0.0
+          ],
+          [
+            2.7383887498403934,
+            -0.39533297422010005,
+            -1.8582408838139055,
+            1.0
+          ]
+        ],
+        "bone_fret": [
+          [
+            -0.0438017242542429,
+            -0.027337565069763165,
+            0.9986661436578314,
+            0.0
+          ],
+          [
+            0.01827396331545994,
+            0.9994363752821196,
+            0.02816014963873453,
+            0.0
+          ],
+          [
+            -0.9988731006574799,
+            0.019483051583029945,
+            -0.04327747085854901,
+            0.0
+          ],
+          [
+            0.0,
+            0.0,
+            0.0,
+            1.0
+          ]
+        ]
+      },
+      "isolate": [
+        "bone_fret_hand",
+        "bone_strum_hand"
+      ],
+      "model": false,
+      "settings": {
+        "stop_backward_rf_medium": {
+          "flags": 12584961,
+          "play_flags": 512
+        },
+        "stop_backward_rf_fast": {
+          "flags": 12584962,
+          "play_flags": 512
+        }
+      },
+      "locomotion": {
+        "turn_degrees": 0
+      }
+    },
+    {
+      "role": "main",
+      "source": "anims/band/guitarist/midori/gh3_guit_midori_a_wlk_start.ska.ps2",
+      "overlays": [
+        "anims/band/guitarist/midori/face/gh3_guitarist_midori_idle.ska.ps2",
+        "anims/band/guitarist/midori/gh3_guitarist_midori_acc01.ska.ps2"
+      ],
+      "aliases": [
+        "turn_forward_medium",
+        "turn_forward_fast"
+      ],
+      "frames": {
+        "bone_pos_guitar": [
+          [
+            -0.0023188470919120064,
+            -0.026812720535710297,
+            0.999637784882921,
+            0.0
+          ],
+          [
+            0.014270873105849834,
+            0.9995377871253365,
+            0.026843142315614747,
+            0.0
+          ],
+          [
+            -0.999895477101957,
+            0.01432794912237424,
+            -0.0019351343585441644,
+            0.0
+          ],
+          [
+            2.7383887498403934,
+            -0.39533297422010005,
+            -1.8582408838139055,
+            1.0
+          ]
+        ],
+        "bone_fret": [
+          [
+            -0.0438017242542429,
+            -0.027337565069763165,
+            0.9986661436578314,
+            0.0
+          ],
+          [
+            0.01827396331545994,
+            0.9994363752821196,
+            0.02816014963873453,
+            0.0
+          ],
+          [
+            -0.9988731006574799,
+            0.019483051583029945,
+            -0.04327747085854901,
+            0.0
+          ],
+          [
+            0.0,
+            0.0,
+            0.0,
+            1.0
+          ]
+        ]
+      },
+      "isolate": [
+        "bone_fret_hand",
+        "bone_strum_hand"
+      ],
+      "model": false,
+      "settings": {
+        "turn_forward_medium": {
+          "flags": 12583937,
+          "play_flags": 512
+        },
+        "turn_forward_fast": {
+          "flags": 12583938,
+          "play_flags": 512
+        }
+      },
+      "locomotion": {
+        "turn_degrees": 0
+      }
+    },
+    {
+      "role": "main",
+      "source": "anims/band/guitarist/midori/gh3_guit_midori_a_wlk_start.ska.ps2",
+      "overlays": [
+        "anims/band/guitarist/midori/face/gh3_guitarist_midori_idle.ska.ps2",
+        "anims/band/guitarist/midori/gh3_guitarist_midori_acc01.ska.ps2"
+      ],
+      "aliases": [
+        "turn_backward_medium",
+        "turn_backward_fast"
+      ],
+      "frames": {
+        "bone_pos_guitar": [
+          [
+            -0.0023188470919120064,
+            -0.026812720535710297,
+            0.999637784882921,
+            0.0
+          ],
+          [
+            0.014270873105849834,
+            0.9995377871253365,
+            0.026843142315614747,
+            0.0
+          ],
+          [
+            -0.999895477101957,
+            0.01432794912237424,
+            -0.0019351343585441644,
+            0.0
+          ],
+          [
+            2.7383887498403934,
+            -0.39533297422010005,
+            -1.8582408838139055,
+            1.0
+          ]
+        ],
+        "bone_fret": [
+          [
+            -0.0438017242542429,
+            -0.027337565069763165,
+            0.9986661436578314,
+            0.0
+          ],
+          [
+            0.01827396331545994,
+            0.9994363752821196,
+            0.02816014963873453,
+            0.0
+          ],
+          [
+            -0.9988731006574799,
+            0.019483051583029945,
+            -0.04327747085854901,
+            0.0
+          ],
+          [
+            0.0,
+            0.0,
+            0.0,
+            1.0
+          ]
+        ]
+      },
+      "isolate": [
+        "bone_fret_hand",
+        "bone_strum_hand"
+      ],
+      "model": false,
+      "settings": {
+        "turn_backward_medium": {
+          "flags": 12584961,
+          "play_flags": 512
+        },
+        "turn_backward_fast": {
+          "flags": 12584962,
+          "play_flags": 512
+        }
+      },
+      "locomotion": {
+        "turn_degrees": 180
+      }
+    },
+    {
+      "role": "main",
+      "source": "anims/band/guitarist/midori/gh3_guit_midori_a_wlk_start.ska.ps2",
+      "overlays": [
+        "anims/band/guitarist/midori/face/gh3_guitarist_midori_idle.ska.ps2",
+        "anims/band/guitarist/midori/gh3_guitarist_midori_acc01.ska.ps2"
+      ],
+      "aliases": [
+        "turn_left_45_medium",
+        "turn_left_45_fast"
+      ],
+      "frames": {
+        "bone_pos_guitar": [
+          [
+            -0.0023188470919120064,
+            -0.026812720535710297,
+            0.999637784882921,
+            0.0
+          ],
+          [
+            0.014270873105849834,
+            0.9995377871253365,
+            0.026843142315614747,
+            0.0
+          ],
+          [
+            -0.999895477101957,
+            0.01432794912237424,
+            -0.0019351343585441644,
+            0.0
+          ],
+          [
+            2.7383887498403934,
+            -0.39533297422010005,
+            -1.8582408838139055,
+            1.0
+          ]
+        ],
+        "bone_fret": [
+          [
+            -0.0438017242542429,
+            -0.027337565069763165,
+            0.9986661436578314,
+            0.0
+          ],
+          [
+            0.01827396331545994,
+            0.9994363752821196,
+            0.02816014963873453,
+            0.0
+          ],
+          [
+            -0.9988731006574799,
+            0.019483051583029945,
+            -0.04327747085854901,
+            0.0
+          ],
+          [
+            0.0,
+            0.0,
+            0.0,
+            1.0
+          ]
+        ]
+      },
+      "isolate": [
+        "bone_fret_hand",
+        "bone_strum_hand"
+      ],
+      "model": false,
+      "settings": {
+        "turn_left_45_medium": {
+          "flags": 12583169,
+          "play_flags": 512
+        },
+        "turn_left_45_fast": {
+          "flags": 12583170,
+          "play_flags": 512
+        }
+      },
+      "locomotion": {
+        "turn_degrees": 45
+      }
+    },
+    {
+      "role": "main",
+      "source": "anims/band/guitarist/midori/gh3_guit_midori_a_wlk_start.ska.ps2",
+      "overlays": [
+        "anims/band/guitarist/midori/face/gh3_guitarist_midori_idle.ska.ps2",
+        "anims/band/guitarist/midori/gh3_guitarist_midori_acc01.ska.ps2"
+      ],
+      "aliases": [
+        "turn_left_90_medium",
+        "turn_left_90_fast"
+      ],
+      "frames": {
+        "bone_pos_guitar": [
+          [
+            -0.0023188470919120064,
+            -0.026812720535710297,
+            0.999637784882921,
+            0.0
+          ],
+          [
+            0.014270873105849834,
+            0.9995377871253365,
+            0.026843142315614747,
+            0.0
+          ],
+          [
+            -0.999895477101957,
+            0.01432794912237424,
+            -0.0019351343585441644,
+            0.0
+          ],
+          [
+            2.7383887498403934,
+            -0.39533297422010005,
+            -1.8582408838139055,
+            1.0
+          ]
+        ],
+        "bone_fret": [
+          [
+            -0.0438017242542429,
+            -0.027337565069763165,
+            0.9986661436578314,
+            0.0
+          ],
+          [
+            0.01827396331545994,
+            0.9994363752821196,
+            0.02816014963873453,
+            0.0
+          ],
+          [
+            -0.9988731006574799,
+            0.019483051583029945,
+            -0.04327747085854901,
+            0.0
+          ],
+          [
+            0.0,
+            0.0,
+            0.0,
+            1.0
+          ]
+        ]
+      },
+      "isolate": [
+        "bone_fret_hand",
+        "bone_strum_hand"
+      ],
+      "model": false,
+      "settings": {
+        "turn_left_90_medium": {
+          "flags": 12583169,
+          "play_flags": 512
+        },
+        "turn_left_90_fast": {
+          "flags": 12583170,
+          "play_flags": 512
+        }
+      },
+      "locomotion": {
+        "turn_degrees": 90
+      }
+    },
+    {
+      "role": "main",
+      "source": "anims/band/guitarist/midori/gh3_guit_midori_a_wlk_start.ska.ps2",
+      "overlays": [
+        "anims/band/guitarist/midori/face/gh3_guitarist_midori_idle.ska.ps2",
+        "anims/band/guitarist/midori/gh3_guitarist_midori_acc01.ska.ps2"
+      ],
+      "aliases": [
+        "turn_left_135_medium",
+        "turn_left_135_fast"
+      ],
+      "frames": {
+        "bone_pos_guitar": [
+          [
+            -0.0023188470919120064,
+            -0.026812720535710297,
+            0.999637784882921,
+            0.0
+          ],
+          [
+            0.014270873105849834,
+            0.9995377871253365,
+            0.026843142315614747,
+            0.0
+          ],
+          [
+            -0.999895477101957,
+            0.01432794912237424,
+            -0.0019351343585441644,
+            0.0
+          ],
+          [
+            2.7383887498403934,
+            -0.39533297422010005,
+            -1.8582408838139055,
+            1.0
+          ]
+        ],
+        "bone_fret": [
+          [
+            -0.0438017242542429,
+            -0.027337565069763165,
+            0.9986661436578314,
+            0.0
+          ],
+          [
+            0.01827396331545994,
+            0.9994363752821196,
+            0.02816014963873453,
+            0.0
+          ],
+          [
+            -0.9988731006574799,
+            0.019483051583029945,
+            -0.04327747085854901,
+            0.0
+          ],
+          [
+            0.0,
+            0.0,
+            0.0,
+            1.0
+          ]
+        ]
+      },
+      "isolate": [
+        "bone_fret_hand",
+        "bone_strum_hand"
+      ],
+      "model": false,
+      "settings": {
+        "turn_left_135_medium": {
+          "flags": 12583169,
+          "play_flags": 512
+        },
+        "turn_left_135_fast": {
+          "flags": 12583170,
+          "play_flags": 512
+        }
+      },
+      "locomotion": {
+        "turn_degrees": 135
+      }
+    },
+    {
+      "role": "main",
+      "source": "anims/band/guitarist/midori/gh3_guit_midori_a_wlk_start.ska.ps2",
+      "overlays": [
+        "anims/band/guitarist/midori/face/gh3_guitarist_midori_idle.ska.ps2",
+        "anims/band/guitarist/midori/gh3_guitarist_midori_acc01.ska.ps2"
+      ],
+      "aliases": [
+        "turn_left_180_medium",
+        "turn_left_180_fast"
+      ],
+      "frames": {
+        "bone_pos_guitar": [
+          [
+            -0.0023188470919120064,
+            -0.026812720535710297,
+            0.999637784882921,
+            0.0
+          ],
+          [
+            0.014270873105849834,
+            0.9995377871253365,
+            0.026843142315614747,
+            0.0
+          ],
+          [
+            -0.999895477101957,
+            0.01432794912237424,
+            -0.0019351343585441644,
+            0.0
+          ],
+          [
+            2.7383887498403934,
+            -0.39533297422010005,
+            -1.8582408838139055,
+            1.0
+          ]
+        ],
+        "bone_fret": [
+          [
+            -0.0438017242542429,
+            -0.027337565069763165,
+            0.9986661436578314,
+            0.0
+          ],
+          [
+            0.01827396331545994,
+            0.9994363752821196,
+            0.02816014963873453,
+            0.0
+          ],
+          [
+            -0.9988731006574799,
+            0.019483051583029945,
+            -0.04327747085854901,
+            0.0
+          ],
+          [
+            0.0,
+            0.0,
+            0.0,
+            1.0
+          ]
+        ]
+      },
+      "isolate": [
+        "bone_fret_hand",
+        "bone_strum_hand"
+      ],
+      "model": false,
+      "settings": {
+        "turn_left_180_medium": {
+          "flags": 12583169,
+          "play_flags": 512
+        },
+        "turn_left_180_fast": {
+          "flags": 12583170,
+          "play_flags": 512
+        }
+      },
+      "locomotion": {
+        "turn_degrees": 180
+      }
+    },
+    {
+      "role": "main",
+      "source": "anims/band/guitarist/midori/gh3_guit_midori_a_wlk_start.ska.ps2",
+      "overlays": [
+        "anims/band/guitarist/midori/face/gh3_guitarist_midori_idle.ska.ps2",
+        "anims/band/guitarist/midori/gh3_guitarist_midori_acc01.ska.ps2"
+      ],
+      "aliases": [
+        "turn_right_45_medium",
+        "turn_right_45_fast"
+      ],
+      "frames": {
+        "bone_pos_guitar": [
+          [
+            -0.0023188470919120064,
+            -0.026812720535710297,
+            0.999637784882921,
+            0.0
+          ],
+          [
+            0.014270873105849834,
+            0.9995377871253365,
+            0.026843142315614747,
+            0.0
+          ],
+          [
+            -0.999895477101957,
+            0.01432794912237424,
+            -0.0019351343585441644,
+            0.0
+          ],
+          [
+            2.7383887498403934,
+            -0.39533297422010005,
+            -1.8582408838139055,
+            1.0
+          ]
+        ],
+        "bone_fret": [
+          [
+            -0.0438017242542429,
+            -0.027337565069763165,
+            0.9986661436578314,
+            0.0
+          ],
+          [
+            0.01827396331545994,
+            0.9994363752821196,
+            0.02816014963873453,
+            0.0
+          ],
+          [
+            -0.9988731006574799,
+            0.019483051583029945,
+            -0.04327747085854901,
+            0.0
+          ],
+          [
+            0.0,
+            0.0,
+            0.0,
+            1.0
+          ]
+        ]
+      },
+      "isolate": [
+        "bone_fret_hand",
+        "bone_strum_hand"
+      ],
+      "model": false,
+      "settings": {
+        "turn_right_45_medium": {
+          "flags": 12583425,
+          "play_flags": 512
+        },
+        "turn_right_45_fast": {
+          "flags": 12583426,
+          "play_flags": 512
+        }
+      },
+      "locomotion": {
+        "turn_degrees": -45
+      }
+    },
+    {
+      "role": "main",
+      "source": "anims/band/guitarist/midori/gh3_guit_midori_a_wlk_start.ska.ps2",
+      "overlays": [
+        "anims/band/guitarist/midori/face/gh3_guitarist_midori_idle.ska.ps2",
+        "anims/band/guitarist/midori/gh3_guitarist_midori_acc01.ska.ps2"
+      ],
+      "aliases": [
+        "turn_right_90_medium",
+        "turn_right_90_fast"
+      ],
+      "frames": {
+        "bone_pos_guitar": [
+          [
+            -0.0023188470919120064,
+            -0.026812720535710297,
+            0.999637784882921,
+            0.0
+          ],
+          [
+            0.014270873105849834,
+            0.9995377871253365,
+            0.026843142315614747,
+            0.0
+          ],
+          [
+            -0.999895477101957,
+            0.01432794912237424,
+            -0.0019351343585441644,
+            0.0
+          ],
+          [
+            2.7383887498403934,
+            -0.39533297422010005,
+            -1.8582408838139055,
+            1.0
+          ]
+        ],
+        "bone_fret": [
+          [
+            -0.0438017242542429,
+            -0.027337565069763165,
+            0.9986661436578314,
+            0.0
+          ],
+          [
+            0.01827396331545994,
+            0.9994363752821196,
+            0.02816014963873453,
+            0.0
+          ],
+          [
+            -0.9988731006574799,
+            0.019483051583029945,
+            -0.04327747085854901,
+            0.0
+          ],
+          [
+            0.0,
+            0.0,
+            0.0,
+            1.0
+          ]
+        ]
+      },
+      "isolate": [
+        "bone_fret_hand",
+        "bone_strum_hand"
+      ],
+      "model": false,
+      "settings": {
+        "turn_right_90_medium": {
+          "flags": 12583425,
+          "play_flags": 512
+        },
+        "turn_right_90_fast": {
+          "flags": 12583426,
+          "play_flags": 512
+        }
+      },
+      "locomotion": {
+        "turn_degrees": -90
+      }
+    },
+    {
+      "role": "main",
+      "source": "anims/band/guitarist/midori/gh3_guit_midori_a_wlk_start.ska.ps2",
+      "overlays": [
+        "anims/band/guitarist/midori/face/gh3_guitarist_midori_idle.ska.ps2",
+        "anims/band/guitarist/midori/gh3_guitarist_midori_acc01.ska.ps2"
+      ],
+      "aliases": [
+        "turn_right_135_medium",
+        "turn_right_135_fast"
+      ],
+      "frames": {
+        "bone_pos_guitar": [
+          [
+            -0.0023188470919120064,
+            -0.026812720535710297,
+            0.999637784882921,
+            0.0
+          ],
+          [
+            0.014270873105849834,
+            0.9995377871253365,
+            0.026843142315614747,
+            0.0
+          ],
+          [
+            -0.999895477101957,
+            0.01432794912237424,
+            -0.0019351343585441644,
+            0.0
+          ],
+          [
+            2.7383887498403934,
+            -0.39533297422010005,
+            -1.8582408838139055,
+            1.0
+          ]
+        ],
+        "bone_fret": [
+          [
+            -0.0438017242542429,
+            -0.027337565069763165,
+            0.9986661436578314,
+            0.0
+          ],
+          [
+            0.01827396331545994,
+            0.9994363752821196,
+            0.02816014963873453,
+            0.0
+          ],
+          [
+            -0.9988731006574799,
+            0.019483051583029945,
+            -0.04327747085854901,
+            0.0
+          ],
+          [
+            0.0,
+            0.0,
+            0.0,
+            1.0
+          ]
+        ]
+      },
+      "isolate": [
+        "bone_fret_hand",
+        "bone_strum_hand"
+      ],
+      "model": false,
+      "settings": {
+        "turn_right_135_medium": {
+          "flags": 12583425,
+          "play_flags": 512
+        },
+        "turn_right_135_fast": {
+          "flags": 12583426,
+          "play_flags": 512
+        }
+      },
+      "locomotion": {
+        "turn_degrees": -135
+      }
+    },
+    {
+      "role": "main",
+      "source": "anims/band/guitarist/midori/gh3_guit_midori_a_wlk_start.ska.ps2",
+      "overlays": [
+        "anims/band/guitarist/midori/face/gh3_guitarist_midori_idle.ska.ps2",
+        "anims/band/guitarist/midori/gh3_guitarist_midori_acc01.ska.ps2"
+      ],
+      "aliases": [
+        "turn_right_180_medium",
+        "turn_right_180_fast"
+      ],
+      "frames": {
+        "bone_pos_guitar": [
+          [
+            -0.0023188470919120064,
+            -0.026812720535710297,
+            0.999637784882921,
+            0.0
+          ],
+          [
+            0.014270873105849834,
+            0.9995377871253365,
+            0.026843142315614747,
+            0.0
+          ],
+          [
+            -0.999895477101957,
+            0.01432794912237424,
+            -0.0019351343585441644,
+            0.0
+          ],
+          [
+            2.7383887498403934,
+            -0.39533297422010005,
+            -1.8582408838139055,
+            1.0
+          ]
+        ],
+        "bone_fret": [
+          [
+            -0.0438017242542429,
+            -0.027337565069763165,
+            0.9986661436578314,
+            0.0
+          ],
+          [
+            0.01827396331545994,
+            0.9994363752821196,
+            0.02816014963873453,
+            0.0
+          ],
+          [
+            -0.9988731006574799,
+            0.019483051583029945,
+            -0.04327747085854901,
+            0.0
+          ],
+          [
+            0.0,
+            0.0,
+            0.0,
+            1.0
+          ]
+        ]
+      },
+      "isolate": [
+        "bone_fret_hand",
+        "bone_strum_hand"
+      ],
+      "model": false,
+      "settings": {
+        "turn_right_180_medium": {
+          "flags": 12583425,
+          "play_flags": 512
+        },
+        "turn_right_180_fast": {
+          "flags": 12583426,
+          "play_flags": 512
+        }
+      },
+      "locomotion": {
+        "turn_degrees": -180
+      }
+    },
+    {
+      "role": "fret",
+      "source": "gh3_hnd_guit_chord_mid_empty_d.ska.ps2",
+      "aliases": [
+        "finger_chord_dmajor"
+      ],
+      "frames": {
+        "bone_fret": [
+          [
+            -0.0438017242542429,
+            -0.027337565069763165,
+            0.9986661436578314,
+            0.0
+          ],
+          [
+            0.01827396331545994,
+            0.9994363752821196,
+            0.02816014963873453,
+            0.0
+          ],
+          [
+            -0.9988731006574799,
+            0.019483051583029945,
+            -0.04327747085854901,
+            0.0
+          ],
+          [
+            0.0,
+            0.0,
+            0.0,
+            1.0
+          ]
+        ]
+      },
+      "pose_layers": [
+        {
+          "source": "anims/band/guitarist/midori/hands/gh3_hnd_guit_chord_mid_roll3_2_d.ska.ps2",
+          "bones": [
+            "bone_L-index01",
+            "bone_L-index02",
+            "bone_L-index03"
+          ]
+        },
+        {
+          "source": "anims/band/guitarist/midori/hands/gh3_hnd_guit_chord_mid_roll3_2_d.ska.ps2",
+          "bones": [
+            "bone_L-middlefinger01",
+            "bone_L-middlefinger02",
+            "bone_L-middlefinger03"
+          ]
+        },
+        {
+          "source": "anims/band/guitarist/midori/hands/gh3_hnd_guit_chord_mid_bar3_d.ska.ps2",
+          "bones": [
+            "bone_L-ringfinger01",
+            "bone_L-ringfinger02",
+            "bone_L-ringfinger03"
+          ]
+        },
+        {
+          "source": "anims/band/guitarist/midori/hands/gh3_hnd_guit_chord_mid_bar5_d.ska.ps2",
+          "bones": [
+            "bone_L-pinky01",
+            "bone_L-pinky02",
+            "bone_L-pinky03"
+          ]
+        }
+      ]
+    },
+    {
+      "role": "fret",
+      "source": "gh3_hnd_guit_chord_mid_empty_d.ska.ps2",
+      "aliases": [
+        "finger_chord_cmajor"
+      ],
+      "frames": {
+        "bone_fret": [
+          [
+            -0.0438017242542429,
+            -0.027337565069763165,
+            0.9986661436578314,
+            0.0
+          ],
+          [
+            0.01827396331545994,
+            0.9994363752821196,
+            0.02816014963873453,
+            0.0
+          ],
+          [
+            -0.9988731006574799,
+            0.019483051583029945,
+            -0.04327747085854901,
+            0.0
+          ],
+          [
+            0.0,
+            0.0,
+            0.0,
+            1.0
+          ]
+        ]
+      },
+      "pose_layers": [
+        {
+          "source": "anims/band/guitarist/midori/hands/gh3_hnd_guit_chord_mid_bar3_d.ska.ps2",
+          "bones": [
+            "bone_L-index01",
+            "bone_L-index02",
+            "bone_L-index03"
+          ]
+        },
+        {
+          "source": "anims/band/guitarist/midori/hands/gh3_hnd_guit_chord_mid_bar4_d.ska.ps2",
+          "bones": [
+            "bone_L-middlefinger01",
+            "bone_L-middlefinger02",
+            "bone_L-middlefinger03"
+          ]
+        },
+        {
+          "source": "anims/band/guitarist/midori/hands/gh3_hnd_guit_chord_mid_roll3_2_d.ska.ps2",
+          "bones": [
+            "bone_L-ringfinger01",
+            "bone_L-ringfinger02",
+            "bone_L-ringfinger03"
+          ]
+        },
+        {
+          "source": "anims/band/guitarist/midori/hands/gh3_hnd_guit_chord_mid_bar5_d.ska.ps2",
+          "bones": [
+            "bone_L-pinky01",
+            "bone_L-pinky02",
+            "bone_L-pinky03"
+          ]
+        }
+      ]
+    },
+    {
+      "role": "fret",
+      "source": "gh3_hnd_guit_chord_mid_empty_d.ska.ps2",
+      "aliases": [
+        "finger_chord_openmajor"
+      ],
+      "frames": {
+        "bone_fret": [
+          [
+            -0.0438017242542429,
+            -0.027337565069763165,
+            0.9986661436578314,
+            0.0
+          ],
+          [
+            0.01827396331545994,
+            0.9994363752821196,
+            0.02816014963873453,
+            0.0
+          ],
+          [
+            -0.9988731006574799,
+            0.019483051583029945,
+            -0.04327747085854901,
+            0.0
+          ],
+          [
+            0.0,
+            0.0,
+            0.0,
+            1.0
+          ]
+        ]
+      },
+      "pose_layers": [
+        {
+          "source": "anims/band/guitarist/midori/hands/gh3_hnd_guit_chord_mid_bar3_d.ska.ps2",
+          "bones": [
+            "bone_L-index01",
+            "bone_L-index02",
+            "bone_L-index03"
+          ]
+        },
+        {
+          "source": "anims/band/guitarist/midori/hands/gh3_hnd_guit_chord_mid_bar3_d.ska.ps2",
+          "bones": [
+            "bone_L-middlefinger01",
+            "bone_L-middlefinger02",
+            "bone_L-middlefinger03"
+          ]
+        },
+        {
+          "source": "anims/band/guitarist/midori/hands/gh3_hnd_guit_chord_mid_bar5_d.ska.ps2",
+          "bones": [
+            "bone_L-ringfinger01",
+            "bone_L-ringfinger02",
+            "bone_L-ringfinger03"
+          ]
+        },
+        {
+          "source": "anims/band/guitarist/midori/hands/gh3_hnd_guit_chord_mid_bar5_d.ska.ps2",
+          "bones": [
+            "bone_L-pinky01",
+            "bone_L-pinky02",
+            "bone_L-pinky03"
+          ]
+        }
+      ]
+    },
+    {
+      "role": "fret",
+      "source": "gh3_hnd_guit_chord_mid_empty_d.ska.ps2",
+      "aliases": [
+        "finger_chord_openminor"
+      ],
+      "frames": {
+        "bone_fret": [
+          [
+            -0.0438017242542429,
+            -0.027337565069763165,
+            0.9986661436578314,
+            0.0
+          ],
+          [
+            0.01827396331545994,
+            0.9994363752821196,
+            0.02816014963873453,
+            0.0
+          ],
+          [
+            -0.9988731006574799,
+            0.019483051583029945,
+            -0.04327747085854901,
+            0.0
+          ],
+          [
+            0.0,
+            0.0,
+            0.0,
+            1.0
+          ]
+        ]
+      },
+      "pose_layers": [
+        {
+          "source": "anims/band/guitarist/midori/hands/gh3_hnd_guit_chord_mid_empty_d.ska.ps2",
+          "bones": [
+            "bone_L-index01",
+            "bone_L-index02",
+            "bone_L-index03"
+          ]
+        },
+        {
+          "source": "anims/band/guitarist/midori/hands/gh3_hnd_guit_chord_mid_bar3_d.ska.ps2",
+          "bones": [
+            "bone_L-middlefinger01",
+            "bone_L-middlefinger02",
+            "bone_L-middlefinger03"
+          ]
+        },
+        {
+          "source": "anims/band/guitarist/midori/hands/gh3_hnd_guit_chord_mid_bar5_d.ska.ps2",
+          "bones": [
+            "bone_L-ringfinger01",
+            "bone_L-ringfinger02",
+            "bone_L-ringfinger03"
+          ]
+        },
+        {
+          "source": "anims/band/guitarist/midori/hands/gh3_hnd_guit_chord_mid_bar5_d.ska.ps2",
+          "bones": [
+            "bone_L-pinky01",
+            "bone_L-pinky02",
+            "bone_L-pinky03"
+          ]
+        }
+      ]
+    },
+    {
+      "role": "fret",
+      "source": "gh3_hnd_guit_chord_mid_empty_d.ska.ps2",
+      "aliases": [
+        "finger_chord_seventh"
+      ],
+      "frames": {
+        "bone_fret": [
+          [
+            -0.0438017242542429,
+            -0.027337565069763165,
+            0.9986661436578314,
+            0.0
+          ],
+          [
+            0.01827396331545994,
+            0.9994363752821196,
+            0.02816014963873453,
+            0.0
+          ],
+          [
+            -0.9988731006574799,
+            0.019483051583029945,
+            -0.04327747085854901,
+            0.0
+          ],
+          [
+            0.0,
+            0.0,
+            0.0,
+            1.0
+          ]
+        ]
+      },
+      "pose_layers": [
+        {
+          "source": "anims/band/guitarist/midori/hands/gh3_hnd_guit_chord_mid_bar3_d.ska.ps2",
+          "bones": [
+            "bone_L-index01",
+            "bone_L-index02",
+            "bone_L-index03"
+          ]
+        },
+        {
+          "source": "anims/band/guitarist/midori/hands/gh3_hnd_guit_chord_mid_bar3_d.ska.ps2",
+          "bones": [
+            "bone_L-middlefinger01",
+            "bone_L-middlefinger02",
+            "bone_L-middlefinger03"
+          ]
+        },
+        {
+          "source": "anims/band/guitarist/midori/hands/gh3_hnd_guit_chord_mid_bar1_d.ska.ps2",
+          "bones": [
+            "bone_L-ringfinger01",
+            "bone_L-ringfinger02",
+            "bone_L-ringfinger03"
+          ]
+        },
+        {
+          "source": "anims/band/guitarist/midori/hands/gh3_hnd_guit_chord_mid_bar1_d.ska.ps2",
+          "bones": [
+            "bone_L-pinky01",
+            "bone_L-pinky02",
+            "bone_L-pinky03"
+          ]
+        }
+      ]
+    },
+    {
+      "role": "fret",
+      "source": "gh3_hnd_guit_chord_mid_empty_d.ska.ps2",
+      "aliases": [
+        "finger_chord_bar"
+      ],
+      "frames": {
+        "bone_fret": [
+          [
+            -0.0438017242542429,
+            -0.027337565069763165,
+            0.9986661436578314,
+            0.0
+          ],
+          [
+            0.01827396331545994,
+            0.9994363752821196,
+            0.02816014963873453,
+            0.0
+          ],
+          [
+            -0.9988731006574799,
+            0.019483051583029945,
+            -0.04327747085854901,
+            0.0
+          ],
+          [
+            0.0,
+            0.0,
+            0.0,
+            1.0
+          ]
+        ]
+      },
+      "pose_layers": [
+        {
+          "source": "anims/band/guitarist/midori/hands/gh3_hnd_guit_chord_mid_bar2_d.ska.ps2",
+          "bones": [
+            "bone_L-index01",
+            "bone_L-index02",
+            "bone_L-index03"
+          ]
+        },
+        {
+          "source": "anims/band/guitarist/midori/hands/gh3_hnd_guit_chord_mid_roll3_2_d.ska.ps2",
+          "bones": [
+            "bone_L-middlefinger01",
+            "bone_L-middlefinger02",
+            "bone_L-middlefinger03"
+          ]
+        },
+        {
+          "source": "anims/band/guitarist/midori/hands/gh3_hnd_guit_chord_mid_roll3_3_d.ska.ps2",
+          "bones": [
+            "bone_L-ringfinger01",
+            "bone_L-ringfinger02",
+            "bone_L-ringfinger03"
+          ]
+        },
+        {
+          "source": "anims/band/guitarist/midori/hands/gh3_hnd_guit_chord_mid_bar1_d.ska.ps2",
+          "bones": [
+            "bone_L-pinky01",
+            "bone_L-pinky02",
+            "bone_L-pinky03"
+          ]
+        }
+      ]
+    },
+    {
+      "role": "fret",
+      "source": "gh3_hnd_guit_chord_mid_empty_d.ska.ps2",
+      "aliases": [
+        "finger_powerchord_1"
+      ],
+      "frames": {
+        "bone_fret": [
+          [
+            -0.0438017242542429,
+            -0.027337565069763165,
+            0.9986661436578314,
+            0.0
+          ],
+          [
+            0.01827396331545994,
+            0.9994363752821196,
+            0.02816014963873453,
+            0.0
+          ],
+          [
+            -0.9988731006574799,
+            0.019483051583029945,
+            -0.04327747085854901,
+            0.0
+          ],
+          [
+            0.0,
+            0.0,
+            0.0,
+            1.0
+          ]
+        ]
+      },
+      "pose_layers": [
+        {
+          "source": "anims/band/guitarist/midori/hands/gh3_hnd_guit_chord_mid_empty_d.ska.ps2",
+          "bones": [
+            "bone_L-index01",
+            "bone_L-index02",
+            "bone_L-index03"
+          ]
+        },
+        {
+          "source": "anims/band/guitarist/midori/hands/gh3_hnd_guit_chord_mid_bar3_d.ska.ps2",
+          "bones": [
+            "bone_L-middlefinger01",
+            "bone_L-middlefinger02",
+            "bone_L-middlefinger03"
+          ]
+        },
+        {
+          "source": "anims/band/guitarist/midori/hands/gh3_hnd_guit_chord_mid_roll3_3_d.ska.ps2",
+          "bones": [
+            "bone_L-ringfinger01",
+            "bone_L-ringfinger02",
+            "bone_L-ringfinger03"
+          ]
+        },
+        {
+          "source": "anims/band/guitarist/midori/hands/gh3_hnd_guit_chord_mid_bar1_d.ska.ps2",
+          "bones": [
+            "bone_L-pinky01",
+            "bone_L-pinky02",
+            "bone_L-pinky03"
+          ]
+        }
+      ]
+    },
+    {
+      "role": "fret",
+      "source": "gh3_hnd_guit_chord_mid_empty_d.ska.ps2",
+      "aliases": [
+        "finger_powerchord_2"
+      ],
+      "frames": {
+        "bone_fret": [
+          [
+            -0.0438017242542429,
+            -0.027337565069763165,
+            0.9986661436578314,
+            0.0
+          ],
+          [
+            0.01827396331545994,
+            0.9994363752821196,
+            0.02816014963873453,
+            0.0
+          ],
+          [
+            -0.9988731006574799,
+            0.019483051583029945,
+            -0.04327747085854901,
+            0.0
+          ],
+          [
+            0.0,
+            0.0,
+            0.0,
+            1.0
+          ]
+        ]
+      },
+      "pose_layers": [
+        {
+          "source": "anims/band/guitarist/midori/hands/gh3_hnd_guit_chord_mid_empty_d.ska.ps2",
+          "bones": [
+            "bone_L-index01",
+            "bone_L-index02",
+            "bone_L-index03"
+          ]
+        },
+        {
+          "source": "anims/band/guitarist/midori/hands/gh3_hnd_guit_chord_mid_bar3_d.ska.ps2",
+          "bones": [
+            "bone_L-middlefinger01",
+            "bone_L-middlefinger02",
+            "bone_L-middlefinger03"
+          ]
+        },
+        {
+          "source": "anims/band/guitarist/midori/hands/gh3_hnd_guit_chord_mid_roll3_3_d.ska.ps2",
+          "bones": [
+            "bone_L-ringfinger01",
+            "bone_L-ringfinger02",
+            "bone_L-ringfinger03"
+          ]
+        },
+        {
+          "source": "anims/band/guitarist/midori/hands/gh3_hnd_guit_chord_mid_bar3_d.ska.ps2",
+          "bones": [
+            "bone_L-pinky01",
+            "bone_L-pinky02",
+            "bone_L-pinky03"
+          ]
+        }
+      ]
+    },
+    {
+      "role": "fret",
+      "source": "gh3_hnd_guit_chord_mid_empty_d.ska.ps2",
+      "aliases": [
+        "finger_hold_index_hi"
+      ],
+      "frames": {
+        "bone_fret": [
+          [
+            -0.0438017242542429,
+            -0.027337565069763165,
+            0.9986661436578314,
+            0.0
+          ],
+          [
+            0.01827396331545994,
+            0.9994363752821196,
+            0.02816014963873453,
+            0.0
+          ],
+          [
+            -0.9988731006574799,
+            0.019483051583029945,
+            -0.04327747085854901,
+            0.0
+          ],
+          [
+            0.0,
+            0.0,
+            0.0,
+            1.0
+          ]
+        ]
+      },
+      "pose_layers": [
+        {
+          "source": "anims/band/guitarist/midori/hands/gh3_hnd_guit_chord_mid_roll3_1_d.ska.ps2",
+          "bones": [
+            "bone_L-index01",
+            "bone_L-index02",
+            "bone_L-index03"
+          ]
+        },
+        {
+          "source": "anims/band/guitarist/midori/hands/gh3_hnd_guit_chord_mid_empty_d.ska.ps2",
+          "bones": [
+            "bone_L-middlefinger01",
+            "bone_L-middlefinger02",
+            "bone_L-middlefinger03"
+          ]
+        },
+        {
+          "source": "anims/band/guitarist/midori/hands/gh3_hnd_guit_chord_mid_bar2_d.ska.ps2",
+          "bones": [
+            "bone_L-ringfinger01",
+            "bone_L-ringfinger02",
+            "bone_L-ringfinger03"
+          ]
+        },
+        {
+          "source": "anims/band/guitarist/midori/hands/gh3_hnd_guit_chord_mid_empty_d.ska.ps2",
+          "bones": [
+            "bone_L-pinky01",
+            "bone_L-pinky02",
+            "bone_L-pinky03"
+          ]
+        }
+      ]
+    },
+    {
+      "role": "fret",
+      "source": "gh3_hnd_guit_chord_mid_empty_d.ska.ps2",
+      "aliases": [
+        "finger_hold_middle_hi"
+      ],
+      "frames": {
+        "bone_fret": [
+          [
+            -0.0438017242542429,
+            -0.027337565069763165,
+            0.9986661436578314,
+            0.0
+          ],
+          [
+            0.01827396331545994,
+            0.9994363752821196,
+            0.02816014963873453,
+            0.0
+          ],
+          [
+            -0.9988731006574799,
+            0.019483051583029945,
+            -0.04327747085854901,
+            0.0
+          ],
+          [
+            0.0,
+            0.0,
+            0.0,
+            1.0
+          ]
+        ]
+      },
+      "pose_layers": [
+        {
+          "source": "anims/band/guitarist/midori/hands/gh3_hnd_guit_chord_mid_roll3_1_d.ska.ps2",
+          "bones": [
+            "bone_L-index01",
+            "bone_L-index02",
+            "bone_L-index03"
+          ]
+        },
+        {
+          "source": "anims/band/guitarist/midori/hands/gh3_hnd_guit_chord_mid_bar1_d.ska.ps2",
+          "bones": [
+            "bone_L-middlefinger01",
+            "bone_L-middlefinger02",
+            "bone_L-middlefinger03"
+          ]
+        },
+        {
+          "source": "anims/band/guitarist/midori/hands/gh3_hnd_guit_chord_mid_bar2_d.ska.ps2",
+          "bones": [
+            "bone_L-ringfinger01",
+            "bone_L-ringfinger02",
+            "bone_L-ringfinger03"
+          ]
+        },
+        {
+          "source": "anims/band/guitarist/midori/hands/gh3_hnd_guit_chord_mid_empty_d.ska.ps2",
+          "bones": [
+            "bone_L-pinky01",
+            "bone_L-pinky02",
+            "bone_L-pinky03"
+          ]
+        }
+      ]
+    },
+    {
+      "role": "fret",
+      "source": "gh3_hnd_guit_chord_mid_empty_d.ska.ps2",
+      "aliases": [
+        "finger_hold_ring_hi"
+      ],
+      "frames": {
+        "bone_fret": [
+          [
+            -0.0438017242542429,
+            -0.027337565069763165,
+            0.9986661436578314,
+            0.0
+          ],
+          [
+            0.01827396331545994,
+            0.9994363752821196,
+            0.02816014963873453,
+            0.0
+          ],
+          [
+            -0.9988731006574799,
+            0.019483051583029945,
+            -0.04327747085854901,
+            0.0
+          ],
+          [
+            0.0,
+            0.0,
+            0.0,
+            1.0
+          ]
+        ]
+      },
+      "pose_layers": [
+        {
+          "source": "anims/band/guitarist/midori/hands/gh3_hnd_guit_chord_mid_roll3_1_d.ska.ps2",
+          "bones": [
+            "bone_L-index01",
+            "bone_L-index02",
+            "bone_L-index03"
+          ]
+        },
+        {
+          "source": "anims/band/guitarist/midori/hands/gh3_hnd_guit_chord_mid_bar2_d.ska.ps2",
+          "bones": [
+            "bone_L-middlefinger01",
+            "bone_L-middlefinger02",
+            "bone_L-middlefinger03"
+          ]
+        },
+        {
+          "source": "anims/band/guitarist/midori/hands/gh3_hnd_guit_chord_mid_bar3_d.ska.ps2",
+          "bones": [
+            "bone_L-ringfinger01",
+            "bone_L-ringfinger02",
+            "bone_L-ringfinger03"
+          ]
+        },
+        {
+          "source": "anims/band/guitarist/midori/hands/gh3_hnd_guit_chord_mid_empty_d.ska.ps2",
+          "bones": [
+            "bone_L-pinky01",
+            "bone_L-pinky02",
+            "bone_L-pinky03"
+          ]
+        }
+      ]
+    },
+    {
+      "role": "fret",
+      "source": "gh3_hnd_guit_chord_mid_empty_d.ska.ps2",
+      "aliases": [
+        "finger_hold_pinky_hi"
+      ],
+      "frames": {
+        "bone_fret": [
+          [
+            -0.0438017242542429,
+            -0.027337565069763165,
+            0.9986661436578314,
+            0.0
+          ],
+          [
+            0.01827396331545994,
+            0.9994363752821196,
+            0.02816014963873453,
+            0.0
+          ],
+          [
+            -0.9988731006574799,
+            0.019483051583029945,
+            -0.04327747085854901,
+            0.0
+          ],
+          [
+            0.0,
+            0.0,
+            0.0,
+            1.0
+          ]
+        ]
+      },
+      "pose_layers": [
+        {
+          "source": "anims/band/guitarist/midori/hands/gh3_hnd_guit_chord_mid_roll3_1_d.ska.ps2",
+          "bones": [
+            "bone_L-index01",
+            "bone_L-index02",
+            "bone_L-index03"
+          ]
+        },
+        {
+          "source": "anims/band/guitarist/midori/hands/gh3_hnd_guit_chord_mid_bar2_d.ska.ps2",
+          "bones": [
+            "bone_L-middlefinger01",
+            "bone_L-middlefinger02",
+            "bone_L-middlefinger03"
+          ]
+        },
+        {
+          "source": "anims/band/guitarist/midori/hands/gh3_hnd_guit_chord_mid_bar3_d.ska.ps2",
+          "bones": [
+            "bone_L-ringfinger01",
+            "bone_L-ringfinger02",
+            "bone_L-ringfinger03"
+          ]
+        },
+        {
+          "source": "anims/band/guitarist/midori/hands/gh3_hnd_guit_chord_mid_bar3_d.ska.ps2",
+          "bones": [
+            "bone_L-pinky01",
+            "bone_L-pinky02",
+            "bone_L-pinky03"
+          ]
+        }
+      ]
+    },
+    {
+      "role": "fret",
+      "source": "gh3_hnd_guit_chord_mid_empty_d.ska.ps2",
+      "aliases": [
+        "finger_vibrato_index_hi"
+      ],
+      "frames": {
+        "bone_fret": [
+          [
+            -0.0438017242542429,
+            -0.027337565069763165,
+            0.9986661436578314,
+            0.0
+          ],
+          [
+            0.01827396331545994,
+            0.9994363752821196,
+            0.02816014963873453,
+            0.0
+          ],
+          [
+            -0.9988731006574799,
+            0.019483051583029945,
+            -0.04327747085854901,
+            0.0
+          ],
+          [
+            0.0,
+            0.0,
+            0.0,
+            1.0
+          ]
+        ]
+      },
+      "pose_layers": [
+        {
+          "source": "anims/band/guitarist/midori/hands/gh3_hnd_guit_chord_mid_roll3_1_d.ska.ps2",
+          "bones": [
+            "bone_L-index01",
+            "bone_L-index02",
+            "bone_L-index03"
+          ]
+        },
+        {
+          "source": "anims/band/guitarist/midori/hands/gh3_hnd_guit_chord_mid_empty_d.ska.ps2",
+          "bones": [
+            "bone_L-middlefinger01",
+            "bone_L-middlefinger02",
+            "bone_L-middlefinger03"
+          ]
+        },
+        {
+          "source": "anims/band/guitarist/midori/hands/gh3_hnd_guit_chord_mid_bar2_d.ska.ps2",
+          "bones": [
+            "bone_L-ringfinger01",
+            "bone_L-ringfinger02",
+            "bone_L-ringfinger03"
+          ]
+        },
+        {
+          "source": "anims/band/guitarist/midori/hands/gh3_hnd_guit_chord_mid_empty_d.ska.ps2",
+          "bones": [
+            "bone_L-pinky01",
+            "bone_L-pinky02",
+            "bone_L-pinky03"
+          ]
+        },
+        {
+          "source": "anims/band/guitarist/midori/hands/gh3_hnd_guit_chord_mid_bar1_bend_d.ska.ps2",
+          "bones": [
+            "bone_fret_hand"
+          ],
+          "ping_pong_seconds": 0.3333333333333333
+        }
+      ]
+    },
+    {
+      "role": "fret",
+      "source": "gh3_hnd_guit_chord_mid_empty_d.ska.ps2",
+      "aliases": [
+        "finger_vibrato_middle_hi"
+      ],
+      "frames": {
+        "bone_fret": [
+          [
+            -0.0438017242542429,
+            -0.027337565069763165,
+            0.9986661436578314,
+            0.0
+          ],
+          [
+            0.01827396331545994,
+            0.9994363752821196,
+            0.02816014963873453,
+            0.0
+          ],
+          [
+            -0.9988731006574799,
+            0.019483051583029945,
+            -0.04327747085854901,
+            0.0
+          ],
+          [
+            0.0,
+            0.0,
+            0.0,
+            1.0
+          ]
+        ]
+      },
+      "pose_layers": [
+        {
+          "source": "anims/band/guitarist/midori/hands/gh3_hnd_guit_chord_mid_roll3_1_d.ska.ps2",
+          "bones": [
+            "bone_L-index01",
+            "bone_L-index02",
+            "bone_L-index03"
+          ]
+        },
+        {
+          "source": "anims/band/guitarist/midori/hands/gh3_hnd_guit_chord_mid_bar1_d.ska.ps2",
+          "bones": [
+            "bone_L-middlefinger01",
+            "bone_L-middlefinger02",
+            "bone_L-middlefinger03"
+          ]
+        },
+        {
+          "source": "anims/band/guitarist/midori/hands/gh3_hnd_guit_chord_mid_bar2_d.ska.ps2",
+          "bones": [
+            "bone_L-ringfinger01",
+            "bone_L-ringfinger02",
+            "bone_L-ringfinger03"
+          ]
+        },
+        {
+          "source": "anims/band/guitarist/midori/hands/gh3_hnd_guit_chord_mid_empty_d.ska.ps2",
+          "bones": [
+            "bone_L-pinky01",
+            "bone_L-pinky02",
+            "bone_L-pinky03"
+          ]
+        },
+        {
+          "source": "anims/band/guitarist/midori/hands/gh3_hnd_guit_chord_mid_bar2_bend_d.ska.ps2",
+          "bones": [
+            "bone_fret_hand"
+          ],
+          "ping_pong_seconds": 0.3333333333333333
+        }
+      ]
+    },
+    {
+      "role": "fret",
+      "source": "gh3_hnd_guit_chord_mid_empty_d.ska.ps2",
+      "aliases": [
+        "finger_vibrato_ring_hi"
+      ],
+      "frames": {
+        "bone_fret": [
+          [
+            -0.0438017242542429,
+            -0.027337565069763165,
+            0.9986661436578314,
+            0.0
+          ],
+          [
+            0.01827396331545994,
+            0.9994363752821196,
+            0.02816014963873453,
+            0.0
+          ],
+          [
+            -0.9988731006574799,
+            0.019483051583029945,
+            -0.04327747085854901,
+            0.0
+          ],
+          [
+            0.0,
+            0.0,
+            0.0,
+            1.0
+          ]
+        ]
+      },
+      "pose_layers": [
+        {
+          "source": "anims/band/guitarist/midori/hands/gh3_hnd_guit_chord_mid_roll3_1_d.ska.ps2",
+          "bones": [
+            "bone_L-index01",
+            "bone_L-index02",
+            "bone_L-index03"
+          ]
+        },
+        {
+          "source": "anims/band/guitarist/midori/hands/gh3_hnd_guit_chord_mid_bar2_d.ska.ps2",
+          "bones": [
+            "bone_L-middlefinger01",
+            "bone_L-middlefinger02",
+            "bone_L-middlefinger03"
+          ]
+        },
+        {
+          "source": "anims/band/guitarist/midori/hands/gh3_hnd_guit_chord_mid_bar3_d.ska.ps2",
+          "bones": [
+            "bone_L-ringfinger01",
+            "bone_L-ringfinger02",
+            "bone_L-ringfinger03"
+          ]
+        },
+        {
+          "source": "anims/band/guitarist/midori/hands/gh3_hnd_guit_chord_mid_empty_d.ska.ps2",
+          "bones": [
+            "bone_L-pinky01",
+            "bone_L-pinky02",
+            "bone_L-pinky03"
+          ]
+        },
+        {
+          "source": "anims/band/guitarist/midori/hands/gh3_hnd_guit_chord_mid_bar3_bend_d.ska.ps2",
+          "bones": [
+            "bone_fret_hand"
+          ],
+          "ping_pong_seconds": 0.3333333333333333
+        }
+      ]
+    },
+    {
+      "role": "fret",
+      "source": "gh3_hnd_guit_chord_mid_empty_d.ska.ps2",
+      "aliases": [
+        "finger_vibrato_pinky_hi"
+      ],
+      "frames": {
+        "bone_fret": [
+          [
+            -0.0438017242542429,
+            -0.027337565069763165,
+            0.9986661436578314,
+            0.0
+          ],
+          [
+            0.01827396331545994,
+            0.9994363752821196,
+            0.02816014963873453,
+            0.0
+          ],
+          [
+            -0.9988731006574799,
+            0.019483051583029945,
+            -0.04327747085854901,
+            0.0
+          ],
+          [
+            0.0,
+            0.0,
+            0.0,
+            1.0
+          ]
+        ]
+      },
+      "pose_layers": [
+        {
+          "source": "anims/band/guitarist/midori/hands/gh3_hnd_guit_chord_mid_roll3_1_d.ska.ps2",
+          "bones": [
+            "bone_L-index01",
+            "bone_L-index02",
+            "bone_L-index03"
+          ]
+        },
+        {
+          "source": "anims/band/guitarist/midori/hands/gh3_hnd_guit_chord_mid_bar2_d.ska.ps2",
+          "bones": [
+            "bone_L-middlefinger01",
+            "bone_L-middlefinger02",
+            "bone_L-middlefinger03"
+          ]
+        },
+        {
+          "source": "anims/band/guitarist/midori/hands/gh3_hnd_guit_chord_mid_bar3_d.ska.ps2",
+          "bones": [
+            "bone_L-ringfinger01",
+            "bone_L-ringfinger02",
+            "bone_L-ringfinger03"
+          ]
+        },
+        {
+          "source": "anims/band/guitarist/midori/hands/gh3_hnd_guit_chord_mid_bar3_d.ska.ps2",
+          "bones": [
+            "bone_L-pinky01",
+            "bone_L-pinky02",
+            "bone_L-pinky03"
+          ]
+        },
+        {
+          "source": "anims/band/guitarist/midori/hands/gh3_hnd_guit_chord_mid_bar4_bend_d.ska.ps2",
+          "bones": [
+            "bone_fret_hand"
+          ],
+          "ping_pong_seconds": 0.3333333333333333
+        }
+      ]
+    }
+  ],
+  "manifest": {
+    "schema_version": 1,
+    "id": "community.gh3.midori",
+    "name": "GH3 Midori",
+    "version": "0.2.0",
+    "content_root": "content",
+    "content_index": "content-index.json",
+    "files": [
+      "char/gh3_midori/anims/gen/gh3_midori_fret.milo_ps2",
+      "char/gh3_midori/anims/gen/gh3_midori_main.milo_ps2",
+      "char/gh3_midori/anims/gen/gh3_midori_strum.milo_ps2",
+      "char/gh3_midori/anims/gen/gh3_midori_ui.milo_ps2",
+      "char/gh3_midori_1/og/gen/gh3_midori_1.milo_ps2",
+      "char/gh3_midori_2/og/gen/gh3_midori_2.milo_ps2"
+    ],
+    "characters": [
+      {
+        "id": "gh3_midori",
+        "label": "Midori",
+        "outfits": [
+          {
+            "selection": "gh3_midori_1",
+            "label": "Outfit 1",
+            "model": "char/gh3_midori_1/og/gen/gh3_midori_1.milo_ps2",
+            "ui_model": "char/gh3_midori_1/og/gen/gh3_midori_1.milo_ps2",
+            "ui_anim": "char/gh3_midori/anims/gen/gh3_midori_ui.milo_ps2",
+            "main_anim": "char/gh3_midori/anims/gen/gh3_midori_main.milo_ps2",
+            "strum_anim": "char/gh3_midori/anims/gen/gh3_midori_strum.milo_ps2",
+            "fret_anim": "char/gh3_midori/anims/gen/gh3_midori_fret.milo_ps2",
+            "animation_source_model": "char/gh3_midori_1/og/gen/gh3_midori_1.milo_ps2",
+            "retarget_animation": false
+          },
+          {
+            "selection": "gh3_midori_2",
+            "label": "PS2 alternate outfit",
+            "model": "char/gh3_midori_2/og/gen/gh3_midori_2.milo_ps2",
+            "ui_model": "char/gh3_midori_2/og/gen/gh3_midori_2.milo_ps2",
+            "ui_anim": "char/gh3_midori/anims/gen/gh3_midori_ui.milo_ps2",
+            "main_anim": "char/gh3_midori/anims/gen/gh3_midori_main.milo_ps2",
+            "strum_anim": "char/gh3_midori/anims/gen/gh3_midori_strum.milo_ps2",
+            "fret_anim": "char/gh3_midori/anims/gen/gh3_midori_fret.milo_ps2",
+            "animation_source_model": "char/gh3_midori_2/og/gen/gh3_midori_2.milo_ps2",
+            "retarget_animation": false
+          }
+        ]
+      }
+    ]
+  },
+  "frame_provenance": {
+    "method": "Rigid nearest-point fit between source PS2 Epiphone Explorer and stock GH2 Xplorer, expressed in their guitar bind-local frames; then fret rotation matched to stock prop bind marker",
+    "median_nearest_vertex_distance_inches": 0.33288561671411043,
+    "max_nearest_vertex_distance_inches": 4.090712308703545,
+    "source_sha256": "8b3ac12205e095bd4a46f57f8f6d680421ec22f2d7c4e66d36a9078d4476fc3d",
+    "stock_sha256": "9c0c009600230e0668c77c4cba02379ce92628c587008c48467a4e69af76c8bc"
+  },
+  "limitations": [
+    "Source delta rotation order inferred; retail PS2 execution not validated",
+    "Fret and synchronized actions are source-pose adaptations, not copies of stock character motion",
+    "Face and hair can reset phase between body clips; normal clip blending is retained, exhaustive seam review not performed",
+    "Bass slap/pluck and retail-only interaction/exclusion consumers are outside this native guitarist contract"
+  ],
+  "groups": {
+    "main": {
+      "normal": [
+        "stand_medium_01",
+        "stand_medium_02",
+        "stand_medium_03",
+        "stand_medium_04",
+        "stand_medium_05",
+        "stand_medium_06",
+        "stand_fast_01",
+        "stand_fast_02",
+        "stand_fast_03",
+        "stand_fast_04",
+        "stand_fast_05"
+      ],
+      "idle": [
+        "idle_medium_01",
+        "idle_medium_02",
+        "idle_fast_01",
+        "idle_fast_02"
+      ],
+      "solo": [
+        "solo_medium_01",
+        "solo_medium_02",
+        "solo_fast_01",
+        "solo_fast_02"
+      ],
+      "extreme": [
+        "extreme_medium_01",
+        "extreme_medium_02",
+        "extreme_fast_01",
+        "extreme_fast_02"
+      ],
+      "bad": [
+        "stand_bad_01",
+        "stand_bad_02"
+      ],
+      "star_power": [
+        "special_01",
+        "special_02"
+      ],
+      "intro": [
+        "intro_01",
+        "intro_02",
+        "intro_03"
+      ],
+      "lose": [
+        "lose_01",
+        "lose_02",
+        "lose_03"
+      ],
+      "win": [
+        "win_01",
+        "win_02",
+        "win_03"
+      ],
+      "win_finals": [
+        "win_final"
+      ],
+      "sync_jump": [
+        "band_jump"
+      ],
+      "win_idle": [
+        "win_idle_1"
+      ],
+      "lose_idle": [
+        "lose_idle_1"
+      ],
+      "walk_walk": [
+        "walk_forward_medium",
+        "walk_forward_fast",
+        "walk_backward_medium",
+        "walk_backward_fast"
+      ],
+      "walk_stop": [
+        "stop_forward_lf_medium",
+        "stop_forward_lf_fast",
+        "stop_forward_rf_medium",
+        "stop_forward_rf_fast",
+        "stop_backward_lf_medium",
+        "stop_backward_lf_fast",
+        "stop_backward_rf_medium",
+        "stop_backward_rf_fast"
+      ],
+      "walk_turn": [
+        "turn_forward_medium",
+        "turn_forward_fast",
+        "turn_backward_medium",
+        "turn_backward_fast",
+        "turn_left_45_medium",
+        "turn_left_45_fast",
+        "turn_left_90_medium",
+        "turn_left_90_fast",
+        "turn_left_135_medium",
+        "turn_left_135_fast",
+        "turn_left_180_medium",
+        "turn_left_180_fast",
+        "turn_right_45_medium",
+        "turn_right_45_fast",
+        "turn_right_90_medium",
+        "turn_right_90_fast",
+        "turn_right_135_medium",
+        "turn_right_135_fast",
+        "turn_right_180_medium",
+        "turn_right_180_fast"
+      ],
+      "sync_head_bang": [
+        "stand_fast_02",
+        "stand_medium_04"
+      ],
+      "sync_wag": [
+        "stand_fast_01",
+        "stand_medium_02"
+      ]
+    }
+  },
+  "outfit": "midori_1",
+  "mapping_notes": {
+    "normal": "Source playing idles",
+    "idle": "Source non-playing breaks",
+    "solo": "Dedicated source solos",
+    "extreme": "Source performance specials",
+    "star_power": "Source specials: activation semantics and timing require visual/runtime verification",
+    "win": "Source win actions",
+    "lose": "Source loss actions",
+    "ui": "Frontend transition and idle; continuity pending",
+    "omissions": "Source-only battle attacks/reactions and optional bassist/retail interaction consumers are not claimed as covered.",
+    "strum_variants": "Source short/medium/long families preserved. GH2 long variants 3/4 reuse source long variants 1/2 because the PS2 source supplies only two long strokes.",
+    "finger_holds": "Source selected-finger compositions; high-register variants use separately fitted source finger layers. Native solo calls and sampled guitar contact verified.",
+    "vibrato": "Source wrist bend ramp ping-ponged over the target vibrato cycle, with separate high finger poses. Native high-vibrato selection and sampled contact verified.",
+    "locomotion": "Source forward/back strides and stops, virtual facing extraction, procedural heading adaptation and pose-matched transition graph. Native turn/walk/stop completion and body/instrument continuity verified.",
+    "chords": "Source finger-channel compositions selected against stock distal bend signatures. No donor skeletal motion copied. Visual review is sampled, not every chord and frame.",
+    "win_finals": "Campaign victory uses source win3, not the unrelated final-strum action."
+  },
+  "additional_outfits": [
+    "midori_2"
+  ],
+  "action_notes": {
+    "sync_head_bang": "Adapted from existing source fast/medium head-nodding performance loops; no custom pose keys",
+    "sync_wag": "Adapted from existing source swaying performance loops; no custom pose keys",
+    "bass": "Guitarist-only conversion. Source has no bassist slap/pluck actions; those optional role calls are excluded.",
+    "retail": "Native game validation required. Retail PS2 GH2 runtime compatibility is not yet verified."
+  },
+  "call_contract": "gh2_native_guitarist_contract.json"
+}

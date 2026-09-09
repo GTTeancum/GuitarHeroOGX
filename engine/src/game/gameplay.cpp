@@ -128,6 +128,29 @@ const char* env_value(const char* name) {
 #endif
 }
 
+std::vector<std::string> diagnostic_character_messages(
+    std::string_view role, double from, double to) {
+    // Process-local replay of named character messages, never host input.
+    // Format: song_seconds:role:handler,song_seconds:role:handler
+    const char* raw = env_value("GHOGX_DIAGNOSTIC_CHARACTER_MESSAGES");
+    if (!raw || to <= from) return {};
+    std::vector<std::string> result;
+    std::istringstream stream(raw);
+    std::string entry;
+    while (std::getline(stream, entry, ',')) {
+        const auto first = entry.find(':');
+        const auto second = first == std::string::npos ? first : entry.find(':', first + 1);
+        if (first == std::string::npos || second == std::string::npos) continue;
+        char* end = nullptr;
+        const double at = std::strtod(entry.c_str(), &end);
+        if (end != entry.c_str() + first || !std::isfinite(at) ||
+            at <= from || at > to || entry.substr(first + 1, second - first - 1) != role)
+            continue;
+        result.push_back(entry.substr(second + 1));
+    }
+    return result;
+}
+
 std::optional<std::string> diagnostic_performer_clip_override(
     std::string_view role) {
     const char* raw = env_value("GHOGX_DIAGNOSTIC_PERFORMER_CLIP");
@@ -4003,6 +4026,17 @@ std::array<float, 16> mat4_mul_game(const std::array<float, 16>& a,
         }
     }
     return r;
+}
+
+std::array<float, 16> mat4_rotate_basis_preserve_position_game(
+    const std::array<float, 16>& rotation,
+    const std::array<float, 16>& world) {
+    const std::array<float, 3> position = {world[12], world[13], world[14]};
+    auto rotated = mat4_mul_game(rotation, world);
+    rotated[12] = position[0];
+    rotated[13] = position[1];
+    rotated[14] = position[2];
+    return rotated;
 }
 
 struct CameraTarget {
@@ -39152,6 +39186,11 @@ void Gameplay::set_diagnostic_star_power_fill(double fill) {
     }
 }
 
+void Gameplay::advance_ending_animation(float dt) {
+    if (std::isfinite(dt) && dt > 0.0f && last_anim_time_ >= 0.0)
+        last_anim_time_ = song_time_ - static_cast<double>(dt);
+}
+
 void Gameplay::set_diagnostic_star_power_active(bool active) {
     diagnostic_star_power_active_ = active;
     if (active) {
@@ -42204,6 +42243,13 @@ ghogx::DataNode Gameplay::handle_performer_driver_message(
       resolved_play_flags =
           (resolved_play_flags & ~0xF0u) |
           ghogx::character::kCharPlayNodeLoop;
+    }
+    if (message.driver == "main.drv") {
+      const bool transient = selected_group_name == "sync_jump" ||
+          selected_group_name == "sync_wag" || selected_group_name == "sync_head_bang";
+      performer.transient_main_clip = transient ? clip->name : std::string{};
+      if (transient)
+        resolved_play_flags = (resolved_play_flags & ~0xF0u) | ghogx::character::kCharPlayNoLoop;
     }
     player->play(*clip, resolved_play_flags, -1.0f, runtime.beat_scale);
     std::fprintf(stderr,
@@ -46612,6 +46658,7 @@ void Gameplay::draw_internal(ghogx::render::Window& win,
                 : 0.0f;
         const bool debug_face_frame = debug_face_enabled_game();
         std::vector<uint32_t> band_jump_ticks_this_frame;
+        std::vector<std::string> band_sync_messages_this_frame;
         if (!intro_active) {
           const double band_jump_window_start =
               song_time_ - std::max(0.001, dt * 1.5);
@@ -46625,6 +46672,9 @@ void Gameplay::draw_internal(ghogx::render::Window& win,
             if (ev.text == "[band_jump]") {
               band_jump_ticks_this_frame.push_back(ev.tick);
             }
+            if (event_time > song_time_ - dt &&
+                (ev.text == "[sync_wag]" || ev.text == "[sync_head_bang]"))
+              band_sync_messages_this_frame.push_back(ev.text.substr(1, ev.text.size()-2));
           }
         }
         const float character_task_frame =
@@ -46660,6 +46710,7 @@ void Gameplay::draw_internal(ghogx::render::Window& win,
               perf.last_midi_marker != midi_state.marker ||
               perf.last_midi_marker_tick != midi_state.marker_tick;
           if (perf.type_script) {
+            perf.type_script->set_win_campaign_song(camera_source_gamecfg_win_campaign_song());
             auto dispatch_type_handler = [&](std::string_view handler) {
               if (!perf.type_script->has_handler(handler))
                 return;
@@ -46676,6 +46727,15 @@ void Gameplay::draw_internal(ghogx::render::Window& win,
             };
             const float task_beat =
                 source_character_task_beat_at(chart_, song_time_);
+            for (const auto& handler : diagnostic_character_messages(
+                     perf.role, song_time_ - dt, song_time_)) {
+                std::fprintf(stderr, "[character-message-proof] role=%s handler=%s t=%.3f available=%d\n",
+                             perf.role.c_str(), handler.c_str(), song_time_,
+                             perf.type_script->has_handler(handler) ? 1 : 0);
+                dispatch_type_handler(handler);
+            }
+            for (const auto& handler : band_sync_messages_this_frame)
+                dispatch_type_handler(handler);
             const uint32_t current_tick =
                 chart_.sec_to_tick(std::max(0.0, song_time_));
             perf.type_script->set_timeline_beats(
@@ -46707,14 +46767,16 @@ void Gameplay::draw_internal(ghogx::render::Window& win,
               dispatch_type_handler(god_effect_active ? "god_effect_start"
                                                       : "god_effect_stop");
               if (god_effect_active)
-                dispatch_type_handler("game_won_msg");
+                dispatch_type_handler(perf.type_script->has_handler("game_won_msg")
+                                          ? "game_won_msg" : "i_won");
             }
             const bool game_lost_active =
                 source_game_lost_camera_dispatched_ || failed_;
             if (perf.type_script_game_lost_active != game_lost_active) {
               perf.type_script_game_lost_active = game_lost_active;
               if (game_lost_active)
-                dispatch_type_handler("game_lost");
+                dispatch_type_handler(perf.type_script->has_handler("game_lost")
+                                          ? "game_lost" : "i_lost");
             }
           }
           if (debug_performer_sync_frame) {
@@ -47230,8 +47292,10 @@ void Gameplay::draw_internal(ghogx::render::Window& win,
                   perf.gh1_walk_phase = 0;
                   perf.gh1_walk_current_waypoint =
                       perf.gh1_walk_target_waypoint;
-                  perf.world_transform = perf.gh1_walk_target_world;
-                  perf.renderer->set_world_transform(perf.world_transform);
+                  // The turn/walk/stop clips and corridor regulator own the
+                  // live root. Snapping to the authored waypoint here moves
+                  // and rotates the guitarist again on the completion frame,
+                  // visibly teleporting them after an otherwise valid walk.
                   perf.gh1_walk_has_root_world = false;
                   perf.gh1_walk_predict_initialized = false;
                   perf.gh1_walk_has_last_facing = false;
@@ -47359,8 +47423,8 @@ void Gameplay::draw_internal(ghogx::render::Window& win,
                   perf.gh1_walk_phase = 0;
                   perf.gh1_walk_current_waypoint =
                       perf.gh1_walk_target_waypoint;
-                  perf.world_transform = perf.gh1_walk_target_world;
-                  perf.renderer->set_world_transform(perf.world_transform);
+                  // Preserve the root reached by the stop clip. The target is
+                  // routing metadata, not a post-animation placement command.
                   perf.gh1_walk_has_root_world = false;
                   perf.gh1_walk_predict_initialized = false;
                   perf.gh1_walk_has_last_facing = false;
@@ -47718,6 +47782,22 @@ void Gameplay::draw_internal(ghogx::render::Window& win,
                 const auto &clip = perf.star_power_group_clips[*selected];
                 perf.star_power_animation_started = song_time_;
                 perf.star_power_animation_duration = clip.duration_seconds();
+                if (authored_main_driver_owned) {
+                  // The authored driver owns the rendered pose. Selecting a
+                  // compatibility clip alone cannot interrupt that driver.
+                  // Use its normal play path; the completion check below restores
+                  // the current performance group through the same driver.
+                  ghogx::character::CharacterTypeScriptDriverMessage message;
+                  message.driver = "main.drv";
+                  message.message = "play";
+                  message.args.push(ghogx::DataNode::Sym(ghogx::Symbol(clip.name)));
+                  message.args.push(ghogx::DataNode::Int(
+                      ghogx::character::kCharPlayNow |
+                      ghogx::character::kCharPlayNoLoop));
+                  handle_performer_driver_message(
+                      static_cast<size_t>(&perf - performers_.data()), message);
+
+                }
                 std::fprintf(
                     stderr,
                     "[world] performer star_power activation: role=%s clip=%s "
@@ -47727,6 +47807,41 @@ void Gameplay::draw_internal(ghogx::render::Window& win,
                     perf.last_star_power_activation_serial,
                     perf.star_power_animation_duration, song_time_);
               }
+            }
+          }
+          if (authored_main_driver_owned && perf.role == "guitarist0" &&
+              perf.star_power_animation_duration > 0.0 &&
+              perf.star_power_group_index < perf.star_power_group_clips.size()) {
+            const auto* current = perf.active_player.source_first_playing_clip();
+            const auto& action = perf.star_power_group_clips[perf.star_power_group_index];
+            if (current && current->name == action.name &&
+                perf.active_player.source_first_playing_time_seconds() >=
+                    action.duration_seconds() - 1e-4f) {
+              const std::string group =
+                  !performer_playing ? "idle" : midi_state.solo ? "solo" : "normal";
+              ghogx::character::CharacterTypeScriptDriverMessage resume;
+              resume.driver = "main.drv";
+              resume.message = "play_group";
+              resume.args.push(ghogx::DataNode::Sym(ghogx::Symbol(group)));
+              resume.args.push(ghogx::DataNode::Int(ghogx::character::kCharPlayNow));
+              handle_performer_driver_message(
+                  static_cast<size_t>(&perf - performers_.data()), resume);
+              perf.star_power_animation_duration = 0.0;
+            }
+          }
+          if (authored_main_driver_owned && !perf.transient_main_clip.empty()) {
+            const auto* action = perf.active_player.source_first_playing_clip();
+            if (action && action->name == perf.transient_main_clip &&
+                perf.active_player.source_first_playing_time_seconds() >= action->duration_seconds() - 1e-4f) {
+              const std::string group = !performer_playing ? "idle" : midi_state.solo ? "solo" : "normal";
+              std::fprintf(stderr, "[world] transient character action complete: role=%s clip=%s resume=%s\n",
+                           perf.role.c_str(), action->name.c_str(), group.c_str());
+              ghogx::character::CharacterTypeScriptDriverMessage resume;
+              resume.driver = "main.drv";
+              resume.message = "play_group";
+              resume.args.push(ghogx::DataNode::Sym(ghogx::Symbol(group)));
+              resume.args.push(ghogx::DataNode::Int(ghogx::character::kCharPlayNow));
+              handle_performer_driver_message(static_cast<size_t>(&perf - performers_.data()), resume);
             }
           }
           if (!authored_main_driver_owned) {
@@ -47879,7 +47994,8 @@ void Gameplay::draw_internal(ghogx::render::Window& win,
                     const float angle_delta = std::remainder(
                         perf.gh1_walk_predict.ang - old_angle,
                         kTwoPi);
-                    perf.world_transform = mat4_mul_game(
+                    perf.world_transform =
+                        mat4_rotate_basis_preserve_position_game(
                         gh1_walk_rotation_z(angle_delta),
                         perf.world_transform);
                     perf.world_transform[12] =
@@ -47962,7 +48078,7 @@ void Gameplay::draw_internal(ghogx::render::Window& win,
                                             regulation
                                                 .waypoint_index;
                                         perf.world_transform =
-                                            mat4_mul_game(
+                                            mat4_rotate_basis_preserve_position_game(
                                                 gh1_walk_rotation_z(
                                                     regulation
                                                         .yaw_adjustment),
@@ -48566,7 +48682,21 @@ void Gameplay::draw_internal(ghogx::render::Window& win,
                 for (auto& [servo_name, source_servo] :
                      perf.source_servos) {
                     (void)servo_name;
-                    source_servo->set_move_self(perf.gh1_walk_state == 0);
+                    // CharWalk's predictor above has already applied this
+                    // frame's facing motion to perf.world_transform. Passing
+                    // it through the servo again moves/rotates the pelvis a
+                    // second time (and separates sibling instrument bones).
+                    // Keep one movement owner, independent of imported rig
+                    // hierarchy; still publish the complete authored pose.
+                    if (perf.charwalk_runtime && perf.gh1_walk_state != 0) {
+                        auto& output = source_servo->output();
+                        for (const char* name : {"bone_facing.pos", "bone_facing_delta.pos"})
+                            if (auto* values = output.channel(name))
+                                std::fill_n(values, 3, 0.0f);
+                        for (const char* name : {"bone_facing.rotz", "bone_facing_delta.rotz"})
+                            if (auto* value = output.channel(name)) *value = 0.0f;
+                    }
+                    source_servo->set_move_self(true);
                     source_servo->poll([](ghogx::milo_scene::Xfm&) {});
                 }
                 if (!perf.source_servo_runtime_reported) {

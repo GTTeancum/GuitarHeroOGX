@@ -7,6 +7,7 @@
 #include <cstdio>
 #include <exception>
 #include <string>
+#include <sstream>
 
 namespace {
 
@@ -147,6 +148,7 @@ bool native_band_character_group_contract() {
         (superclasses Character)
         (types
           (guitarist
+            (i_won {$this set_game_over {if_else {gamecfg win_campaign_song} win_finals win}})
             (solo_on {$this gtr_solo_on})
             (solo_off {$this gtr_solo_off}))))
     )DTA");
@@ -180,6 +182,9 @@ bool native_band_character_group_contract() {
       {"wail_off", "normal"},
       {"solo_on", "solo"},
       {"solo_off", "normal"},
+      {"band_jump", "sync_jump"},
+      {"sync_wag", "sync_wag"},
+      {"sync_head_bang", "sync_head_bang"},
   };
   for (const auto& [handler, expected_group] : requests) {
     if (!instance->has_handler(handler) ||
@@ -202,6 +207,22 @@ bool native_band_character_group_contract() {
       return false;
     }
   }
+  ghogx::DataArray outcome;
+  outcome.push(ghogx::DataNode::Sym(ghogx::Symbol("lose")));
+  if (!instance->has_handler("set_game_over") ||
+      !instance->run_handler("set_game_over", outcome, &error)) return false;
+  const auto ending = instance->take_driver_messages();
+  if (ending.size() != 1 || ending[0].message != "play_group" ||
+      ending[0].args.at(0).as_string().value_or("") != "lose" ||
+      ending[0].args.at(1).as_int().value_or(0) !=
+          (ghogx::character::kCharPlayNow | ghogx::character::kCharPlayNoLoop)) return false;
+  for (bool campaign : {false, true}) {
+    instance->set_win_campaign_song(campaign);
+    if (!instance->run_handler("i_won", &error)) return false;
+    const auto messages = instance->take_driver_messages();
+    if (messages.size() != 1 || messages[0].args.at(0).as_string().value_or("") !=
+        (campaign ? "win_finals" : "win")) return false;
+  }
   if (!instance->unhandled_messages().empty()) {
     std::fprintf(stderr, "native band handlers emitted unhandled messages\n");
     return false;
@@ -214,7 +235,7 @@ bool native_band_character_group_contract() {
 int main(int argc, char** argv) {
   if (!driver_bridge_contract()) return 1;
   if (!native_band_character_group_contract()) return 1;
-  if (argc == 4) {
+  if (argc == 4 || argc == 5) {
     ghogx::character::Character character;
     if (!ghogx::character::load_character(
             argv[1], argv[2], argv[3], character)) {
@@ -248,6 +269,30 @@ int main(int argc, char** argv) {
     if (!instance || !instance->run_handler("enter", &error)) {
       std::fprintf(stderr, "enter failed: %s\n", error.c_str());
       return 1;
+    }
+    if (argc == 5) {
+      std::istringstream requested(argv[4]);
+      std::string handler;
+      instance->take_driver_messages();
+      while (std::getline(requested, handler, ',')) {
+        const auto before = instance->unhandled_messages().size();
+        const bool available = instance->has_handler(handler);
+        const bool handled = available && instance->run_handler(handler, &error);
+        const auto messages = instance->take_driver_messages();
+        std::printf("handler=%s available=%d handled=%d new_unhandled=%zu drivers=%zu\n",
+                    handler.c_str(), available ? 1 : 0, handled ? 1 : 0,
+                    instance->unhandled_messages().size() - before, messages.size());
+        for (const auto& message : messages) {
+          std::printf("  driver=%s message=%s", message.driver.c_str(), message.message.c_str());
+          for (size_t i = 0; i < message.args.size(); ++i) {
+            if (const auto value = message.args.at(i).as_string())
+              std::printf(" arg%zu=%.*s", i, static_cast<int>(value->size()), value->data());
+            else if (const auto value = message.args.at(i).as_int())
+              std::printf(" arg%zu=0x%08x", i, static_cast<unsigned>(*value));
+          }
+          std::printf("\n");
+        }
+      }
     }
     const auto driver_messages = instance->take_driver_messages();
     for (const auto& message : driver_messages) {

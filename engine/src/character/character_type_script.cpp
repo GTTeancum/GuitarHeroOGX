@@ -578,6 +578,18 @@ class ScriptTimelineObject final : public Object {
   float* value_ = nullptr;
 };
 
+class ScriptGameConfigObject final : public Object {
+ public:
+  explicit ScriptGameConfigObject(bool* won) : won_(won) { set_name(Symbol("gamecfg")); }
+  Symbol class_name() const override { return Symbol("Object"); }
+  DataNode handle_property(Symbol message, const DataArray& args) override {
+    if (message == Symbol("win_campaign_song")) return DataNode::Int(*won_ ? 1 : 0);
+    return Object::handle_property(message, args);
+  }
+ private:
+  bool* won_;
+};
+
 class ScriptWaypointObject final : public Object {
  public:
   explicit ScriptWaypointObject(CharacterTypeScriptWaypoint waypoint)
@@ -612,6 +624,7 @@ struct CharacterTypeScriptInstance::Impl final : script::Host {
   std::vector<CharacterTypeScriptDriverMessage> pending_driver_messages;
   float task_beat = 0.0f;
   float next_event_beat = 0.0f;
+  bool win_campaign_song = false;
 
   Object* resolve_object(Symbol name) override {
     const std::string object_name(name.c_str());
@@ -755,6 +768,20 @@ struct CharacterTypeScriptInstance::Impl final : script::Host {
         if (handler == Symbol("wail_off")) return play_group("normal");
         if (handler == Symbol("gtr_solo_on")) return play_group("solo");
         if (handler == Symbol("gtr_solo_off")) return play_group("normal");
+        if (handler == Symbol("band_jump")) return play_group("sync_jump");
+        if (handler == Symbol("sync_wag")) return play_group("sync_wag");
+        if (handler == Symbol("sync_head_bang")) return play_group("sync_head_bang");
+        // GUITAR_COMMON's i_won/i_lost handlers delegate their selected group
+        // to this native BandCharacter message rather than to a DTA handler.
+        if (handler == Symbol("set_game_over") && !args.empty()) {
+          const auto group = args.at(0).as_string();
+          if (group && !group->empty()) {
+            DataArray group_args;
+            group_args.push(DataNode::Sym(Symbol(std::string(*group))));
+            group_args.push(DataNode::Int(kCharPlayNow | kCharPlayNoLoop));
+            return dispatch_driver(Symbol("main.drv"), Symbol("play_group"), group_args);
+          }
+        }
       }
       on_unhandled(std::string("character-handler?:") + handler.c_str());
       return DataNode();
@@ -997,6 +1024,9 @@ CharacterTypeScriptInstance::create(
     impl->objects_by_name[parser_name] = parser_object.get();
     impl->objects.push_back(std::move(parser_object));
   }
+  auto gamecfg = std::make_unique<ScriptGameConfigObject>(&impl->win_campaign_song);
+  impl->objects_by_name["gamecfg"] = gamecfg.get();
+  impl->objects.push_back(std::move(gamecfg));
   if (error) error->clear();
   return std::unique_ptr<CharacterTypeScriptInstance>(
       new CharacterTypeScriptInstance(std::move(impl)));
@@ -1049,6 +1079,10 @@ void CharacterTypeScriptInstance::set_timeline_beats(
   impl_->next_event_beat = next_event_beat;
 }
 
+void CharacterTypeScriptInstance::set_win_campaign_song(bool won) {
+  impl_->win_campaign_song = won;
+}
+
 void CharacterTypeScriptInstance::set_driver_message_handler(
     DriverMessageHandler handler) {
   impl_->driver_message_handler = std::move(handler);
@@ -1068,7 +1102,9 @@ bool CharacterTypeScriptInstance::has_handler(
   if (impl_->program->class_name() != "BandCharacter") return false;
   return name == "play" || name == "idle" ||
          name == "wail_on" || name == "wail_off" ||
-         name == "gtr_solo_on" || name == "gtr_solo_off";
+         name == "gtr_solo_on" || name == "gtr_solo_off" ||
+         name == "band_jump" || name == "sync_wag" ||
+         name == "sync_head_bang" || name == "set_game_over";
 }
 
 bool CharacterTypeScriptInstance::named_object_active(

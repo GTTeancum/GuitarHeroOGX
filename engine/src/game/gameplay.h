@@ -989,6 +989,8 @@ class Gameplay {
   //             bit0=Green  bit1=Red  bit2=Yellow  bit3=Blue
   //             bit4=Orange bit5=Strum bit6=Star power bit7=Whammy.
   void tick(float dt, uint32_t fret_mask, float whammy_axis = 0.0f);
+  // Continue character presentation after the scoring/audio clock has stopped.
+  void advance_ending_animation(float dt);
 
   // Build venue, performer, camera, lighting, and prop render resources while
   // the caller is still presenting its loading screen. This keeps asset
@@ -1530,6 +1532,7 @@ class Gameplay {
     uint32_t last_star_power_activation_serial = 0;
     double star_power_animation_started = -9999.0;
     double star_power_animation_duration = 0.0;
+    std::string transient_main_clip;
     std::string last_midi_marker;
     uint32_t last_midi_marker_tick = UINT32_MAX;
     uint32_t last_traced_performer_event_tick = UINT32_MAX;

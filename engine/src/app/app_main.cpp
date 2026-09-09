@@ -191,6 +191,17 @@ void wait_for_frame_deadline(
   }
 }
 
+float diagnostic_ending_hold(float normal_seconds) {
+  char value[32] = {};
+  const DWORD length = GetEnvironmentVariableA(
+      "GHOGX_DIAGNOSTIC_ENDING_HOLD_SECONDS", value, sizeof(value));
+  if (!length || length >= sizeof(value)) return normal_seconds;
+  char* end = nullptr;
+  const double seconds = std::strtod(value, &end);
+  if (end == value || *end || !std::isfinite(seconds)) return normal_seconds;
+  return static_cast<float>(std::clamp(seconds, static_cast<double>(normal_seconds), 30.0));
+}
+
 void wait_for_next_frame_deadline(
     std::chrono::steady_clock::time_point& deadline,
     std::chrono::steady_clock::duration interval) {
@@ -548,15 +559,16 @@ class AppEngine : public ghogx::Engine {
                      gameplay_.score());
         gameplay_.stop_audio();
         state_ = AppState::Failed;
-        fail_hold_sec_ = kFailHoldSeconds;
+        fail_hold_sec_ = diagnostic_ending_hold(kFailHoldSeconds);
       }
       else if (gameplay_.is_finished()) {
         std::fprintf(stderr, "[ghogx] song finished — final score %d\n", gameplay_.score());
         gameplay_.stop_audio();
         state_ = AppState::Finished;
-        finish_hold_sec_ = kFinishHoldSeconds;
+        finish_hold_sec_ = diagnostic_ending_hold(kFinishHoldSeconds);
       }
     } else if (state_ == AppState::Failed) {
+      gameplay_.advance_ending_animation(dt);
       fail_hold_sec_ = std::max(0.0f, fail_hold_sec_ - dt);
       if (fail_hold_sec_ <= 0.0f ||
           win_->action_pressed(Action::Confirm) ||
@@ -565,6 +577,7 @@ class AppEngine : public ghogx::Engine {
         started_ = false;
       }
     } else if (state_ == AppState::Finished) {
+      gameplay_.advance_ending_animation(dt);
       finish_hold_sec_ = std::max(0.0f, finish_hold_sec_ - dt);
       if (finish_hold_sec_ <= 0.0f ||
           win_->action_pressed(Action::Confirm) ||

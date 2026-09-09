@@ -1,0 +1,249 @@
+{
+  "version": "0.2.0",
+  "scope": "Native GH2 guitarist dispatch",
+  "native_required_contract": "passed",
+  "retail_ps2_gh2_execution": "unverified",
+  "source": {
+    "platform": "PS2",
+    "manifest_sha256": "e7f0543b61f78a6994415dbcf891653b5683d871d9c345cba6c9005b244056ce",
+    "skeleton_path": "skeletons/gh3_guitarist_midori.ske.ps2",
+    "skeleton_sha256_prefix": "0662e879482221d4",
+    "outfits": [
+      "midori_1",
+      "midori_2"
+    ]
+  },
+  "recipe_sha256": "0170a47b71f2f564c93cac330bc5ae3be5b18bf399c19a087e392690a7371cf7",
+  "files": [
+    {
+      "path": "char/gh3_midori/anims/gen/gh3_midori_fret.milo_ps2",
+      "size": 7458,
+      "sha256": "c21c5832c04a3cc382282d76bb48b380f3a9c66cb68ca9c6dfa100e553fd8cdd"
+    },
+    {
+      "path": "char/gh3_midori/anims/gen/gh3_midori_main.milo_ps2",
+      "size": 4096840,
+      "sha256": "f0c78ddb9a8719f22f32c43d9c317172ff65cacf4f976e377112776233d03a58"
+    },
+    {
+      "path": "char/gh3_midori/anims/gen/gh3_midori_strum.milo_ps2",
+      "size": 6384,
+      "sha256": "e0c9638a8879a68f77ddce4046303b11bb2720d9fa1a96cff221f8260b496780"
+    },
+    {
+      "path": "char/gh3_midori/anims/gen/gh3_midori_ui.milo_ps2",
+      "size": 61744,
+      "sha256": "26fb10d15e0b4035aa8309a2a19552e8693087209a2750c53b95892cad5a7dea"
+    },
+    {
+      "path": "char/gh3_midori_1/og/gen/gh3_midori_1.milo_ps2",
+      "size": 286801,
+      "sha256": "72b3d94c364bde3126d2b4ebc2e5ac6982780e74d9cb398d73662eff98858792"
+    },
+    {
+      "path": "char/gh3_midori_2/og/gen/gh3_midori_2.milo_ps2",
+      "size": 274933,
+      "sha256": "12216e00579b5f8165246a23ccd8750f5cfc05c5105da80dc0270cfad9d24708"
+    }
+  ],
+  "banks": {
+    "main": {
+      "clips": 72,
+      "groups": 18,
+      "required_calls_present": true
+    },
+    "ui": {
+      "clips": 2,
+      "groups": 0,
+      "required_calls_present": true
+    },
+    "fret": {
+      "clips": 25,
+      "groups": 0,
+      "required_calls_present": true
+    },
+    "strum": {
+      "clips": 11,
+      "groups": 0,
+      "required_calls_present": true
+    }
+  },
+  "clean_rebuild": {
+    "result": "all six content files reproduced byte-for-byte",
+    "outfits_share_banks": true
+  },
+  "tests": {
+    "converter_and_recipe_contract_tests": 5,
+    "native_type_script_tests": "passed",
+    "stock_type_handler_dispatch": "passed without new unhandled messages",
+    "strict_all_pages_binding": "passed"
+  },
+  "visual_review": {
+    "method": "Representative native frames and edited native capture clips; not an every-frame or every-variant review",
+    "both_outfits_sampled_frames": [
+      420,
+      720,
+      1320,
+      1920
+    ],
+    "close_hand_frames": [
+      420,
+      720,
+      840
+    ],
+    "outcome_frames": {
+      "win": [
+        420,
+        552
+      ],
+      "lose": [
+        90,
+        300,
+        540
+      ],
+      "finals": [
+        420,
+        540,
+        720
+      ]
+    },
+    "sync_frames": [
+      180,
+      540,
+      660
+    ],
+    "intro_frames": [
+      60,
+      180,
+      360
+    ]
+  },
+  "limitations": [
+    "Source delta rotation order inferred; retail PS2 execution not validated",
+    "Fret and synchronized actions are source-pose adaptations, not copies of stock character motion",
+    "Face and hair can reset phase between body clips; normal clip blending is retained, exhaustive seam review not performed",
+    "Bass slap/pluck and retail-only interaction/exclusion consumers are outside this native guitarist contract"
+  ],
+  "runtime_executable_sha256": "34a829c7a4042a3b4f27aec9d647e3d32020f6c1007c3801536dfe76869e779e",
+  "runtime_build": "Current workspace build; unrelated pre-existing loading changes excluded from scoped source commit",
+  "evidence": {
+    "actions-gh3_midori_1": [
+      "[world] authored CharDriver play: role=guitarist0 driver=main.drv message=play_group query=intro clip=intro_02 clipFlags=0x00000003 playFlags=0x00000002 resolvedPlayFlags=0x00000002 savedNodeContinuation=0",
+      "[character-message-proof] role=guitarist0 handler=idle t=32.000 available=1",
+      "[character-message-proof] role=guitarist0 handler=play t=36.000 available=1",
+      "[character-message-proof] role=guitarist0 handler=solo_on t=40.000 available=1",
+      "[character-message-proof] role=guitarist0 handler=solo_off t=45.000 available=1",
+      "[character-message-proof] role=guitarist0 handler=wail_on t=46.000 available=1",
+      "[character-message-proof] role=guitarist0 handler=wail_off t=50.000 available=1",
+      "[character-message-proof] role=guitarist0 handler=band_jump t=51.000 available=1",
+      "[world] transient character action complete: role=guitarist0 clip=band_jump resume=normal",
+      "[character-message-proof] role=guitarist0 handler=sync_wag t=57.000 available=1",
+      "[world] transient character action complete: role=guitarist0 clip=stand_medium_02 resume=normal",
+      "[character-message-proof] role=guitarist0 handler=sync_head_bang t=64.000 available=1",
+      "[world] GH1 CharWalk complete: waypoint=walk_solo.way t=68.667",
+      "[world] transient character action complete: role=guitarist0 clip=stand_fast_01 resume=normal",
+      "[ghogx] final gameplay summary: state=playing song=shoutatthedevil diff=3 t=76.983 score=43185 streak=0 mult=1 hits=115 misses=6 overstrums=0 rock=0.919 sp=0.500 active=0 failed=0 finished=0"
+    ],
+    "actions-gh3_midori_2": [
+      "[world] authored CharDriver play: role=guitarist0 driver=main.drv message=play_group query=intro clip=intro_02 clipFlags=0x00000003 playFlags=0x00000002 resolvedPlayFlags=0x00000002 savedNodeContinuation=0",
+      "[character-message-proof] role=guitarist0 handler=idle t=32.000 available=1",
+      "[character-message-proof] role=guitarist0 handler=play t=36.000 available=1",
+      "[character-message-proof] role=guitarist0 handler=solo_on t=40.000 available=1",
+      "[character-message-proof] role=guitarist0 handler=solo_off t=45.000 available=1",
+      "[character-message-proof] role=guitarist0 handler=wail_on t=46.000 available=1",
+      "[character-message-proof] role=guitarist0 handler=wail_off t=50.000 available=1",
+      "[character-message-proof] role=guitarist0 handler=band_jump t=51.000 available=1",
+      "[world] transient character action complete: role=guitarist0 clip=band_jump resume=normal",
+      "[character-message-proof] role=guitarist0 handler=sync_wag t=57.000 available=1",
+      "[world] transient character action complete: role=guitarist0 clip=stand_medium_02 resume=normal",
+      "[character-message-proof] role=guitarist0 handler=sync_head_bang t=64.000 available=1",
+      "[world] GH1 CharWalk complete: waypoint=walk_solo.way t=68.667",
+      "[world] transient character action complete: role=guitarist0 clip=stand_fast_01 resume=normal",
+      "[ghogx] final gameplay summary: state=playing song=shoutatthedevil diff=3 t=76.983 score=43185 streak=0 mult=1 hits=115 misses=6 overstrums=0 rock=0.919 sp=0.500 active=0 failed=0 finished=0"
+    ],
+    "star-power-fixed": [
+      "[world] authored CharDriver play: role=guitarist0 driver=main.drv message=play_group query=intro clip=intro_02 clipFlags=0x00000003 playFlags=0x00000002 resolvedPlayFlags=0x00000002 savedNodeContinuation=0",
+      "[world] performer star_power activation: role=guitarist0 clip=special_02 source=char/gh3_midori/anims/gen/gh3_midori_main.milo_ps2 serial=1 duration=6.300 t=30.033",
+      "[ghogx] final gameplay summary: state=playing song=shoutatthedevil diff=3 t=40.150 score=10160 streak=28 mult=3 hits=28 misses=0 overstrums=0 rock=0.828 sp=0.250 active=0 failed=0 finished=0"
+    ],
+    "win": [
+      "[world] authored CharDriver play: role=guitarist0 driver=main.drv message=play_group query=intro clip=intro_02 clipFlags=0x00000003 playFlags=0x00000002 resolvedPlayFlags=0x00000002 savedNodeContinuation=0",
+      "[world] authored CharDriver play: role=guitarist0 driver=main.drv message=play_group query=win clip=win_02 clipFlags=0x00000003 playFlags=0x00000011 resolvedPlayFlags=0x00000011 savedNodeContinuation=0",
+      "[ghogx] final gameplay summary: state=title song=shoutatthedevil diff=3 t=208.050 score=312 streak=3 mult=1 hits=3 misses=0 overstrums=0 rock=0.503 sp=0.000 active=0 failed=0 finished=1"
+    ],
+    "lose": [
+      "[world] authored CharDriver play: role=guitarist0 driver=main.drv message=play_group query=intro clip=intro_02 clipFlags=0x00000003 playFlags=0x00000002 resolvedPlayFlags=0x00000002 savedNodeContinuation=0",
+      "[world] authored CharDriver play: role=guitarist0 driver=main.drv message=play_group query=lose clip=lose_02 clipFlags=0x00000003 playFlags=0x00000011 resolvedPlayFlags=0x00000011 savedNodeContinuation=0",
+      "[ghogx] final gameplay summary: state=title song=shoutatthedevil diff=3 t=30.283 score=0 streak=0 mult=1 hits=0 misses=2 overstrums=0 rock=0.000 sp=0.000 active=0 failed=1 finished=0"
+    ],
+    "finals": [
+      "[world] authored CharDriver play: role=guitarist0 driver=main.drv message=play_group query=intro clip=intro_02 clipFlags=0x00000003 playFlags=0x00000002 resolvedPlayFlags=0x00000002 savedNodeContinuation=0",
+      "[world] authored CharDriver play: role=guitarist0 driver=main.drv message=play_group query=win_finals clip=win_final clipFlags=0x00000003 playFlags=0x00000011 resolvedPlayFlags=0x00000011 savedNodeContinuation=0",
+      "[ghogx] final gameplay summary: state=title song=shoutatthedevil diff=3 t=208.050 score=312 streak=3 mult=1 hits=3 misses=0 overstrums=0 rock=0.503 sp=0.000 active=0 failed=0 finished=1"
+    ],
+    "sync": [
+      "[world] authored CharDriver play: role=guitarist0 driver=main.drv message=play_group query=intro clip=intro_02 clipFlags=0x00000003 playFlags=0x00000002 resolvedPlayFlags=0x00000002 savedNodeContinuation=0",
+      "[character-message-proof] role=guitarist0 handler=sync_wag t=31.000 available=1",
+      "[character-message-proof] role=guitarist0 handler=sync_head_bang t=38.000 available=1",
+      "[world] transient character action complete: role=guitarist0 clip=stand_medium_04 resume=normal",
+      "[ghogx] final gameplay summary: state=playing song=shoutatthedevil diff=3 t=49.983 score=17261 streak=49 mult=4 hits=49 misses=0 overstrums=0 rock=0.810 sp=0.250 active=0 failed=0 finished=0"
+    ],
+    "intro": [
+      "[world] authored CharDriver play: role=guitarist0 driver=main.drv message=play_group query=intro clip=intro_02 clipFlags=0x00000003 playFlags=0x00000002 resolvedPlayFlags=0x00000002 savedNodeContinuation=0",
+      "[ghogx] final gameplay summary: state=playing song=shoutatthedevil diff=3 t=5.000 score=0 streak=0 mult=1 hits=0 misses=0 overstrums=0 rock=0.500 sp=0.000 active=0 failed=0 finished=0"
+    ],
+    "walk": [
+      "[world] authored CharDriver play: role=guitarist0 driver=main.drv message=play_group query=intro clip=intro_02 clipFlags=0x00000003 playFlags=0x00000002 resolvedPlayFlags=0x00000002 savedNodeContinuation=0",
+      "[world] performer star_power activation: role=guitarist0 clip=special_02 source=char/gh3_midori/anims/gen/gh3_midori_main.milo_ps2 serial=1 duration=6.300 t=59.550",
+      "[world] GH1 CharWalk complete: waypoint=walk_solo.way t=68.667",
+      "[world] GH1 CharWalk complete: waypoint=walk_solo.way t=82.850",
+      "[ghogx] final gameplay summary: state=playing song=shoutatthedevil diff=3 t=99.983 score=56040 streak=176 mult=4 hits=176 misses=0 overstrums=0 rock=1.000 sp=0.250 active=0 failed=0 finished=0"
+    ],
+    "hand-contact": [
+      "[world] authored CharDriver play: role=guitarist0 driver=main.drv message=play_group query=intro clip=intro_02 clipFlags=0x00000003 playFlags=0x00000002 resolvedPlayFlags=0x00000002 savedNodeContinuation=0",
+      "[character-message-proof] role=guitarist0 handler=idle t=32.000 available=1",
+      "[character-message-proof] role=guitarist0 handler=play t=36.000 available=1",
+      "[character-message-proof] role=guitarist0 handler=solo_on t=40.000 available=1",
+      "[ghogx] final gameplay summary: state=playing song=shoutatthedevil diff=3 t=44.983 score=11301 streak=36 mult=4 hits=36 misses=0 overstrums=0 rock=0.673 sp=0.250 active=0 failed=0 finished=0",
+      "[handpose] phase=postcontrollers role=guitarist0 t=40.000 tick=30120 mask=0x04 strum=strum_short_03 fret=finger_hold_index_hi",
+      "[handpose] phase=postcontrollers role=guitarist0 t=42.000 tick=30720 mask=0x0c strum=strum_long_03 fret=finger_vibrato_ring_hi"
+    ]
+  },
+  "local_media": [
+    {
+      "file": "manage-band.png",
+      "bytes": 768422,
+      "sha256": "ce96c3da3b696aea352c2070ffbe0c23187aa3cdbbb51d2dd1e116efd01f865d"
+    },
+    {
+      "file": "midori-both-outfits-actions.mp4",
+      "bytes": 13870462,
+      "sha256": "fbb187b7078cde658b26272b84360d08ad58753dcb0761d778c436eff422fbb3"
+    },
+    {
+      "file": "midori-outcomes.mp4",
+      "bytes": 4340875,
+      "sha256": "d6a6af412a38a41aa062a2efd8b0c0462284604f05779c5f119b25d9b38108d6"
+    },
+    {
+      "file": "solo-hand-contact.png",
+      "bytes": 1723784,
+      "sha256": "53690b12e79a678661e342e50cade1f8cb1df84252c97d1e4d38383f1b6eed77"
+    },
+    {
+      "file": "star-power-progress.png",
+      "bytes": 587777,
+      "sha256": "fe283446be722f29eb1e5058e9a041d555a13cc9f0c3166ee70d2e2290b8ed84"
+    }
+  ],
+  "installed_validation": {
+    "version": "0.2.0",
+    "six_content_hashes_verified": true,
+    "runtime_sha256": "34a829c7a4042a3b4f27aec9d647e3d32020f6c1007c3801536dfe76869e779e",
+    "variant": "gh3_midori_2",
+    "native_exit_code": 0,
+    "hits": 14,
+    "misses": 0,
+    "star_power_source_clip": "special_02"
+  }
+}

@@ -1,4 +1,7 @@
-# GH3 Midori to GH2 Casey conversion
+# Retired GH3 Midori to GH2 Casey experiment
+
+For the current PS2 source-rig pipeline and both-outfit action conversion, see
+[GH3 PS2 conversion](../tools/GH3_PS2_CONVERSION.md). The experiment below is retired.
 
 ## Status
 

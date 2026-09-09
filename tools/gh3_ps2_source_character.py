@@ -75,7 +75,22 @@ def matrix12(m):
     return list(m[:3, :3].flatten()) + list(m[3, :3])
 
 
-def write_acp(path, name, channels, samples, duration, clip_flags=0, blend_width=.24):
+def write_acp(path, name, channels, samples, duration, clip_flags=0, blend_width=.24, play_flags=0):
+    widths = {'pos': 3, 'scale': 3, 'quat': 4, 'rotx': 1, 'roty': 1,
+              'rotz': 1, 'drotx': 1, 'droty': 1, 'drotz': 1}
+    categories = {name: index for index, name in enumerate(widths)}
+    spans = []
+    offset = 0
+    for channel in channels:
+        suffix = channel.rsplit('.', 1)[-1]
+        spans.append((categories[suffix], channel, offset, widths[suffix]))
+        offset += widths[suffix]
+    values = np.asarray(samples, dtype='<f4')
+    if values.ndim != 2 or values.shape[1] != offset:
+        raise ValueError('ACP sample width differs from channel layout')
+    spans.sort(key=lambda item: item[0])
+    channels = [item[1] for item in spans]
+    values = np.concatenate([values[:, start:start+width] for _, _, start, width in spans], axis=1)
     out = bytearray()
     def u(x): out.extend(struct.pack('<I', x))
     def f(x): out.extend(struct.pack('<f', x))
@@ -85,16 +100,18 @@ def write_acp(path, name, channels, samples, duration, clip_flags=0, blend_width
     # GH1 play bit 1 converts to GH2's one-beat alignment (0x1000), not
     # ordinary playback. It can seek past a short strum as soon as it starts.
     # Let the target driver choose looping and timing, like stock hand clips.
-    f(0); f(duration); f(1); u(clip_flags); u(0); f(blend_width); u(5)
+    time_flags = {0: 0, 0x1000: 1, 0x2000: 2, 0x4000: 4, 0x8000: 8, 0x200: 16, 0x400: 32}
+    if play_flags not in time_flags: raise ValueError('Unsupported target clip time flags')
+    f(0); f(duration); f(1); u(clip_flags); u(time_flags[play_flags]); f(blend_width); u(5)
     u(len(channels))
     for channel in channels: s(channel)
     u(len(samples)); u(0); u(0); u(0); u(0)
-    out.extend(np.asarray(samples, dtype='<f4').tobytes())
+    out.extend(values.tobytes())
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_bytes(out)
 
 
-def convert(source, output, scale, clip_match, overlay_matches=(), rebase_frames=None, isolate_transforms=(), clip_aliases=(), gh2_arm_axes=False, outfit='midori_1'):
+def convert(source, output, scale, clip_match, overlay_matches=(), rebase_frames=None, isolate_transforms=(), clip_aliases=(), gh2_arm_axes=False, outfit='midori_1', clip_settings=None, hold_last_frame=False, pose_layers=(), locomotion=None):
     output.mkdir(parents=True, exist_ok=True)
     manifest = json.loads((source / 'midori_source_ir_manifest.json').read_text())
     selected = next((item for item in manifest['outfits'] if item['name'] == outfit), None)
@@ -227,6 +244,7 @@ def convert(source, output, scale, clip_match, overlay_matches=(), rebase_frames
     mask_checked = 0
     clip = None
     overlays = {}
+    replacement_clips = {}
     with gzip.open(source/'animations/midori_ska_ir.jsonl.gz', 'rt') as f:
         for line in f:
             candidate = json.loads(line)
@@ -239,8 +257,21 @@ def convert(source, output, scale, clip_match, overlay_matches=(), rebase_frames
                 if match in candidate['path']:
                     if match in overlays: raise ValueError('Overlay selector is ambiguous')
                     overlays[match] = candidate
+            for number, layer in enumerate(pose_layers):
+                if candidate['path'] == layer['source']:
+                    if number in replacement_clips: raise ValueError('Duplicate replacement source')
+                    replacement_clips[number] = candidate
     if clip is None: raise ValueError('Source clip not found')
     if set(overlays) != set(overlay_matches): raise ValueError('Source overlay not found')
+    if len(replacement_clips) != len(pose_layers): raise ValueError('Source pose layer not found')
+    owned_bones = set()
+    for number, layer in enumerate(pose_layers):
+        requested = set(layer['bones'])
+        if not requested or requested - set(names): raise ValueError('Pose layer contains unknown or no bones')
+        if requested & owned_bones: raise ValueError('Pose layers overlap')
+        keyed_names = {names[i] for i in source_tracks(replacement_clips[number])}
+        if requested - keyed_names: raise ValueError('Pose layer requests unkeyed source bones')
+        owned_bones.update(requested)
     assert clip['header']['bone_count'] == len(bones)
     if clip['header']['flags'] & 0x200:
         # A partial hand layer must not acquire unrelated body channels merely
@@ -249,13 +280,17 @@ def convert(source, output, scale, clip_match, overlay_matches=(), rebase_frames
     source_duration = clip['header']['duration_seconds']
     # GH3's zero-duration hand poses are persistent holds. GH2 players need a
     # positive interval to stay active; resampling clamped keys changes no pose.
-    duration = source_duration if source_duration > 0 else 1.0
+    duration = source_duration if source_duration > 0 and not hold_last_frame else 1.0
     times = np.linspace(0, round(duration*60), round(duration*30)+1)
     qs, ts = {}, {}
-    for layer in [clip, *overlays.values()]:
+    layer_specs = [(clip, None, {}), *((o, None, {}) for o in overlays.values())]
+    layer_specs += [(replacement_clips[i], set(spec['bones']), spec) for i, spec in enumerate(pose_layers)]
+    for layer, replacement_bones, layer_spec in layer_specs:
         if layer['header']['bone_count'] != len(bones): raise ValueError('Overlay skeleton size differs')
         delta_layer = bool(layer['header']['flags'] & 0x200)
         layer_times = times
+        if layer is clip and hold_last_frame:
+            layer_times = np.full_like(times, round(source_duration * 60))
         if layer is not clip:
             period = round(layer['header']['duration_seconds']*60)
             if period < 0: raise ValueError('Overlay has a negative duration')
@@ -266,7 +301,19 @@ def convert(source, output, scale, clip_match, overlay_matches=(), rebase_frames
                 layer_times = np.zeros_like(times)
             else:
                 layer_times = times % period
+            if 'ping_pong_seconds' in layer_spec:
+                cycle = float(layer_spec['ping_pong_seconds'])
+                if not math.isfinite(cycle) or cycle <= 0 or period <= 0:
+                    raise ValueError('Ping-pong requires positive cycle and source duration')
+                phase = np.mod(times / 60 / cycle, 1.0)
+                layer_times = (1.0 - np.abs(phase * 2.0 - 1.0)) * period
         for i,b in source_tracks(layer).items():
+            if replacement_bones is not None:
+                if names[i] not in replacement_bones: continue
+                # Each replacement is an authored source pose relative to its
+                # bind, not a delta to compound onto an unrelated hand pose.
+                qs.pop(i, None)
+                ts.pop(i, None)
             qkeys = {k['time']:k['raw_xyzw'] for k in b['quat_keys']}
             tkeys = {k['time']:k['raw_xyz'] for k in b['trans_keys']}
             if qkeys:
@@ -282,12 +329,20 @@ def convert(source, output, scale, clip_match, overlay_matches=(), rebase_frames
                 kt = sorted(tkeys); values=np.array([tkeys[t] for t in kt]); sampled=np.array([np.interp(layer_times,kt,values[:,c]) for c in range(3)]).T
                 if delta_layer and i in ts: sampled += ts[i]
                 ts[i] = sampled
-    samples=[]; parity=0.
+    samples=[]; parity=0.; facing_samples=[]
     for frame in range(len(times)):
         local=[source_local(b, qs[i][frame] if i in qs else None, ts[i][frame] if i in ts else None) for i,b in enumerate(bones)]
         target=rebase_local([target_matrix(m,scale) for m in local])
-        actual=worlds(target,bones); expected=[target_matrix(w,scale) for w in worlds(local,bones)]
+        expected=[target_matrix(w,scale) for w in worlds(local,bones)]
         for i, matrix in rebases.items(): expected[i] = matrix @ expected[i]
+        if locomotion is not None:
+            if bones[0]['parent_index'] not in (None, -1): raise ValueError('Locomotion requires a root at index zero')
+            facing = np.eye(4)
+            facing[3,:3] = target[0][3,:3] - target_rest[0][3,:3]
+            target[0][3,:3] = target_rest[0][3,:3]
+            expected = [m @ np.linalg.inv(facing) for m in expected]
+            facing_samples.append(facing[3,:3].copy())
+        actual=worlds(target,bones)
         parity=max(parity,max(float(np.max(np.abs(a-e))) for a,e in zip(actual,expected)))
         if frame in {0, len(times)//2, len(times)-1}:
             expected_meshes = {}
@@ -307,6 +362,22 @@ def convert(source, output, scale, clip_match, overlay_matches=(), rebase_frames
         for i in sorted(set(qs) | rebase_channels): row.extend(Rotation.from_matrix(target[i][:3,:3].T).as_quat())
         samples.append(row)
     channels=[names[i]+'.pos' for i in sorted(set(ts) | rebase_channels)]+[names[i]+'.quat' for i in sorted(set(qs) | rebase_channels)]
+    if locomotion is not None:
+        # GH3 translates Control_Root; GH2 CharWalk consumes virtual facing
+        # channels and applies their delta to Character.local. Keep the skin
+        # in place to avoid applying the same displacement twice.
+        source_path = np.asarray(facing_samples)
+        position = np.zeros(3)
+        turn = math.radians(float(locomotion.get('turn_degrees', 0)))
+        for frame, row in enumerate(samples):
+            phase = frame / max(1, len(samples)-1)
+            angle = turn * phase
+            if frame:
+                delta = source_path[frame] - source_path[frame-1]
+                c, s = math.cos(angle), math.sin(angle)
+                position += delta @ np.array([[c,s,0],[-s,c,0],[0,0,1]])
+            row.extend([*position, angle])
+        channels += ['bone_facing.pos', 'bone_facing.rotz']
     if parity > 1e-5:
         raise ValueError(f'Frame conversion changed an authored world transform: {parity}')
     # Sparse performance clips delegate absent arm chains to hand IK. Complete
@@ -319,10 +390,17 @@ def convert(source, output, scale, clip_match, overlay_matches=(), rebase_frames
         # Source delta hand strokes begin at note onset. A body-style crossfade
         # longer than the stroke's attack suppresses the authored wrist motion.
         blend_width = 0.0 if clip['header']['flags'] & 0x200 else .24
-        write_acp(output/'acp'/f'{alias}.acp', alias, channels, samples, duration, clip_flags, blend_width)
+        settings = (clip_settings or {}).get(alias, {})
+        # Target selection flags describe the call contract; arm ownership must
+        # come from the source's actual keyed channels, never a donor clip.
+        flags = (int(settings.get('flags', 0)) & ~0x00c00000) | clip_flags
+        write_acp(output/'acp'/f'{alias}.acp', alias, channels, samples, duration,
+                  flags, float(settings.get('blend_width', blend_width)), int(settings.get('play_flags', 0)))
     report=dict(status='conversion_probe_not_published',source_model=selected['skin_path'],source_outfit=outfit,
         source_skeleton=manifest['skeleton']['path'],source_clip=clip['path'],skeleton_unit_scale=scale,
         source_overlays=[c['path'] for c in overlays.values()],
+        source_pose_layers=list(pose_layers),
+        locomotion=locomotion,
         delta_layer_order='base local rotation @ source delta; requires source runtime validation',
         bones=len(bones), triangles=sum(len(c['faces']) for c in chunks), vertices=sum(len(c['vertices']) for c in chunks),
         chunks=len(chunks), bind_matrix_max_error=bind_error, animation_world_basis_max_error=parity,
@@ -340,6 +418,10 @@ if __name__ == '__main__':
     parser=argparse.ArgumentParser()
     parser.add_argument('--source',type=Path,required=True); parser.add_argument('--output',type=Path,required=True)
     parser.add_argument('--outfit',default='midori_1',help='Outfit name from the verified PS2 source manifest')
+    parser.add_argument('--clip-settings',type=Path,help='Per-alias target selection flags and blend widths')
+    parser.add_argument('--hold-last-frame',action='store_true',help='Hold the source terminal body pose while continuing overlay layers')
+    parser.add_argument('--pose-layers',type=Path,help='Explicit disjoint source bone-channel replacements')
+    parser.add_argument('--locomotion',type=Path,help='Extract source root motion into GH2 facing channels; optional procedural turn angle')
     parser.add_argument('--skeleton-unit-scale',type=float,default=100/2.54)
     parser.add_argument('--clip',default='gh3_guit_mido_a_med_idle01.ska.ps2')
     parser.add_argument('--overlay', action='append', default=[], help='Loop a disjoint source facial/accessory layer into this clip')
@@ -348,4 +430,7 @@ if __name__ == '__main__':
     parser.add_argument('--clip-alias',action='append',default=[],help='Target animation call name; repeat for equivalent calls')
     parser.add_argument('--gh2-arm-axes',action='store_true',help='Derive positive-X arm frames and the GH2 Z hinge from the source bind pose')
     args=parser.parse_args(); convert(args.source,args.output,args.skeleton_unit_scale,args.clip,args.overlay,
-        json.loads(args.rebase_frames.read_text()) if args.rebase_frames else None, args.isolate_transform,args.clip_alias,args.gh2_arm_axes,args.outfit)
+        json.loads(args.rebase_frames.read_text()) if args.rebase_frames else None, args.isolate_transform,args.clip_alias,args.gh2_arm_axes,args.outfit,
+        json.loads(args.clip_settings.read_text()) if args.clip_settings else None, args.hold_last_frame,
+        json.loads(args.pose_layers.read_text()) if args.pose_layers else (),
+        json.loads(args.locomotion.read_text()) if args.locomotion else None)

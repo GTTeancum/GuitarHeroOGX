@@ -14,10 +14,33 @@ import subprocess
 import sys
 
 
+def validate_recipe_contract(recipe, contract):
+    aliases = {}
+    for item in recipe['animations']:
+        known = aliases.setdefault(item['role'], set())
+        for name in item['aliases']:
+            if name in known: raise ValueError(f'Duplicate {item["role"]} call: {name}')
+            known.add(name)
+    for role, required in contract.get('banks', {}).items():
+        known = aliases.get(role, set())
+        missing = set(required.get('clips', [])) - known
+        if missing: raise ValueError(f'Missing required {role} calls: {sorted(missing)}')
+        groups = recipe.get('groups', {}).get(role, {})
+        for group in required.get('groups', []):
+            members = groups.get(group, [])
+            if not members or set(members) - known:
+                raise ValueError(f'Missing or unplayable required {role} group: {group}')
+
+
 def build(source, converter, recipe_path, work, output):
     recipe = json.loads(recipe_path.read_text())
+    contract = json.loads((recipe_path.parent / recipe['call_contract']).read_text()) if recipe.get('call_contract') else {}
+    validate_recipe_contract(recipe, contract)
+    if len(recipe['manifest']['characters']) != 1:
+        raise ValueError('One source character per conversion recipe is required')
+    character_id = recipe['manifest']['characters'][0]['id']
+    model_prefix = recipe.get('model_prefix', 'gh3_')
     outfit = recipe.get('outfit', 'midori_1')
-    model_id = 'gh3_' + outfit
     work.mkdir(parents=True, exist_ok=True)
     output.mkdir(parents=True, exist_ok=True)
     env = os.environ.copy()
@@ -33,6 +56,7 @@ def build(source, converter, recipe_path, work, output):
             raise RuntimeError(f'{name} failed ({result.returncode}); see {work / (name + ".log")}')
 
     banks = {}
+    model_bundles = {}
     for number, item in enumerate(recipe['animations']):
         folder = work / f'clip-{number:02d}'
         args = [sys.executable, tool, '--source', source, '--output', folder,
@@ -44,6 +68,19 @@ def build(source, converter, recipe_path, work, output):
         for value in item.get('overlays', []): args += ['--overlay', value]
         for value in item.get('isolate', []): args += ['--isolate-transform', value]
         for value in item['aliases']: args += ['--clip-alias', value]
+        if item.get('hold_last_frame'): args += ['--hold-last-frame']
+        if item.get('pose_layers'):
+            layers = work / f'layers-{number:02d}.json'
+            layers.write_text(json.dumps(item['pose_layers']))
+            args += ['--pose-layers', layers]
+        if 'locomotion' in item:
+            motion = work / f'locomotion-{number:02d}.json'
+            motion.write_text(json.dumps(item['locomotion']))
+            args += ['--locomotion', motion]
+        if item.get('settings'):
+            settings = work / f'settings-{number:02d}.json'
+            settings.write_text(json.dumps(item['settings']))
+            args += ['--clip-settings', settings]
         run(args, f'clip-{number:02d}')
         bank = work / ('bank-' + item['role'])
         bank.mkdir(exist_ok=True)
@@ -54,23 +91,47 @@ def build(source, converter, recipe_path, work, output):
         banks[item['role']] = bank
         if item.get('model'):
             shutil.copyfile(folder / 'midori.meshbundle', work / 'model.meshbundle')
+            model_bundles[outfit] = work / 'model.meshbundle'
+            for extra in recipe.get('additional_outfits', []):
+                if extra == outfit or extra in model_bundles:
+                    raise ValueError('Duplicate additional outfit')
+                extra_folder = work / ('model-' + extra)
+                extra_args = list(args)
+                extra_args[extra_args.index('--outfit')+1] = extra
+                extra_args[extra_args.index('--output')+1] = extra_folder
+                run(extra_args, 'model-source-' + extra)
+                model_bundles[extra] = extra_folder / 'midori.meshbundle'
     content = output / 'content'
-    bank_root = content / 'char/gh3_midori/anims/gen'
+    bank_root = content / f'char/{character_id}/anims/gen'
     bank_root.mkdir(parents=True, exist_ok=True)
+    transition_path = work / 'movement-transitions.tsv'
+    has_locomotion = any('locomotion' in a for a in recipe['animations'])
+    if has_locomotion:
+        run([sys.executable, tool.with_name('build_gh2_locomotion_graph.py'),
+             '--bank', banks['main'], '--recipe', recipe_path,
+             '--output', transition_path], 'movement-transitions')
     for role, folder in banks.items():
-        run([converter, 'build-clipset-from-acp', folder, '--name', 'gh3_midori_' + role,
-             '--role', 'guitar-' + role, '--out', bank_root / ('gh3_midori_' + role + '.milo_ps2'),
-             '--move-self', '0'], role + '-bank')
+        bank_args = [converter, 'build-clipset-from-acp', folder, '--name', character_id + '_' + role,
+             '--role', 'guitar-' + role, '--out', bank_root / (character_id + '_' + role + '.milo_ps2'),
+             '--move-self', '1' if role == 'main' and any('locomotion' in a for a in recipe['animations']) else '0']
+        for name, members in recipe.get('groups', {}).get(role, {}).items():
+            bank_args += ['--group', name + '=' + ','.join(members)]
+        if role == 'main' and has_locomotion:
+            bank_args += ['--transitions', transition_path]
+        run(bank_args, role + '-bank')
     # Explicit probe limitation: the reviewed bank is also the UI placeholder.
     if 'ui' not in banks:
-        shutil.copyfile(bank_root / 'gh3_midori_main.milo_ps2', bank_root / 'gh3_midori_ui.milo_ps2')
-    model = content / f'char/{model_id}/og/gen/{model_id}.milo_ps2'
-    model.parent.mkdir(parents=True, exist_ok=True)
-    args = [converter, 'build-character-from-meshbundle', work / 'model.meshbundle',
-            '--name', model_id, '--out', model, '--preserve-guitar-proxies']
-    for role in ['main', 'strum', 'fret']:
-        args += ['--' + role + '-anim', f'char/gh3_midori/anims/gen/gh3_midori_{role}.milo_ps2']
-    run(args, 'model')
+        shutil.copyfile(bank_root / (character_id + '_main.milo_ps2'), bank_root / (character_id + '_ui.milo_ps2'))
+    if not model_bundles: raise ValueError('Recipe has no model source')
+    for model_outfit, bundle in model_bundles.items():
+        model_id = model_prefix + model_outfit
+        model = content / f'char/{model_id}/og/gen/{model_id}.milo_ps2'
+        model.parent.mkdir(parents=True, exist_ok=True)
+        args = [converter, 'build-character-from-meshbundle', bundle,
+                '--name', model_id, '--out', model, '--preserve-guitar-proxies']
+        for role in ['main', 'strum', 'fret']:
+            args += ['--' + role + '-anim', f'char/{character_id}/anims/gen/{character_id}_{role}.milo_ps2']
+        run(args, 'model-' + model_outfit)
     manifest = recipe['manifest']
     (output / 'manifest.json').write_text(json.dumps(manifest, indent=2))
     index = {'files': []}

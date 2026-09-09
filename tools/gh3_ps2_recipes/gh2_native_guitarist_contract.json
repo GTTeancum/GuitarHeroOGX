@@ -1,0 +1,91 @@
+{
+  "scope": "Native GH2 guitarist dispatch; retail PS2 execution remains a separate validation gate",
+  "banks": {
+    "main": {
+      "groups": [
+        "normal",
+        "idle",
+        "solo",
+        "extreme",
+        "bad",
+        "star_power",
+        "intro",
+        "lose",
+        "win",
+        "win_finals",
+        "sync_jump",
+        "win_idle",
+        "lose_idle",
+        "walk_walk",
+        "walk_stop",
+        "walk_turn",
+        "sync_head_bang",
+        "sync_wag"
+      ]
+    },
+    "ui": {
+      "clips": [
+        "ui_enter",
+        "ui_loop"
+      ]
+    },
+    "fret": {
+      "clips": [
+        "finger_chord_bar",
+        "finger_chord_cmajor",
+        "finger_chord_dmajor",
+        "finger_chord_openmajor",
+        "finger_chord_openminor",
+        "finger_chord_seventh",
+        "finger_hold_index",
+        "finger_hold_index_hi",
+        "finger_hold_middle",
+        "finger_hold_middle_hi",
+        "finger_hold_pinky",
+        "finger_hold_pinky_hi",
+        "finger_hold_ring",
+        "finger_hold_ring_hi",
+        "finger_open",
+        "finger_powerchord_1",
+        "finger_powerchord_2",
+        "finger_vibrato_index",
+        "finger_vibrato_index_hi",
+        "finger_vibrato_middle",
+        "finger_vibrato_middle_hi",
+        "finger_vibrato_pinky",
+        "finger_vibrato_pinky_hi",
+        "finger_vibrato_ring",
+        "finger_vibrato_ring_hi"
+      ]
+    },
+    "strum": {
+      "clips": [
+        "strum_long_01",
+        "strum_long_02",
+        "strum_long_03",
+        "strum_long_04",
+        "strum_open",
+        "strum_pick_01",
+        "strum_pick_02",
+        "strum_short_01",
+        "strum_short_02",
+        "strum_short_03",
+        "strum_short_04"
+      ]
+    }
+  },
+  "optional_role_calls": {
+    "bass_strum": [
+      "bass_pluck_middle",
+      "bass_pluck_open",
+      "bass_pluck_pointer",
+      "bass_slap_open",
+      "bass_slap_pull",
+      "bass_slap_thumb"
+    ]
+  },
+  "limits": [
+    "Names and groups do not prove motion semantics, contact, loop seams or execution on retail GH2.",
+    "Unimplemented retail interaction and exclusion consumers are reported by the conservative stock inventory audit, not silently treated as covered."
+  ]
+}

@@ -3,7 +3,8 @@
 This pipeline preserves the PS2 source skeleton, skinning and animation samples,
 renames the target bone channels, derives GH2 arm frames, and retains source
 instrument proxies. Both Midori outfits were reviewed in native gameplay and
-approved for local DLC installation on 2026-09-08.
+approved for local DLC installation on 2026-09-08. The expanded
+`midori_actions.json` recipe is the reusable native-game action conversion.
 
 Requirements: Python 3.12, numpy, scipy, Pillow; the repository's
 milo_convert_tool (build tools/milo_convert with CMake); a GH3 PS2 USA ISO;
@@ -13,16 +14,14 @@ Run from the repository root:
 
 ```powershell
 python tools/gh3_midori_ir.py --iso "path/to/Guitar Hero III - Legends of Rock (USA).iso" --nxtools "path/to/nxtools" --output "scratch/ir/midori_source_ir_manifest.json" --asset-dir "scratch/ir"
-python tools/build_gh3_ps2_playing_probe.py --source "scratch/ir" --converter "path/to/milo_convert_tool.exe" --recipe tools/gh3_ps2_recipes/midori_1.json --work "scratch/base" --output "output/base/community.gh3.midori"
-python tools/build_gh3_ps2_playing_probe.py --source "scratch/ir" --converter "path/to/milo_convert_tool.exe" --recipe tools/gh3_ps2_recipes/midori_2.json --work "scratch/alt" --output "output/alt/community.gh3.midori"
+python tools/build_gh3_ps2_playing_probe.py --source "scratch/ir" --converter "path/to/milo_convert_tool.exe" --recipe tools/gh3_ps2_recipes/midori_actions.json --work "scratch/build" --output "output/community.gh3.midori"
 ```
 
-Use separate empty work/output directories. Each command creates a standalone
-outfit package with the same package ID; do not install the standalone packages
-together. To combine outfits, retain the four shared banks, include both model
-files, merge the manifest outfits/files, and rebuild the content index hashes.
-The reviewed combined package verified all four banks identical between outfits.
-The builder produces a candidate and does not install it automatically.
+Use empty work/output directories. `additional_outfits` builds the alternate
+model and shares all four animation banks. The combined package contains two
+models, four banks, a manifest and a hash index. The builder creates a candidate;
+it does not install it. The older `midori_1.json`/`midori_2.json` recipes retain
+the initial playing probes and do not provide the expanded action contract.
 
 The recipes retain explicit source-to-instrument frame mappings and clip aliases.
 Hand attacks use immediate playback and no body-style crossfade. Generic rigid
@@ -30,11 +29,42 @@ frame rebasing compensates descendants and checks world-pose invariance.
 The milo builder's --preserve-guitar-proxies prevents replacement of source IK
 helpers; generated root bone names also follow the normal GH2 channel suffix rule.
 
-Current scope: one playing body loop with face/accessory overlays and source hand
-clips; the body bank is also a UI placeholder. Full action coverage, loop seams,
-complete hand-call mapping and retail GH2 compatibility remain unverified. Local
-native gameplay approval does not establish retail compatibility. Retired donor
-rig scripts in this repository are not part of this pipeline.
+The expanded recipe supplies separate body, frontend, fret and strum banks.
+Body clips retain source face/accessory overlays. Main selection flags preserve
+source ownership of the arm chains: a complete authored arm is not overwritten
+by hand IK. Source hand attacks keep their note-onset timing. Body and frontend
+clips use source seconds; they are not assumed to have stock animation lengths.
+
+| GH2 consumer | Converted source behavior |
+|---|---|
+| normal / idle / bad | Playing, break and poor-performance source actions |
+| solo / extreme / star_power | Source solos and special performances |
+| intro / win / lose / win_finals | Source intros and outcomes; campaign victory uses win3 |
+| sync_jump | Source jump, then return to the current performance group |
+| sync_wag / sync_head_bang | Existing source sway/head-nodding performances adapted to the group calls |
+| walk_turn / walk_walk / walk_stop | Source strides/stops, extracted root motion and generated movement links |
+| ui_enter / ui_loop | Source frontend entrance and resting pose |
+| 25 fret calls | Source finger-channel compositions, distinct high variants and source wrist bends |
+| 11 guitar strum calls | Source short/medium/long strokes and rest; extra long variants reuse source long strokes |
+
+There are no authored directional turn clips in this source set. The recipe
+adapts source walk starts with a continuous heading change. The generic
+`build_gh2_locomotion_graph.py` matches existing body poses to select transition
+times and adds stationary facing channels for GH2's predictor. It does not edit
+body pose keys. The MILO writer accepts `--transitions`, validates every link,
+and serializes the native transition graph. In the native integration CharWalk
+owns world movement once; the servo still publishes the full body pose.
+
+`fit_gh3_ps2_hand_calls.py` proposes disjoint source finger layers using stock
+distal-joint bend signatures. Its score is not proof of guitar contact. Thumb,
+wrist and finger proportions remain those of the source character; these are
+functional call adaptations, not replicas of Casey's hand poses. Review fretting,
+high variants and vibrato in game after changing the source rig or instrument.
+
+The native guitarist scope excludes the six bassist slap/pluck calls. Retail
+interaction/exclusion consumers and execution on a retail PS2 GH2 build remain
+unverified. Native success must not be advertised as retail compatibility.
+Retired donor-rig scripts are not part of this pipeline.
 
 ## Required animation-call review for future conversions
 
@@ -42,7 +72,7 @@ Rig compatibility and a playing clip do not establish animation-call compatibili
 Audit every converted character against the target bank inventory:
 
 ```powershell
-python tools/audit_gh2_character_calls.py --stock-hdr "path/to/GEN/main.hdr" --stock-ark "path/to/GEN/main_0.ark" --package "path/to/DLC/package" --character gh3_midori --stock-character rock1 --recipe tools/gh3_ps2_recipes/midori_1.json --output "call-inventory.json"
+python tools/audit_gh2_character_calls.py --stock-hdr "path/to/GEN/main.hdr" --stock-ark "path/to/GEN/main_0.ark" --package "path/to/DLC/package" --character gh3_midori --stock-character rock1 --recipe tools/gh3_ps2_recipes/midori_actions.json --output "call-inventory.json"
 ```
 
 This reads stock banks directly from the archive and all outfit bank references
@@ -60,7 +90,26 @@ the resulting motion. Unsupported source-only animations may be dropped; require
 GH2 actions cannot silently fall back to idle and count as completed mappings.
 This applies to subsequent Neversoft conversions as well as Midori.
 
-The 2026-09-08 installed Midori audit FAILS completeness: main 1/113, UI 1/2,
-fret 9/25 and strum 4/17 stock clip names covered; 29 main groups missing,
-including star_power, solo, intro, win and lose. Installation was authorized for
-the reviewed visual candidate; it did not establish complete animation mapping.
+The builder additionally checks `gh2_native_guitarist_contract.json` before
+conversion: every required direct call and group must exist, groups must have
+playable members, and aliases cannot collide. Keep this consumer contract when
+adapting a new character; change the source mappings and prove their behavior.
+Optional stock variants are still shown as gaps by the conservative inventory.
+
+Native verification uses actual stock `char_objects.dtb` handlers and the normal
+driver resolver. `GHOGX_DIAGNOSTIC_CHARACTER_MESSAGES` accepts
+`song_seconds:role:handler` entries for process-local dispatch tests. This does
+not send OS input or substitute a forced rendered pose. Star Power should also
+be tested through the guitar input script, and win/loss through actual song
+completion/failure. `GHOGX_DIAGNOSTIC_ENDING_HOLD_SECONDS=12` extends only the
+diagnostic result display so a long outro can be inspected after the audio stops.
+
+Run the converter contract tests with `MILO_CONVERT_TOOL` set to the built tool:
+
+```powershell
+python -m unittest discover -s tools -p "test_gh3_ps2_*.py"
+```
+
+Then run the native character type-script and all-pages clip-binding tests,
+capture both outfits playing, exercise transient-action return and walking,
+and verify the final content hashes. Remove disposable build and capture trees.

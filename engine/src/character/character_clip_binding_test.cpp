@@ -118,6 +118,21 @@ void unit_tests() {
 int main(int argc, char** argv) {
   try {
     unit_tests();
+    if (argc == 5 && std::string(argv[1]) == "--poses") {
+      for (const auto& entry : load_clip_catalog(argv[2], argv[3], {argv[4]})) {
+        const auto clip = load_clip(argv[2], argv[3], argv[4], entry.name);
+        check(clip.loaded && !clip.frames.empty(), "pose inventory clip loaded");
+        for (size_t frame : {size_t(0), clip.frames.size() / 2, clip.frames.size() - 1}) {
+          for (const auto& channel : clip.frames[frame]) {
+            std::printf("POSE\t%s\t%zu\t%s\t%d\t%.9g\t%.9g\t%.9g\t%.9g\t%.9g\t%.9g\t%.9g\t%.9g\n",
+                entry.name.c_str(), frame, channel.bone_name.c_str(), int(channel.type),
+                channel.pos[0], channel.pos[1], channel.pos[2],
+                channel.quat[0], channel.quat[1], channel.quat[2], channel.quat[3], channel.angle);
+          }
+        }
+      }
+      return 0;
+    }
     if (argc > 1 && std::string(argv[1]) == "--facing") {
       if (argc != 6) throw std::runtime_error("usage: test --facing hdr ark milo clip");
       const auto clip = load_clip(argv[2], argv[3], argv[4], argv[5]);
