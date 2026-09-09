@@ -3,6 +3,7 @@
 #include <exception>
 #include <cstdio>
 #include <cstring>
+#include <stdexcept>
 #include <vector>
 
 namespace {
@@ -252,6 +253,108 @@ int main() {
         std::fprintf(stderr, "milo_test: GH2 directory prefix failed\n");
         return 1;
     }
+
+    // A normal large directory has one terminator per declared object. Its
+    // recovery work must stay bounded; the old suffix search exhausts this
+    // cooperative-work budget long before it finishes this fixture.
+    const auto make_modern_prefix = [](uint32_t count) {
+        std::vector<uint8_t> data;
+        append_u32(data, 24);
+        append_string(data, "RndDir");
+        append_string(data, "boundary_test");
+        append_u32(data, 0);
+        append_u32(data, 0);
+        append_u32(data, count);
+        for (uint32_t i = 0; i < count; ++i) {
+            append_string(data, "Mat");
+            const auto name = "material_" + std::to_string(i);
+            append_string(data, name.c_str());
+        }
+        append_u32(data, 8);
+        append_u32(data, 0xDEADDEAD);
+        return data;
+    };
+    auto large_directory = make_modern_prefix(1000);
+    for (uint32_t i = 0; i < 1000; ++i) {
+        append_u32(large_directory, 21);
+        append_u32(large_directory, 0x11111111);
+        append_u32(large_directory, 0xDEADDEAD);
+    }
+    auto large_embedded_marker = large_directory;
+    const size_t first_large_body = make_modern_prefix(1000).size();
+    std::vector<uint8_t> embedded_data;
+    append_u32(embedded_data, 0xDEADDEAD);
+    append_u32(embedded_data, 0x11111111); // not a packed object revision
+    large_embedded_marker.insert(
+        large_embedded_marker.begin() + first_large_body + 4,
+        embedded_data.begin(), embedded_data.end());
+    try {
+      for (const auto* fixture : {&large_directory, &large_embedded_marker}) {
+        size_t work_callbacks = 0;
+        const auto large = gh::milo::parse_directory(*fixture, [&]() {
+            if (++work_callbacks > 32)
+                throw std::runtime_error("superlinear directory boundary work");
+        });
+        if (!large.boundaries_exact || large.entries.size() != 1000 ||
+            gh::milo::serialize_directory(large) != *fixture)
+            throw std::runtime_error("large directory did not round-trip exactly");
+      }
+    } catch (const std::exception& ex) {
+        std::fprintf(stderr, "milo_test: large boundary recovery: %s\n", ex.what());
+        return 1;
+    }
+
+    // Two valid partitions remain ambiguous. Pruning must neither claim a
+    // unique parse nor change the first partition chosen by the old solver.
+    auto ambiguous_directory = make_modern_prefix(2);
+    const size_t ambiguous_start = ambiguous_directory.size();
+    for (uint32_t i = 0; i < 3; ++i) {
+        append_u32(ambiguous_directory, 21);
+        append_u32(ambiguous_directory, 0xDEADDEAD);
+    }
+    const auto ambiguous = gh::milo::parse_directory(ambiguous_directory);
+    if (ambiguous.boundaries_exact || ambiguous.entries.size() != 2 ||
+        ambiguous.entries[0].offset != ambiguous_start ||
+        ambiguous.entries[0].body_bytes.size() != 4 ||
+        ambiguous.entries[1].body_bytes.size() != 12) {
+        std::fprintf(stderr, "milo_test: ambiguous boundary recovery changed\n");
+        return 1;
+    }
+
+    bool rejected_ambiguous_write = false;
+    try {
+        (void)gh::milo::serialize_directory(ambiguous);
+    } catch (const std::runtime_error&) {
+        rejected_ambiguous_write = true;
+    }
+    if (!rejected_ambiguous_write) {
+        std::fprintf(stderr, "milo_test: ambiguous directory was serializable\n");
+        return 1;
+    }
+    // Runtime consumers share one inflate+directory parse while assembling a
+    // screen/world, then explicitly release it at the lifecycle boundary.
+    const auto cache_container =
+        gh::milo::make_container(gh1, gh::milo::BlockStructure::MILO_A);
+    const auto cache_bytes = gh::milo::serialize_container(cache_container);
+    const auto cache_header = gh::milo::parse_header(cache_bytes);
+    const auto cached_a = gh::milo::inflate_directory_cached(
+        "milo_test/cache", cache_bytes, cache_header);
+    const auto cached_b = gh::milo::inflate_directory_cached(
+        "milo_test/cache", cache_bytes, cache_header);
+    if (cached_a != cached_b || cached_a->payload != gh1 ||
+        cached_a->directory.entries.size() != 2) {
+        std::fprintf(stderr, "milo_test: parsed-directory cache failed\n");
+        return 1;
+    }
+    gh::milo::clear_inflated_directory_cache();
+    const auto cached_after_clear = gh::milo::inflate_directory_cached(
+        "milo_test/cache", cache_bytes, cache_header);
+    if (cached_after_clear == cached_a) {
+        std::fprintf(stderr,
+                     "milo_test: parsed-directory cache clear failed\n");
+        return 1;
+    }
+    gh::milo::clear_inflated_directory_cache();
 
     std::printf("milo_test: all checks passed\n");
     return 0;

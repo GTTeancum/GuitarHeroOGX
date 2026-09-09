@@ -647,7 +647,8 @@ Container make_object_aligned_container(const std::vector<uint8_t>& payload,
     return container;
 }
 
-Directory parse_directory(const std::vector<uint8_t>& p) {
+Directory parse_directory(const std::vector<uint8_t>& p,
+                          const std::function<void()>& progress) {
     Directory d{};
     if (p.size() < 4) throw std::runtime_error("milo dir: too short");
 
@@ -718,6 +719,7 @@ Directory parse_directory(const std::vector<uint8_t>& p) {
 
         std::vector<size_t> markers;
         for (size_t at = pos; at + 4 <= p.size(); ++at) {
+            if (progress && (at & 0x3ffffu) == 0u) progress();
             if (rd_u32(p.data() + at) == kAddePadding)
                 markers.push_back(at);
         }
@@ -727,6 +729,7 @@ Directory parse_directory(const std::vector<uint8_t>& p) {
             std::vector<size_t> terminators;
         };
         std::map<std::pair<size_t, size_t>, BoundaryResult> memo;
+        size_t marker_work = 0;
         std::function<BoundaryResult(size_t, size_t)> solve =
             [&](size_t index, size_t start) -> BoundaryResult {
                 const auto key = std::make_pair(index, start);
@@ -750,6 +753,8 @@ Directory parse_directory(const std::vector<uint8_t>& p) {
                     std::lower_bound(markers.begin(), markers.end(),
                                      start + 4);
                 for (auto it = first_marker; it != markers.end(); ++it) {
+                    if (progress && (++marker_work & 0x7ffu) == 0u)
+                        progress();
                     const size_t terminator = *it;
                     BoundaryResult tail;
                     if (index + 1 == expected.size()) {
@@ -824,6 +829,7 @@ Directory parse_directory(const std::vector<uint8_t>& p) {
     // until its root and class readers are complete.
     auto scan = [&](size_t from) -> size_t {
         for (size_t k = from; k + 4 <= p.size(); ++k) {
+            if (progress && (k & 0x3ffffu) == 0u) progress();
             if (rd_u32(p.data() + k) == kAddePadding) return k;
         }
         return p.size();
@@ -831,6 +837,7 @@ Directory parse_directory(const std::vector<uint8_t>& p) {
     auto scan_object_padding = [&](size_t from, const std::string* type = nullptr,
                                    size_t body_start = 0) -> size_t {
         for (size_t k = from; k + 4 <= p.size(); ++k) {
+            if (progress && (k & 0x3ffffu) == 0u) progress();
             if (rd_u32(p.data() + k) != kAddePadding) continue;
             // GH1 directory revision 10 remaps legacy View objects to Group.
             // A View body starts with Group revision 7.  This transition is a
@@ -880,6 +887,7 @@ Directory parse_directory(const std::vector<uint8_t>& p) {
     if (!d.entries.empty()) {
         std::vector<size_t> markers;
         for (size_t at = cursor; at + 4 <= p.size(); ++at) {
+            if (progress && (at & 0x3ffffu) == 0u) progress();
             if (rd_u32(p.data() + at) == kAddePadding)
                 markers.push_back(at);
         }
@@ -888,6 +896,7 @@ Directory parse_directory(const std::vector<uint8_t>& p) {
             std::vector<size_t> terminators;
         };
         std::map<std::pair<size_t, size_t>, BoundaryResult> memo;
+        size_t marker_work = 0;
         std::function<BoundaryResult(size_t, size_t)> solve =
             [&](size_t index, size_t start) -> BoundaryResult {
                 const auto key = std::make_pair(index, start);
@@ -903,7 +912,19 @@ Directory parse_directory(const std::vector<uint8_t>& p) {
                 const auto first_marker =
                     std::lower_bound(markers.begin(), markers.end(),
                                      start + 4);
-                for (auto it = first_marker; it != markers.end(); ++it) {
+                // Each remaining object needs a distinct terminator. Skip
+                // choices that cannot leave enough markers for the declared
+                // tail. This removes only impossible partitions, preserving
+                // embedded markers, candidate order and ambiguity detection.
+                const size_t remaining = d.entries.size() - index;
+                if (static_cast<size_t>(markers.end() - first_marker) < remaining) {
+                    memo.emplace(key, result);
+                    return result;
+                }
+                const auto candidate_end = markers.end() - (remaining - 1);
+                for (auto it = first_marker; it != candidate_end; ++it) {
+                    if (progress && (++marker_work & 0x7ffu) == 0u)
+                        progress();
                     const size_t terminator = *it;
                     BoundaryResult tail;
                     if (index + 1 == d.entries.size()) {
@@ -932,7 +953,28 @@ Directory parse_directory(const std::vector<uint8_t>& p) {
                 return result;
             };
 
-        const BoundaryResult result = solve(0, cursor);
+        // With exactly one marker per object, every boundary is forced.
+        // Validate that chain iteratively to avoid deep recursion and copying
+        // every suffix vector for large, unambiguous converted directories.
+        BoundaryResult result;
+        if (markers.size() == d.entries.size() &&
+            markers.back() + 4 == p.size()) {
+            size_t start = cursor;
+            bool valid = true;
+            for (size_t terminator : markers) {
+                if (start + 4 > terminator ||
+                    !plausible_packed_revision(rd_u32(p.data() + start))) {
+                    valid = false;
+                    break;
+                }
+                start = terminator + 4;
+            }
+            if (valid) {
+                result.solutions = 1;
+                result.terminators = markers;
+            }
+        }
+        if (result.solutions == 0) result = solve(0, cursor);
         if (result.solutions > 0 &&
             result.terminators.size() == d.entries.size()) {
             size_t start = cursor;

@@ -16,6 +16,7 @@
 #pragma once
 
 #include <cstdint>
+#include <functional>
 #include <string>
 #include <vector>
 
@@ -142,7 +143,9 @@ std::vector<uint8_t> inflate_payload(const std::vector<uint8_t>& bytes,
 // terminator chain. Generated/custom revision-10 types retain a non-writable
 // packed-revision fallback. Later directory revisions retain structural
 // scanning until their root and class readers are complete.
-Directory parse_directory(const std::vector<uint8_t>& payload);
+Directory parse_directory(
+    const std::vector<uint8_t>& payload,
+    const std::function<void()>& progress = {});
 
 // Serialize the exact structural prefix through the object table and, for
 // revisions 7-16, the external-resource vector. Root/child bodies are not
