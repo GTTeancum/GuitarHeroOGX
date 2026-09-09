@@ -1,0 +1,84 @@
+{
+  "status": "forearms and stretched left hand repaired; installed as DLC 0.2.1",
+  "model_sha256": "71ef19b9ea8a106cd00a969c005e6837c5c52061863108d3711ebf18f45f8333",
+  "source_donor_sha256": "962bd3773d530e086c575f89f955c0309b74cdac6bb947d4be20bd53f4f0ef57",
+  "runtime_sha256": "335ff5fe0e43918b69e057dd08948e39758ebde0da9e143570acff2589e93d5e",
+  "source_bind_validation": {
+    "passed": true,
+    "meshes": 95,
+    "vertices": 6023,
+    "slots": 345,
+    "max_position_error": 3.801536720656807E-06,
+    "max_offset_error": 6.020809635742808E-06,
+    "worst_slot": {
+      "mesh": "rb2_duke_of_gravity_093.mesh",
+      "bone": "bone_L-middlefinger01.mesh"
+    }
+  },
+  "rejected_stale_source_validation": {
+    "passed": false,
+    "meshes": 95,
+    "vertices": 6023,
+    "slots": 345,
+    "max_position_error": 3.801536720656807E-06,
+    "max_offset_error": 1.2992111321200923,
+    "worst_slot": {
+      "mesh": "rb2_duke_of_gravity_002.mesh",
+      "bone": "bone_spine1.mesh"
+    }
+  },
+  "geometry": {
+    "meshes": 95,
+    "vertices": 6023,
+    "weights_uv_faces_unchanged": true,
+    "source_cross_mesh_seam_pairs": 1176,
+    "maximum_retargeted_seam_gap": 0,
+    "worst": null
+  },
+  "native_run": {
+    "native_seam_samples_over_threshold": 0,
+    "captured_frames": 100,
+    "frames": 660,
+    "hits": 27,
+    "overstrums": 0,
+    "native_seam_samples": 485,
+    "exit_code": 0,
+    "misses": 0
+  },
+  "visual_review": "Individual full-body and close-up gameplay frames, including 60, 180, 300, 420, 540, 654; higher-resolution native Manage Band capture. Not every frame; user acceptance not claimed.",
+  "preserved_material_texture_bodies": 32,
+  "rebased_slots": 345,
+  "preserved_controller_entries": 17,
+  "tests": [
+    "skin_bind_retarget_test passed",
+    "stale source donor rejected; fresh source donor passed including weights",
+    "conflicting preservation flags rejected",
+    "final converter rebuild byte-identical",
+    "MILO roundtrip and both installed DLC indexes verified"
+  ],
+  "retained_baked_texture_audit": {
+    "textures": [
+      {
+        "texture": "Tex__rb2_duke_of_gravity_atlas_0.tex",
+        "bytes": 1048646,
+        "changed": true,
+        "sha256": "5cbcfe11979e2443236c63c57048bd8c8e2b0188b93fad013dc792990e817feb"
+      },
+      {
+        "texture": "Tex__rb2_duke_of_gravity_atlas_1.tex",
+        "bytes": 1048646,
+        "changed": true,
+        "sha256": "1b99e60e0af0a8cc9c5b48ec1485b2ddff56fa3b2565c7f09d1e2d524db31fae"
+      },
+      {
+        "texture": "Tex__rb2_duke_of_gravity_atlas_2.tex",
+        "bytes": 1048646,
+        "changed": true,
+        "sha256": "373e002060551a257b6ebc13e5e12a1d35acbf05b923a8d70ebbf85d780bfae8"
+      }
+    ],
+    "non_texture_payload_unchanged": true,
+    "texture_headers_and_alpha_unchanged": true,
+    "output_sha256": "71ef19b9ea8a106cd00a969c005e6837c5c52061863108d3711ebf18f45f8333"
+  }
+}

@@ -87,7 +87,10 @@ the source/atlas counts, placement, AO parameters, and resulting texel data.
 
 The mesh-bundle stage retains 95 source render meshes, 6,023 vertices, 7,135
 faces, source skin weights, bind transforms, and render flags. The generated
-donor is merged into the source-audited `classic` compatible target with:
+donor was originally merged into the source-audited `classic` compatible target
+with the following split. **Duke 0.2.1 supersedes this split:** all 345 slots and
+their vertices now use the target bind pose, fixing the detached forearms.
+The old split is retained here to identify obsolete packages:
 
 - one GH2-compatible target skeleton and controller graph;
 - 235 body slots rebased to the target bind graph;
@@ -111,8 +114,10 @@ authored `bone_pos_guitar.mesh` transform.
    machine-readable source/deform/material/atlas/AO audit.
 3. Run `milo_convert_tool build-character-from-meshbundle`, supplying the
    chosen GH2 main, strum, and fret banks.
-4. Run `milo_convert_tool merge-character-render-payload` with
-   `--rebind-template-rig`. Do not preserve donor hand-slot offsets when the
+4. For Duke's stock-rig conversion, run `milo_convert_tool merge-character-render-payload`
+   with `--retarget-template-bind-pose`, which adapts vertices and normals as
+   well as bind offsets. See `docs/RB2_DUKE_FOREARM_CHECK.md` for the 0.2.1 fix,
+   retained baked atlases, and validation. Do not preserve donor hand-slot offsets when the
    source and target bind poses differ: every connected skin slot must be
    rebased into the same GH2 bind space or sleeves and hands separate.
    Facial presets additionally use `--retarget-rb2-face-rig`, which maps the

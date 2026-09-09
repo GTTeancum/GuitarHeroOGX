@@ -8,6 +8,7 @@
 #include "milo.h"
 #include "milo_object.h"
 #include "singer_face_track.h"
+#include "skin_bind_retarget.h"
 
 #include <algorithm>
 #include <array>
@@ -1596,6 +1597,7 @@ void usage() {
         << "  milo_convert_tool merge-character-render-payload "
            "<template.milo_ps2> --donor <character.milo_ps2> "
            "[--mesh-limit <count>] [--rebind-template-rig] "
+           "[--retarget-template-bind-pose] "
            "[--preserve-donor-bind-offsets] "
            "[--preserve-donor-hand-mesh-bind-offsets] "
            "[--retarget-rb2-face-rig] "
@@ -2919,6 +2921,7 @@ int main(int argc, char** argv) {
             fs::path output;
             size_t mesh_limit = std::numeric_limits<size_t>::max();
             bool rebind_template_rig = false;
+            bool retarget_template_bind_pose = false;
             bool preserve_donor_bind_offsets = false;
             bool preserve_donor_hand_mesh_bind_offsets = false;
             bool retarget_rb2_face_rig = false;
@@ -2930,6 +2933,10 @@ int main(int argc, char** argv) {
                     mesh_limit = static_cast<size_t>(std::stoull(argv[++i]));
                 else if (arg == "--rebind-template-rig")
                     rebind_template_rig = true;
+                else if (arg == "--retarget-template-bind-pose") {
+                    rebind_template_rig = true;
+                    retarget_template_bind_pose = true;
+                }
                 else if (arg == "--preserve-donor-bind-offsets")
                     preserve_donor_bind_offsets = true;
                 else if (arg ==
@@ -2942,6 +2949,10 @@ int main(int argc, char** argv) {
                 else usage();
             }
             if (donor_path.empty() || output.empty()) usage();
+            if (retarget_template_bind_pose &&
+                (preserve_donor_bind_offsets || preserve_donor_hand_mesh_bind_offsets))
+                throw std::runtime_error(
+                    "bind-pose retargeting cannot preserve donor offsets");
             if ((preserve_donor_bind_offsets ||
                  preserve_donor_hand_mesh_bind_offsets) &&
                 !rebind_template_rig)
@@ -3257,6 +3268,8 @@ int main(int argc, char** argv) {
             size_t mesh_bind_slots_preserved = 0;
             size_t meshes_with_bind_slots_preserved = 0;
             size_t mesh_bind_slots_remapped = 0;
+            size_t vertices_bind_retargeted = 0;
+            float retarget_radius = 0;
             float max_bind_residual = 0.0f;
             size_t render_entries_added = 0;
             for (const auto& donor_entry : donor_directory.entries) {
@@ -3302,6 +3315,54 @@ int main(int argc, char** argv) {
                         auto mesh = gh::milo_object::parse_mesh28(
                             render_entry.body_bytes,
                             static_cast<uint32_t>(directory.dir_version));
+                        if (retarget_template_bind_pose) {
+                            std::array<std::array<float, 12>, 4> deltas{};
+                            for (size_t i = 0; i < mesh.bone_slots.size(); ++i) {
+                                const auto& slot = mesh.bone_slots[i];
+                                if (slot.bone.empty()) continue;
+                                const auto target = resolve_template_bone(slot.bone);
+                                if (target.empty())
+                                    throw std::runtime_error("unmapped retarget bone: " + slot.bone);
+                                // A collapsed helper must use its surviving ancestor's
+                                // source frame, not the helper's inverse bind. Otherwise
+                                // facial pieces move independently around the same head.
+                                std::string source = slot.bone;
+                                std::set<std::string> visited;
+                                while (!template_bind_worlds.count(source) &&
+                                       !(retarget_rb2_face_rig && rb2_face_aliases.count(source))) {
+                                    if (!visited.insert(source).second ||
+                                        !donor_transforms.count(source))
+                                        throw std::runtime_error("unresolved source bind ancestor: " + slot.bone);
+                                    source = donor_transforms.at(source).parent;
+                                }
+                                const auto source_offset = source == slot.bone
+                                    ? slot.offset
+                                    : invert_affine_transform(donor_transforms.at(source).world);
+                                deltas[i] = multiply_affine_transform(
+                                    multiply_affine_transform(source_offset, template_bind_worlds.at(target)),
+                                    invert_affine_transform(mesh.transformable.world));
+                            }
+                            float mesh_radius = 0;
+                            for (auto& vertex : mesh.vertices) {
+                                gh::milo_convert::retarget_skin_vertex(
+                                    vertex.position, vertex.normal,
+                                    vertex.color_or_weights, deltas);
+                                float squared_radius = 0;
+                                for (float value : vertex.position) squared_radius += value * value;
+                                mesh_radius = std::max(mesh_radius, std::sqrt(squared_radius));
+                                float world_squared_radius = 0;
+                                const auto& world = mesh.transformable.world;
+                                for (size_t axis = 0; axis < 3; ++axis) {
+                                    const float value = vertex.position[0] * world[axis] +
+                                        vertex.position[1] * world[3 + axis] +
+                                        vertex.position[2] * world[6 + axis] + world[9 + axis];
+                                    world_squared_radius += value * value;
+                                }
+                                retarget_radius = std::max(retarget_radius, std::sqrt(world_squared_radius));
+                                ++vertices_bind_retargeted;
+                            }
+                            mesh.drawable.sphere = {0, 0, 0, mesh_radius};
+                        }
                         const auto is_hand_chain_bone =
                             [](const std::string& bone) {
                                 static constexpr std::array<const char*, 6>
@@ -3414,11 +3475,11 @@ int main(int argc, char** argv) {
                             if (preserve_slot_bind_offsets[slot_index]) {
                                 ++mesh_bind_slots_preserved;
                             } else {
-                                slot.offset = multiply_affine_transform(
-                                    invert_affine_transform(
-                                        template_bind_worlds.at(
-                                            template_bone)),
-                                    mesh.transformable.world);
+                                const auto inverse_bind = invert_affine_transform(
+                                    template_bind_worlds.at(template_bone));
+                                slot.offset = retarget_template_bind_pose
+                                    ? multiply_affine_transform(mesh.transformable.world, inverse_bind)
+                                    : multiply_affine_transform(inverse_bind, mesh.transformable.world);
                                 const auto reconstructed_world =
                                     multiply_affine_transform(
                                         slot.offset,
@@ -3485,6 +3546,8 @@ int main(int argc, char** argv) {
             target.self_shadow = donor_target.self_shadow;
             target.render_directory.drawable.sphere =
                 donor_target.render_directory.drawable.sphere;
+            if (retarget_template_bind_pose)
+                target.render_directory.drawable.sphere = {0, 0, 0, retarget_radius};
             directory.dir_body_bytes =
                 gh::milo_object::serialize_band_character1(character);
 
@@ -3520,6 +3583,8 @@ int main(int argc, char** argv) {
                       << donor_transforms_skipped
                       << " mesh_bind_slots_rebased="
                       << mesh_bind_slots_rebased
+                      << " vertices_bind_retargeted="
+                      << vertices_bind_retargeted
                       << " mesh_bind_slots_preserved="
                       << mesh_bind_slots_preserved
                       << " meshes_with_bind_slots_preserved="

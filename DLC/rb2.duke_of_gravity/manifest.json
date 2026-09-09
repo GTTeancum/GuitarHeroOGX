@@ -2,7 +2,7 @@
   "schema_version": 1,
   "id": "rb2.duke_of_gravity",
   "name": "The Duke of Gravity",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "source_game": "rb2_wii",
   "source_prefab": "guitar32",
   "content_root": "content",
