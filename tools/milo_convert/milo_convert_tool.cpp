@@ -1167,8 +1167,6 @@ std::string strip_mesh_channel_suffix(const std::string& base) {
 std::string generated_char_bone_name(
     const std::string& base,
     const std::string& bone_extension) {
-    if (base == "Control_Root" || base == "Control_Root.mesh")
-        return base;
     if (ends_with_text(base, ".mesh"))
         return base;
     return base + bone_extension;
@@ -1179,7 +1177,6 @@ std::string generated_char_bone_parent_name(
     const std::string& child_base,
     const std::string& bone_extension) {
     if (parent_base.empty()) return {};
-    if (parent_base == "Control_Root") return parent_base;
     if (ends_with_text(child_base, ".mesh"))
         return generated_char_bone_name(parent_base + ".mesh", bone_extension);
     return generated_char_bone_name(parent_base, bone_extension);
@@ -1558,7 +1555,7 @@ void usage() {
         << "  milo_convert_tool build-character-from-meshbundle "
            "<meshbundle> --name <dir-name> --out <GH2.milo_ps2> "
            "[--main-anim <milo>] [--strum-anim <milo>] "
-           "[--fret-anim <milo>]\n"
+           "[--fret-anim <milo>] [--preserve-guitar-proxies]\n"
         << "  milo_convert_tool inspect-clipset <GH2.milo_ps2> "
             "[--channels] [--events]\n"
         << "  milo_convert_tool replace-clipset-clips <base.milo_ps2> "
@@ -4865,11 +4862,14 @@ int main(int argc, char** argv) {
             std::string main_anim;
             std::string strum_anim;
             std::string fret_anim;
+            bool preserve_guitar_proxies = false;
             for (int i = 3; i < argc; ++i) {
                 const std::string arg = argv[i];
                 if (arg == "--name" && i + 1 < argc) name = argv[++i];
                 else if (arg == "--out" && i + 1 < argc)
                     output = argv[++i];
+                else if (arg == "--preserve-guitar-proxies")
+                    preserve_guitar_proxies = true;
                 else if (arg == "--main-anim" && i + 1 < argc)
                     main_anim = argv[++i];
                 else if (arg == "--strum-anim" && i + 1 < argc)
@@ -4891,6 +4891,17 @@ int main(int argc, char** argv) {
             }
 
             MeshBundle bundle = parse_meshbundle(input);
+            if (preserve_guitar_proxies) {
+                if (!has_guitarist_graph)
+                    throw std::runtime_error(
+                        "--preserve-guitar-proxies requires a guitarist graph");
+                for (const auto* proxy : {"bone_fret.mesh", "bone_strum.mesh",
+                                          "bone_fret_hand.mesh", "bone_strum_hand.mesh"}) {
+                    if (bundle.bone_transforms.find(proxy) == bundle.bone_transforms.end())
+                        throw std::runtime_error(
+                            std::string("source meshbundle is missing guitar proxy ") + proxy);
+                }
+            }
             if (bundle.chunks.empty())
                 throw std::runtime_error(
                     "meshbundle has no Mesh28 chunks");
@@ -5032,7 +5043,7 @@ int main(int argc, char** argv) {
             if (has_guitarist_graph)
                 append_guitarist_runtime_graph(
                     directory, main_anim, strum_anim, fret_anim);
-            if (has_guitarist_graph)
+            if (has_guitarist_graph && !preserve_guitar_proxies)
                 patch_guitarist_proxy_transforms(directory);
 
             const auto target_payload =

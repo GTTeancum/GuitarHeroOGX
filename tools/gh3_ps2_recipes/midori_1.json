@@ -1,0 +1,373 @@
+{
+  "status": "UNAPPROVED playing probe, incomplete animation library and UI placeholder",
+  "animations": [
+    {
+      "role": "main",
+      "source": "anims/band/guitarist/midori/gh3_guit_mido_a_med_idle01.ska.ps2",
+      "overlays": [
+        "anims/band/guitarist/midori/face/gh3_guitarist_midori_idle.ska.ps2",
+        "anims/band/guitarist/midori/gh3_guitarist_midori_acc01.ska.ps2"
+      ],
+      "aliases": [
+        "idle",
+        "idle1",
+        "idle_medium_01",
+        "ui_loop",
+        "gh3_source_idle"
+      ],
+      "frames": {
+        "bone_pos_guitar": [
+          [
+            -0.0023188470919120064,
+            -0.026812720535710297,
+            0.999637784882921,
+            0.0
+          ],
+          [
+            0.014270873105849834,
+            0.9995377871253365,
+            0.026843142315614747,
+            0.0
+          ],
+          [
+            -0.999895477101957,
+            0.01432794912237424,
+            -0.0019351343585441644,
+            0.0
+          ],
+          [
+            2.7383887498403934,
+            -0.39533297422010005,
+            -1.8582408838139055,
+            1.0
+          ]
+        ],
+        "bone_fret": [
+          [
+            -0.0438017242542429,
+            -0.027337565069763165,
+            0.9986661436578314,
+            0.0
+          ],
+          [
+            0.01827396331545994,
+            0.9994363752821196,
+            0.02816014963873453,
+            0.0
+          ],
+          [
+            -0.9988731006574799,
+            0.019483051583029945,
+            -0.04327747085854901,
+            0.0
+          ],
+          [
+            0.0,
+            0.0,
+            0.0,
+            1.0
+          ]
+        ]
+      },
+      "isolate": [
+        "bone_fret_hand",
+        "bone_strum_hand"
+      ],
+      "model": true
+    },
+    {
+      "role": "strum",
+      "source": "gh3_hnd_guit_strum_mido_norm_l01_d.ska.ps2",
+      "aliases": [
+        "strum_long_01"
+      ],
+      "frames": {}
+    },
+    {
+      "role": "strum",
+      "source": "gh3_hnd_guit_strum_mido_norm_s01_d.ska.ps2",
+      "aliases": [
+        "strum_short_01"
+      ],
+      "frames": {}
+    },
+    {
+      "role": "strum",
+      "source": "gh3_hnd_guit_strum_mido_norm_m01_d.ska.ps2",
+      "aliases": [
+        "strum_pick_01"
+      ],
+      "frames": {}
+    },
+    {
+      "role": "strum",
+      "source": "gh3_hnd_guit_strum_mido_nostrum_d.ska.ps2",
+      "aliases": [
+        "strum_open"
+      ],
+      "frames": {}
+    },
+    {
+      "role": "fret",
+      "source": "gh3_hnd_guit_chord_mid_empty_d.ska.ps2",
+      "aliases": [
+        "finger_open"
+      ],
+      "frames": {
+        "bone_fret": [
+          [
+            -0.0438017242542429,
+            -0.027337565069763165,
+            0.9986661436578314,
+            0.0
+          ],
+          [
+            0.01827396331545994,
+            0.9994363752821196,
+            0.02816014963873453,
+            0.0
+          ],
+          [
+            -0.9988731006574799,
+            0.019483051583029945,
+            -0.04327747085854901,
+            0.0
+          ],
+          [
+            0.0,
+            0.0,
+            0.0,
+            1.0
+          ]
+        ]
+      }
+    },
+    {
+      "role": "fret",
+      "source": "gh3_hnd_guit_chord_mid_bar1_d.ska.ps2",
+      "aliases": [
+        "finger_powerchord_1",
+        "finger_hold_index"
+      ],
+      "frames": {
+        "bone_fret": [
+          [
+            -0.0438017242542429,
+            -0.027337565069763165,
+            0.9986661436578314,
+            0.0
+          ],
+          [
+            0.01827396331545994,
+            0.9994363752821196,
+            0.02816014963873453,
+            0.0
+          ],
+          [
+            -0.9988731006574799,
+            0.019483051583029945,
+            -0.04327747085854901,
+            0.0
+          ],
+          [
+            0.0,
+            0.0,
+            0.0,
+            1.0
+          ]
+        ]
+      }
+    },
+    {
+      "role": "fret",
+      "source": "gh3_hnd_guit_chord_mid_bar2_d.ska.ps2",
+      "aliases": [
+        "finger_powerchord_2",
+        "finger_hold_middle"
+      ],
+      "frames": {
+        "bone_fret": [
+          [
+            -0.0438017242542429,
+            -0.027337565069763165,
+            0.9986661436578314,
+            0.0
+          ],
+          [
+            0.01827396331545994,
+            0.9994363752821196,
+            0.02816014963873453,
+            0.0
+          ],
+          [
+            -0.9988731006574799,
+            0.019483051583029945,
+            -0.04327747085854901,
+            0.0
+          ],
+          [
+            0.0,
+            0.0,
+            0.0,
+            1.0
+          ]
+        ]
+      }
+    },
+    {
+      "role": "fret",
+      "source": "gh3_hnd_guit_chord_mid_bar3_d.ska.ps2",
+      "aliases": [
+        "finger_hold_ring"
+      ],
+      "frames": {
+        "bone_fret": [
+          [
+            -0.0438017242542429,
+            -0.027337565069763165,
+            0.9986661436578314,
+            0.0
+          ],
+          [
+            0.01827396331545994,
+            0.9994363752821196,
+            0.02816014963873453,
+            0.0
+          ],
+          [
+            -0.9988731006574799,
+            0.019483051583029945,
+            -0.04327747085854901,
+            0.0
+          ],
+          [
+            0.0,
+            0.0,
+            0.0,
+            1.0
+          ]
+        ]
+      }
+    },
+    {
+      "role": "fret",
+      "source": "gh3_hnd_guit_chord_mid_bar4_d.ska.ps2",
+      "aliases": [
+        "finger_hold_pinky"
+      ],
+      "frames": {
+        "bone_fret": [
+          [
+            -0.0438017242542429,
+            -0.027337565069763165,
+            0.9986661436578314,
+            0.0
+          ],
+          [
+            0.01827396331545994,
+            0.9994363752821196,
+            0.02816014963873453,
+            0.0
+          ],
+          [
+            -0.9988731006574799,
+            0.019483051583029945,
+            -0.04327747085854901,
+            0.0
+          ],
+          [
+            0.0,
+            0.0,
+            0.0,
+            1.0
+          ]
+        ]
+      }
+    },
+    {
+      "role": "fret",
+      "source": "gh3_hnd_guit_chord_mid_bar5_d.ska.ps2",
+      "aliases": [
+        "finger_hold_pinky_hi",
+        "finger_chord_bar"
+      ],
+      "frames": {
+        "bone_fret": [
+          [
+            -0.0438017242542429,
+            -0.027337565069763165,
+            0.9986661436578314,
+            0.0
+          ],
+          [
+            0.01827396331545994,
+            0.9994363752821196,
+            0.02816014963873453,
+            0.0
+          ],
+          [
+            -0.9988731006574799,
+            0.019483051583029945,
+            -0.04327747085854901,
+            0.0
+          ],
+          [
+            0.0,
+            0.0,
+            0.0,
+            1.0
+          ]
+        ]
+      }
+    }
+  ],
+  "manifest": {
+    "schema_version": 1,
+    "id": "community.gh3.midori",
+    "name": "GH3 Midori",
+    "version": "0.1.0",
+    "content_root": "content",
+    "content_index": "content-index.json",
+    "files": [
+      "char/gh3_midori/anims/gen/gh3_midori_fret.milo_ps2",
+      "char/gh3_midori/anims/gen/gh3_midori_main.milo_ps2",
+      "char/gh3_midori/anims/gen/gh3_midori_strum.milo_ps2",
+      "char/gh3_midori/anims/gen/gh3_midori_ui.milo_ps2",
+      "char/gh3_midori_1/og/gen/gh3_midori_1.milo_ps2"
+    ],
+    "characters": [
+      {
+        "id": "gh3_midori",
+        "label": "Midori",
+        "outfits": [
+          {
+            "selection": "gh3_midori_1",
+            "label": "Outfit 1",
+            "model": "char/gh3_midori_1/og/gen/gh3_midori_1.milo_ps2",
+            "ui_model": "char/gh3_midori_1/og/gen/gh3_midori_1.milo_ps2",
+            "ui_anim": "char/gh3_midori/anims/gen/gh3_midori_ui.milo_ps2",
+            "main_anim": "char/gh3_midori/anims/gen/gh3_midori_main.milo_ps2",
+            "strum_anim": "char/gh3_midori/anims/gen/gh3_midori_strum.milo_ps2",
+            "fret_anim": "char/gh3_midori/anims/gen/gh3_midori_fret.milo_ps2",
+            "animation_source_model": "char/gh3_midori_1/og/gen/gh3_midori_1.milo_ps2",
+            "retarget_animation": false
+          }
+        ]
+      }
+    ]
+  },
+  "frame_provenance": {
+    "method": "Rigid nearest-point fit between source PS2 Epiphone Explorer and stock GH2 Xplorer, expressed in their guitar bind-local frames; then fret rotation matched to stock prop bind marker",
+    "median_nearest_vertex_distance_inches": 0.33288561671411043,
+    "max_nearest_vertex_distance_inches": 4.090712308703545,
+    "source_sha256": "8b3ac12205e095bd4a46f57f8f6d680421ec22f2d7c4e66d36a9078d4476fc3d",
+    "stock_sha256": "9c0c009600230e0668c77c4cba02379ce92628c587008c48467a4e69af76c8bc"
+  },
+  "limitations": [
+    "Source delta rotation order inferred; not independently retail-validated",
+    "Hand aliases are a preliminary correspondence, not complete stock chord/viseme coverage",
+    "Face and hair loop phase discontinuities remain",
+    "Only main medium playing loop included",
+    "Stock retail PS2 compatibility not tested"
+  ]
+}
