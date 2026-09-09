@@ -43,7 +43,7 @@ clips use source seconds; they are not assumed to have stock animation lengths.
 | sync_jump | Source jump, then return to the current performance group |
 | sync_wag / sync_head_bang | Existing source sway/head-nodding performances adapted to the group calls |
 | walk_turn / walk_walk / walk_stop | Source strides/stops, extracted root motion and generated movement links |
-| ui_enter / ui_loop | Source frontend entrance and resting pose |
+| ui_enter / ui_loop | Frontend intro2, then its held terminal pose with complete face/hair cycles |
 | 25 fret calls | Source finger-channel compositions, distinct high variants and source wrist bends |
 | 11 guitar strum calls | Source short/medium/long strokes and rest; extra long variants reuse source long strokes |
 
@@ -113,3 +113,14 @@ python -m unittest discover -s tools -p "test_gh3_ps2_*.py"
 Then run the native character type-script and all-pages clip-binding tests,
 capture both outfits playing, exercise transient-action return and walking,
 and verify the final content hashes. Remove disposable build and capture trees.
+
+## Menu presentation
+
+Manage Band uses the same `ui_loop` idle path as multiplayer character select;
+it never invokes the 1P entrance. A camera fitted once to each posed model
+centers the preview at 20% of screen width, inside the left 40% bay. Career
+continues to play `ui_enter` followed by `ui_loop` using its authored placement.
+Midori 0.2.1 replaces the incompatible out-to-A / out-idle pairing with source
+frontend intro2 and its held terminal body pose. `cycle_hold_overlays` keeps the
+longest face/accessory cycle intact and fits whole cycles of shorter overlays
+into the same interval, retaining source poses without resetting mid-key.

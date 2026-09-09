@@ -69,6 +69,7 @@ def build(source, converter, recipe_path, work, output):
         for value in item.get('isolate', []): args += ['--isolate-transform', value]
         for value in item['aliases']: args += ['--clip-alias', value]
         if item.get('hold_last_frame'): args += ['--hold-last-frame']
+        if item.get('cycle_hold_overlays'): args += ['--cycle-hold-overlays']
         if item.get('pose_layers'):
             layers = work / f'layers-{number:02d}.json'
             layers.write_text(json.dumps(item['pose_layers']))

@@ -2617,6 +2617,8 @@ struct MenuCharacterPreview {
   std::vector<std::unique_ptr<ghogx::character::CharClip>> transferred_clips;
   ghogx::character::CharClipPlayer clip_player;
   bool enter_pending_loop = false;
+  bool menu_preview_framed = false;
+  ghogx::render::OrbitCamera menu_preview_camera;
   std::unique_ptr<ghogx::character::CharRenderer> renderer;
 };
 
@@ -3015,7 +3017,8 @@ std::vector<MenuCharacterPreview> rebuild_character_display_scenes(
           panel->get_property(Symbol(indexed_runtime_name(
                                   "char_transfer_pending", player).c_str()))
               .as_int().value_or(0) != 0;
-      if (slots == 1 && char_event == Symbol("animate")) {
+      if (panel_name != Symbol("manage_band_char_preview") &&
+          slots == 1 && char_event == Symbol("animate")) {
         preview.ui_enter_clip = std::make_unique<ghogx::character::CharClip>(
             ghogx::character::load_clip(hdr, ark, ui_anim_milo, "ui_enter"));
       }
@@ -8201,7 +8204,19 @@ int run_menu_mode(const std::string& hdr, const std::string& ark,
                 if (device)
                   device->Clear(0, nullptr, D3DCLEAR_ZBUFFER, 0, 1.0f, 0);
               }
-              character.renderer->draw_over_scene(scene_renderer.camera());
+              if (character.panel == "manage_band_char_preview") {
+                character.renderer->set_world_transform(identity_mat4());
+                if (!character.menu_preview_framed) {
+                  character.renderer->frame_menu_preview(
+                      static_cast<float>(win->bb_width()) /
+                      static_cast<float>(std::max(1, win->bb_height())));
+                  character.menu_preview_camera = character.renderer->camera();
+                  character.menu_preview_framed = true;
+                }
+                character.renderer->draw_over_scene(character.menu_preview_camera);
+              } else {
+                character.renderer->draw_over_scene(scene_renderer.camera());
+              }
             }
           }
           scene_renderer.draw_text_over_scene();

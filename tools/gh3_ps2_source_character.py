@@ -111,7 +111,7 @@ def write_acp(path, name, channels, samples, duration, clip_flags=0, blend_width
     path.write_bytes(out)
 
 
-def convert(source, output, scale, clip_match, overlay_matches=(), rebase_frames=None, isolate_transforms=(), clip_aliases=(), gh2_arm_axes=False, outfit='midori_1', clip_settings=None, hold_last_frame=False, pose_layers=(), locomotion=None):
+def convert(source, output, scale, clip_match, overlay_matches=(), rebase_frames=None, isolate_transforms=(), clip_aliases=(), gh2_arm_axes=False, outfit='midori_1', clip_settings=None, hold_last_frame=False, pose_layers=(), locomotion=None, cycle_hold_overlays=False):
     output.mkdir(parents=True, exist_ok=True)
     manifest = json.loads((source / 'midori_source_ir_manifest.json').read_text())
     selected = next((item for item in manifest['outfits'] if item['name'] == outfit), None)
@@ -281,6 +281,12 @@ def convert(source, output, scale, clip_match, overlay_matches=(), rebase_frames
     # GH3's zero-duration hand poses are persistent holds. GH2 players need a
     # positive interval to stay active; resampling clamped keys changes no pose.
     duration = source_duration if source_duration > 0 and not hold_last_frame else 1.0
+    if cycle_hold_overlays:
+        if not hold_last_frame:
+            raise ValueError('Cyclic held overlays require a held body pose')
+        duration = max((o['header']['duration_seconds'] for o in overlays.values()), default=1.0)
+        if not math.isfinite(duration) or duration <= 0:
+            raise ValueError('Cyclic held overlays require a positive duration')
     times = np.linspace(0, round(duration*60), round(duration*30)+1)
     qs, ts = {}, {}
     layer_specs = [(clip, None, {}), *((o, None, {}) for o in overlays.values())]
@@ -300,7 +306,13 @@ def convert(source, output, scale, clip_match, overlay_matches=(), rebase_frames
                     raise ValueError('Zero-duration overlay has moving keys')
                 layer_times = np.zeros_like(times)
             else:
-                layer_times = times % period
+                if cycle_hold_overlays and not layer_spec:
+                    # Fit whole source cycles to the longest overlay so a held
+                    # menu pose cannot reset the face/hair partway through a key.
+                    cycles = max(1, round(duration * 60 / period))
+                    layer_times = np.mod(times / round(duration * 60) * cycles, 1.0) * period
+                else:
+                    layer_times = times % period
             if 'ping_pong_seconds' in layer_spec:
                 cycle = float(layer_spec['ping_pong_seconds'])
                 if not math.isfinite(cycle) or cycle <= 0 or period <= 0:
@@ -419,6 +431,7 @@ if __name__ == '__main__':
     parser.add_argument('--source',type=Path,required=True); parser.add_argument('--output',type=Path,required=True)
     parser.add_argument('--outfit',default='midori_1',help='Outfit name from the verified PS2 source manifest')
     parser.add_argument('--clip-settings',type=Path,help='Per-alias target selection flags and blend widths')
+    parser.add_argument('--cycle-hold-overlays',action='store_true',help='Fit whole overlay cycles into a held body loop')
     parser.add_argument('--hold-last-frame',action='store_true',help='Hold the source terminal body pose while continuing overlay layers')
     parser.add_argument('--pose-layers',type=Path,help='Explicit disjoint source bone-channel replacements')
     parser.add_argument('--locomotion',type=Path,help='Extract source root motion into GH2 facing channels; optional procedural turn angle')
@@ -433,4 +446,4 @@ if __name__ == '__main__':
         json.loads(args.rebase_frames.read_text()) if args.rebase_frames else None, args.isolate_transform,args.clip_alias,args.gh2_arm_axes,args.outfit,
         json.loads(args.clip_settings.read_text()) if args.clip_settings else None, args.hold_last_frame,
         json.loads(args.pose_layers.read_text()) if args.pose_layers else (),
-        json.loads(args.locomotion.read_text()) if args.locomotion else None)
+        json.loads(args.locomotion.read_text()) if args.locomotion else None, args.cycle_hold_overlays)

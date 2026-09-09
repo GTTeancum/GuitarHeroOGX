@@ -1,0 +1,15 @@
+{
+  "version": "0.2.1",
+  "held_loop_seconds": 8.666666984558105,
+  "loop_frames": 261,
+  "maximum_first_last_channel_difference": 0.0,
+  "native_capture_exit_codes": {
+    "base": 0,
+    "alt": 0,
+    "stock": 0,
+    "career": 0
+  },
+  "tests": "5 conversion tests passed",
+  "review": "Sampled frames; not every-frame review",
+  "recipe_sha256": "f6c3da76f40e8c3bca34c21c8186560bde2cc09fc4665406641845636bb30982"
+}

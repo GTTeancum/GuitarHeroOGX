@@ -1858,6 +1858,27 @@ void CharRenderer::frame_camera() {
                c.target[0], c.target[1], c.target[2], c.distance);
 }
 
+void CharRenderer::frame_menu_preview(float aspect) {
+  frame_camera();
+  if (!impl_->have_bounds) return;
+  auto& c = impl_->cam;
+  const float width = impl_->bb_max[0] - impl_->bb_min[0];
+  const float height = impl_->bb_max[2] - impl_->bb_min[2];
+  const float depth = impl_->bb_max[1] - impl_->bb_min[1];
+  const float tangent = std::tan(c.fov * 0.5f);
+  c.pitch = 0.0f;
+  c.distance = std::max(height / (2.0f * tangent * 0.68f),
+                        width / (2.0f * tangent * std::max(aspect, 0.1f) * 0.32f))
+               + depth * 0.5f;
+  c.near_z = 0.2f;
+  c.far_z = std::max(5000.0f, c.distance * 6.0f);
+  c.eye(c.authored_eye);
+  for (int i = 0; i < 3; ++i) c.authored_at[i] = c.target[i];
+  c.authored = true;
+  c.screen_offset[0] = -0.6f * 768.0f;
+  c.screen_offset[1] = 0.0f;
+}
+
 void CharRenderer::update(float dt) {
   impl_->anim_t += dt;
 

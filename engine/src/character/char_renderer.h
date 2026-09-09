@@ -55,6 +55,8 @@ class CharRenderer {
                          const std::string& attach_bone);
 
   ghogx::render::OrbitCamera& camera();
+  // Fit the current pose once for a stable, instrument-free menu preview.
+  void frame_menu_preview(float aspect);
   void set_world_offset(float x, float y, float z);
   void set_world_transform(const std::array<float, 16>& m);
   void set_min_lod(int min_lod);

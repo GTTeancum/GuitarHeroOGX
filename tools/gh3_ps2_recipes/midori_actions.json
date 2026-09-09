@@ -2923,7 +2923,7 @@
     },
     {
       "role": "ui",
-      "source": "anims/band/guitarist/midori/frontend/gh3_guit_midori_tran_outtoa.ska.ps2",
+      "source": "anims/band/guitarist/midori/frontend/gh3_guit_midori_a_intro2.ska.ps2",
       "overlays": [
         "anims/band/guitarist/midori/face/gh3_guitarist_midori_idle.ska.ps2",
         "anims/band/guitarist/midori/gh3_guitarist_midori_acc01.ska.ps2"
@@ -2999,7 +2999,7 @@
     },
     {
       "role": "ui",
-      "source": "anims/band/guitarist/midori/frontend/gh3_guit_midori_tran_out_idle.ska.ps2",
+      "source": "anims/band/guitarist/midori/frontend/gh3_guit_midori_a_intro2.ska.ps2",
       "overlays": [
         "anims/band/guitarist/midori/face/gh3_guitarist_midori_idle.ska.ps2",
         "anims/band/guitarist/midori/gh3_guitarist_midori_acc01.ska.ps2"
@@ -3071,7 +3071,9 @@
           "flags": 0,
           "play_flags": 512
         }
-      }
+      },
+      "hold_last_frame": true,
+      "cycle_hold_overlays": true
     },
     {
       "role": "main",
@@ -6187,7 +6189,7 @@
     "schema_version": 1,
     "id": "community.gh3.midori",
     "name": "GH3 Midori",
-    "version": "0.2.0",
+    "version": "0.2.1",
     "content_root": "content",
     "content_index": "content-index.json",
     "files": [
