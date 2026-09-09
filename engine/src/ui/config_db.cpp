@@ -884,6 +884,8 @@ void ConfigDb::load_addon_manifests(
             addon_dir, json_string(row, "ui_model"));
         variant.ui_anim_path = normalized_manifest_path(
             addon_dir, json_string(row, "ui_anim"));
+        const std::string ui_guitar = json_string(row, "ui_guitar");
+        variant.ui_guitar = ui_guitar.empty() ? Symbol() : Symbol(ui_guitar);
         variant.main_anim_path = normalized_manifest_path(
             addon_dir, json_string(row, "main_anim"));
         variant.strum_anim_path = normalized_manifest_path(

@@ -2999,7 +2999,7 @@
     },
     {
       "role": "ui",
-      "source": "anims/band/guitarist/midori/frontend/gh3_guit_midori_a_intro2.ska.ps2",
+      "source": "anims/band/guitarist/midori/frontend/gh3_guit_midori_a_intro4.ska.ps2",
       "overlays": [
         "anims/band/guitarist/midori/face/gh3_guitarist_midori_idle.ska.ps2",
         "anims/band/guitarist/midori/gh3_guitarist_midori_acc01.ska.ps2"
@@ -3071,9 +3071,7 @@
           "flags": 0,
           "play_flags": 512
         }
-      },
-      "hold_last_frame": true,
-      "cycle_hold_overlays": true
+      }
     },
     {
       "role": "main",
@@ -6189,7 +6187,7 @@
     "schema_version": 1,
     "id": "community.gh3.midori",
     "name": "GH3 Midori",
-    "version": "0.2.1",
+    "version": "0.2.2",
     "content_root": "content",
     "content_index": "content-index.json",
     "files": [
@@ -6215,7 +6213,8 @@
             "strum_anim": "char/gh3_midori/anims/gen/gh3_midori_strum.milo_ps2",
             "fret_anim": "char/gh3_midori/anims/gen/gh3_midori_fret.milo_ps2",
             "animation_source_model": "char/gh3_midori_1/og/gen/gh3_midori_1.milo_ps2",
-            "retarget_animation": false
+            "retarget_animation": false,
+            "ui_guitar": "xplorer"
           },
           {
             "selection": "gh3_midori_2",
@@ -6227,7 +6226,8 @@
             "strum_anim": "char/gh3_midori/anims/gen/gh3_midori_strum.milo_ps2",
             "fret_anim": "char/gh3_midori/anims/gen/gh3_midori_fret.milo_ps2",
             "animation_source_model": "char/gh3_midori_2/og/gen/gh3_midori_2.milo_ps2",
-            "retarget_animation": false
+            "retarget_animation": false,
+            "ui_guitar": "xplorer"
           }
         ]
       }

@@ -2948,6 +2948,28 @@ std::vector<MenuCharacterPreview> rebuild_character_display_scenes(
           if (hide) preview.renderer->set_object_showing(mesh.name, false);
         }
       }
+      if (variant && variant->ui_guitar.valid()) {
+        const Symbol guitar = variant->ui_guitar;
+        const Symbol skin = db.first_guitar_skin(guitar);
+        Symbol guitar_outfit = symbol_value(
+            db.guitar_skin_field(guitar, skin, Symbol("outfit")));
+        if (!guitar_outfit.valid()) guitar_outfit = guitar;
+        const std::string guitar_path = "char/og/guitars/gen/" +
+                                       std::string(guitar_outfit.c_str()) + ".milo_ps2";
+        milo_scene::Scene guitar_scene;
+        if (milo_scene::load_scene(hdr, ark, guitar_path, guitar_scene)) {
+          const Symbol material = symbol_value(
+              db.guitar_skin_field(guitar, skin, Symbol("mat")));
+          apply_guitar_skin_material(guitar_scene, material);
+          std::map<std::string, ghogx::asset::Image> guitar_textures;
+          load_scene_textures(hdr, ark, guitar_path, guitar_scene, guitar_textures);
+          preview.renderer->set_attached_prop(std::move(guitar_scene),
+                                              guitar_textures, "bone_pos_guitar.mesh");
+        } else {
+          std::fprintf(stderr, "[menu-char] missing UI guitar=%s outfit=%s\n",
+                       guitar_path.c_str(), outfit.c_str());
+        }
+      }
       preview.renderer->set_world_transform(placement_world);
       preview.renderer->set_use_scene_lighting(true);
       std::string ui_anim_owner = outfit.c_str();

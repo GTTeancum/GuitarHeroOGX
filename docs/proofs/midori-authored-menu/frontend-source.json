@@ -1,0 +1,27 @@
+{
+  "platform": "PS2",
+  "character": "midori",
+  "package": "pak/models/guitarists/midori_1/midori_1_anims.pak.ps2",
+  "table_sha256": "dded88e9fc77d4d187f8efe5349ab1c7c22eab74506e1f7a1dfb98216ac19518",
+  "stances": {
+    "stance_frontend": [
+      {
+        "path": "anims/band/guitarist/midori/frontend/gh3_guit_midori_a_intro2.ska.ps2",
+        "size": 42800,
+        "sha256": "c9127126af8be14c7438e08d3f5bd8d6241a250da98570a0874381f40435daaf"
+      },
+      {
+        "path": "anims/band/guitarist/midori/frontend/gh3_guit_midori_a_intro4.ska.ps2",
+        "size": 30632,
+        "sha256": "06f45695cc3ec6763a903bd37b6b03821dc04ccb9caf93b63792c281f63348a0"
+      }
+    ],
+    "stance_frontend_guitar": [
+      {
+        "path": "anims/band/guitarist/midori/frontend/gh3_guit_midori_tran_out_idle.ska.ps2",
+        "size": 12880,
+        "sha256": "f7495f308a65b81f2de15e19a292b53431f03bbc702df077121d2eaaa3bf08e1"
+      }
+    ]
+  }
+}

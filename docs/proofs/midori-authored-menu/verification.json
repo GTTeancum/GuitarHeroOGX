@@ -1,0 +1,62 @@
+{
+  "version": "0.2.2",
+  "held_body_pose": false,
+  "ui_enter": "frontend/gh3_guit_midori_a_intro2.ska.ps2",
+  "ui_loop": "frontend/gh3_guit_midori_a_intro4.ska.ps2",
+  "loop_seconds": 3.2666666507720947,
+  "loop_frames": 99,
+  "body_channel_ranges": {
+    "bone_pelvis.pos": 4.306102752685547,
+    "bone_L-upperArm.pos": 0.0,
+    "bone_L-hand.pos": 0.0,
+    "bone_R-upperArm.pos": 0.0,
+    "bone_R-hand.pos": 0.0,
+    "bone_pelvis.quat": 0.142364501953125,
+    "bone_L-upperArm.quat": 1.4120149612426758,
+    "bone_L-hand.quat": 1.5881171226501465,
+    "bone_R-upperArm.quat": 1.4314773082733154,
+    "bone_R-hand.quat": 1.5188113451004028
+  },
+  "instrument": "xplorer attached at bone_pos_guitar.mesh using gameplay renderer",
+  "native_runs": {
+    "base": 0,
+    "alt": 0,
+    "career": 0
+  },
+  "visual_review": "Sampled motion sequence and both outfits; not every frame",
+  "content_index": {
+    "files": [
+      {
+        "path": "char/gh3_midori/anims/gen/gh3_midori_fret.milo_ps2",
+        "size": 7458,
+        "sha256": "c21c5832c04a3cc382282d76bb48b380f3a9c66cb68ca9c6dfa100e553fd8cdd"
+      },
+      {
+        "path": "char/gh3_midori/anims/gen/gh3_midori_main.milo_ps2",
+        "size": 4096840,
+        "sha256": "f0c78ddb9a8719f22f32c43d9c317172ff65cacf4f976e377112776233d03a58"
+      },
+      {
+        "path": "char/gh3_midori/anims/gen/gh3_midori_strum.milo_ps2",
+        "size": 6384,
+        "sha256": "e0c9638a8879a68f77ddce4046303b11bb2720d9fa1a96cff221f8260b496780"
+      },
+      {
+        "path": "char/gh3_midori/anims/gen/gh3_midori_ui.milo_ps2",
+        "size": 138591,
+        "sha256": "90272626cc696b5a1f5828a0f3daf4251e21f43e0ca9c30b0c5c69caa7ff2cae"
+      },
+      {
+        "path": "char/gh3_midori_1/og/gen/gh3_midori_1.milo_ps2",
+        "size": 286801,
+        "sha256": "72b3d94c364bde3126d2b4ebc2e5ac6982780e74d9cb398d73662eff98858792"
+      },
+      {
+        "path": "char/gh3_midori_2/og/gen/gh3_midori_2.milo_ps2",
+        "size": 274933,
+        "sha256": "12216e00579b5f8165246a23ccd8750f5cfc05c5105da80dc0270cfad9d24708"
+      }
+    ]
+  },
+  "recipe_sha256": "e6df72d9c636e1a9111b1dc2900615bb32685ad893df1449a0c527ef9fec8ec1"
+}

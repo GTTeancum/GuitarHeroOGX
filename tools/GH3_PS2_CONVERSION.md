@@ -43,7 +43,7 @@ clips use source seconds; they are not assumed to have stock animation lengths.
 | sync_jump | Source jump, then return to the current performance group |
 | sync_wag / sync_head_bang | Existing source sway/head-nodding performances adapted to the group calls |
 | walk_turn / walk_walk / walk_stop | Source strides/stops, extracted root motion and generated movement links |
-| ui_enter / ui_loop | Frontend intro2, then its held terminal pose with complete face/hair cycles |
+| ui_enter / ui_loop | Full source stance_frontend intro2 / intro4 performances |
 | 25 fret calls | Source finger-channel compositions, distinct high variants and source wrist bends |
 | 11 guitar strum calls | Source short/medium/long strokes and rest; extra long variants reuse source long strokes |
 
@@ -120,7 +120,19 @@ Manage Band uses the same `ui_loop` idle path as multiplayer character select;
 it never invokes the 1P entrance. A camera fitted once to each posed model
 centers the preview at 20% of screen width, inside the left 40% bay. Career
 continues to play `ui_enter` followed by `ui_loop` using its authored placement.
-Midori 0.2.1 replaces the incompatible out-to-A / out-idle pairing with source
-frontend intro2 and its held terminal body pose. `cycle_hold_overlays` keeps the
-longest face/accessory cycle intact and fits whole cycles of shorter overlays
-into the same interval, retaining source poses without resetting mid-key.
+Midori 0.2.2 uses the complete frontend intro2 and intro4 performances mapped by
+GH3's `stance_frontend/idle` table. The previous 0.2.1 held pose was rejected;
+it is not a character-select conversion template. The outfit's optional
+`ui_guitar` field attaches a stock instrument through the gameplay renderer's
+`bone_pos_guitar.mesh` attachment, in both Manage Band and Career.
+
+Verify source dispatch before choosing menu animations:
+
+```powershell
+python tools/audit_gh3_ps2_frontend.py --iso "path/to/Guitar Hero III - Legends of Rock (USA).iso" --character midori --output frontend-source.json
+```
+
+The audit reads the PS2 QB/PAB animation table and checks exact SKA bytes in the
+character animation PAK. This matters because frontend and gameplay clips can
+have identical basenames but different contents. `stance_frontend_guitar` is
+the separate guitar-selection hold, not the character-selection idle.

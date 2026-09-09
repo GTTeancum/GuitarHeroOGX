@@ -34,6 +34,8 @@ struct CharacterVariant {
   std::string model_path;
   std::string ui_model_path;
   std::string ui_anim_path;
+  // Instrument used by source character-select animations, when required.
+  Symbol ui_guitar;
   std::string main_anim_path;
   std::string strum_anim_path;
   std::string fret_anim_path;
