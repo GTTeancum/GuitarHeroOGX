@@ -6187,7 +6187,7 @@
     "schema_version": 1,
     "id": "community.gh3.midori",
     "name": "GH3 Midori",
-    "version": "0.2.2",
+    "version": "0.2.3",
     "content_root": "content",
     "content_index": "content-index.json",
     "files": [
@@ -6213,8 +6213,7 @@
             "strum_anim": "char/gh3_midori/anims/gen/gh3_midori_strum.milo_ps2",
             "fret_anim": "char/gh3_midori/anims/gen/gh3_midori_fret.milo_ps2",
             "animation_source_model": "char/gh3_midori_1/og/gen/gh3_midori_1.milo_ps2",
-            "retarget_animation": false,
-            "ui_guitar": "xplorer"
+            "retarget_animation": false
           },
           {
             "selection": "gh3_midori_2",
@@ -6226,8 +6225,7 @@
             "strum_anim": "char/gh3_midori/anims/gen/gh3_midori_strum.milo_ps2",
             "fret_anim": "char/gh3_midori/anims/gen/gh3_midori_fret.milo_ps2",
             "animation_source_model": "char/gh3_midori_2/og/gen/gh3_midori_2.milo_ps2",
-            "retarget_animation": false,
-            "ui_guitar": "xplorer"
+            "retarget_animation": false
           }
         ]
       }

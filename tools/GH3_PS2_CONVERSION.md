@@ -120,11 +120,9 @@ Manage Band uses the same `ui_loop` idle path as multiplayer character select;
 it never invokes the 1P entrance. A camera fitted once to each posed model
 centers the preview at 20% of screen width, inside the left 40% bay. Career
 continues to play `ui_enter` followed by `ui_loop` using its authored placement.
-Midori 0.2.2 uses the complete frontend intro2 and intro4 performances mapped by
+Midori 0.2.3 uses the complete frontend intro2 and intro4 performances mapped by
 GH3's `stance_frontend/idle` table. The previous 0.2.1 held pose was rejected;
-it is not a character-select conversion template. The outfit's optional
-`ui_guitar` field attaches a stock instrument through the gameplay renderer's
-`bone_pos_guitar.mesh` attachment, in both Manage Band and Career.
+it is not a character-select conversion template. Midori's character-select presentation is instrument-free. Verify prop visibility separately from animation selection.
 
 Verify source dispatch before choosing menu animations:
 

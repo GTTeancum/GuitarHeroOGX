@@ -1,0 +1,86 @@
+{
+  "accepted_date": "2026-09-09",
+  "manifest": {
+    "schema_version": 1,
+    "id": "community.gh3.midori",
+    "name": "GH3 Midori",
+    "version": "0.2.3",
+    "content_root": "content",
+    "content_index": "content-index.json",
+    "files": [
+      "char/gh3_midori/anims/gen/gh3_midori_fret.milo_ps2",
+      "char/gh3_midori/anims/gen/gh3_midori_main.milo_ps2",
+      "char/gh3_midori/anims/gen/gh3_midori_strum.milo_ps2",
+      "char/gh3_midori/anims/gen/gh3_midori_ui.milo_ps2",
+      "char/gh3_midori_1/og/gen/gh3_midori_1.milo_ps2",
+      "char/gh3_midori_2/og/gen/gh3_midori_2.milo_ps2"
+    ],
+    "characters": [
+      {
+        "id": "gh3_midori",
+        "label": "Midori",
+        "outfits": [
+          {
+            "selection": "gh3_midori_1",
+            "label": "Outfit 1",
+            "model": "char/gh3_midori_1/og/gen/gh3_midori_1.milo_ps2",
+            "ui_model": "char/gh3_midori_1/og/gen/gh3_midori_1.milo_ps2",
+            "ui_anim": "char/gh3_midori/anims/gen/gh3_midori_ui.milo_ps2",
+            "main_anim": "char/gh3_midori/anims/gen/gh3_midori_main.milo_ps2",
+            "strum_anim": "char/gh3_midori/anims/gen/gh3_midori_strum.milo_ps2",
+            "fret_anim": "char/gh3_midori/anims/gen/gh3_midori_fret.milo_ps2",
+            "animation_source_model": "char/gh3_midori_1/og/gen/gh3_midori_1.milo_ps2",
+            "retarget_animation": false
+          },
+          {
+            "selection": "gh3_midori_2",
+            "label": "PS2 alternate outfit",
+            "model": "char/gh3_midori_2/og/gen/gh3_midori_2.milo_ps2",
+            "ui_model": "char/gh3_midori_2/og/gen/gh3_midori_2.milo_ps2",
+            "ui_anim": "char/gh3_midori/anims/gen/gh3_midori_ui.milo_ps2",
+            "main_anim": "char/gh3_midori/anims/gen/gh3_midori_main.milo_ps2",
+            "strum_anim": "char/gh3_midori/anims/gen/gh3_midori_strum.milo_ps2",
+            "fret_anim": "char/gh3_midori/anims/gen/gh3_midori_fret.milo_ps2",
+            "animation_source_model": "char/gh3_midori_2/og/gen/gh3_midori_2.milo_ps2",
+            "retarget_animation": false
+          }
+        ]
+      }
+    ]
+  },
+  "content_index": {
+    "files": [
+      {
+        "path": "char/gh3_midori/anims/gen/gh3_midori_fret.milo_ps2",
+        "size": 7458,
+        "sha256": "c21c5832c04a3cc382282d76bb48b380f3a9c66cb68ca9c6dfa100e553fd8cdd"
+      },
+      {
+        "path": "char/gh3_midori/anims/gen/gh3_midori_main.milo_ps2",
+        "size": 4096840,
+        "sha256": "f0c78ddb9a8719f22f32c43d9c317172ff65cacf4f976e377112776233d03a58"
+      },
+      {
+        "path": "char/gh3_midori/anims/gen/gh3_midori_strum.milo_ps2",
+        "size": 6384,
+        "sha256": "e0c9638a8879a68f77ddce4046303b11bb2720d9fa1a96cff221f8260b496780"
+      },
+      {
+        "path": "char/gh3_midori/anims/gen/gh3_midori_ui.milo_ps2",
+        "size": 138591,
+        "sha256": "90272626cc696b5a1f5828a0f3daf4251e21f43e0ca9c30b0c5c69caa7ff2cae"
+      },
+      {
+        "path": "char/gh3_midori_1/og/gen/gh3_midori_1.milo_ps2",
+        "size": 286801,
+        "sha256": "72b3d94c364bde3126d2b4ebc2e5ac6982780e74d9cb398d73662eff98858792"
+      },
+      {
+        "path": "char/gh3_midori_2/og/gen/gh3_midori_2.milo_ps2",
+        "size": 274933,
+        "sha256": "12216e00579b5f8165246a23ccd8750f5cfc05c5105da80dc0270cfad9d24708"
+      }
+    ]
+  },
+  "installed_runtime_sha256": "8977a923020d359c2ccdde21318a528230f7b8700b620e7d2ae5adabd7443410"
+}

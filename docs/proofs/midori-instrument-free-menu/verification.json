@@ -1,0 +1,15 @@
+{
+  "version": "0.2.3",
+  "ui_guitar": null,
+  "held_body_pose": false,
+  "motion_bank_unchanged_from_0_2_2": true,
+  "native_capture_exit_codes": {
+    "base": 0,
+    "alt": 0
+  },
+  "sampled_visual_review": [
+    62,
+    102
+  ],
+  "video_seconds": 7.533333333333333
+}
