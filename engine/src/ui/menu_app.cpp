@@ -7297,7 +7297,9 @@ void rebuild_text(const std::string& hdr, const std::string& ark, ScreenManager&
     // HelpBarPanel expands its display array into per-control resource slots;
     // help_bar.txt is that template, not an additional static footer label.
     // append_help_footer below performs the native panel expansion.
-    if (pn != Symbol("helpbar")) {
+    if (pn != Symbol("helpbar") &&
+        !(screen && screen->name() == Symbol("practice_game_screen") &&
+          pn == Symbol("mtv_overlay_panel"))) {
       for (const MenuLabel& label : labels) {
         if (!label.font.empty())
           panel_fonts.insert(normalized_label_font(label.font));
@@ -7572,6 +7574,12 @@ int run_menu_mode(const std::string& hdr, const std::string& ark,
 
   ghogx::game::AudioPlayer menu_audio;
   ghogx::game::AudioPlayer meta_music_audio;
+  std::unique_ptr<ghogx::game::AudioPlayer> song_preview_audio;
+  Symbol requested_preview_song;
+  Symbol playing_preview_song;
+  double preview_start_seconds = 0.0;
+  double preview_end_seconds = 0.0;
+  bool preview_request_pending = false;
   bool meta_music_requested = false;
   bool menu_sfx_ready = false;
   Symbol loaded_menu_audio_venue;
@@ -7629,6 +7637,33 @@ int run_menu_mode(const std::string& hdr, const std::string& ark,
           menu_audio.pause_all_sfx(value);
         } else if (action == Symbol("meta_music")) {
           meta_music_requested = value;
+        } else if (action == Symbol("song_preview")) {
+          const int index = db.song_index(cue);
+          double start_ms = int_value(
+              mgr.get_global(Symbol("song_preview_start_ms")), -1);
+          double end_ms = int_value(
+              mgr.get_global(Symbol("song_preview_end_ms")), -1);
+          if (value && index >= 0 && (start_ms < 0 || end_ms < 0)) {
+            auto range = db.song(static_cast<std::size_t>(index))
+                             ->find_keyed(Symbol("preview"));
+            if (range && range->size() >= 3) {
+              start_ms = range->at(1).as_float().value_or(
+                  static_cast<float>(range->at(1).as_int().value_or(0)));
+              end_ms = range->at(2).as_float().value_or(
+                  static_cast<float>(range->at(2).as_int().value_or(0)));
+            }
+          }
+          const Symbol next = value && index >= 0 && start_ms >= 0 &&
+                                      end_ms > start_ms
+                                  ? cue : Symbol();
+          if (next == requested_preview_song &&
+              start_ms / 1000.0 == preview_start_seconds &&
+              end_ms / 1000.0 == preview_end_seconds)
+            return;
+          requested_preview_song = next;
+          preview_start_seconds = start_ms / 1000.0;
+          preview_end_seconds = end_ms / 1000.0;
+          preview_request_pending = true;
         }
       });
   gh::dtb::NodeList init_roots =
@@ -7994,12 +8029,17 @@ int run_menu_mode(const std::string& hdr, const std::string& ark,
       options.play_boot_presentation && !explicit_start_screen
           ? RuntimePhase::BootLogos
           : RuntimePhase::Menus;
-  meta_music_requested = phase == RuntimePhase::Menus;
+  // A direct-start setlist has already run its authored `meta_music stop` and
+  // `song_preview` commands. Do not restart ambience over that song preview.
+  if (!explicit_start_screen)
+    meta_music_requested = phase == RuntimePhase::Menus;
   float phase_seconds = 0.0f;
   float screen_seconds = 0.0f;
   PssVideoPlayerWin32 intro_video;
   bool intro_video_started = false;
   bool gameplay_loaded = false;
+  bool practice_gameplay = false;
+  int loaded_restart_count = 0;
   bool gameplay_results_committed = false;
   bool auto_loop_completed = false;
   std::string automated_screen;
@@ -9023,6 +9063,7 @@ int run_menu_mode(const std::string& hdr, const std::string& ark,
                  "judgement=presentation+video_input_offset\n",
                  gameplay.audio_offset_ms(),
                  gameplay.video_input_offset_ms());
+    gameplay.set_practice_mode(practice_gameplay);
     if (!gameplay.load_song(gameplay_hdr, gameplay_ark, loaded_song,
                             loaded_difficulty)) {
       std::fprintf(stderr, "[flow] gameplay load failed: %s diff=%d\n",
@@ -9044,8 +9085,9 @@ int run_menu_mode(const std::string& hdr, const std::string& ark,
                                 Symbol("artist")),
                   locale)
             : std::string{};
-    song_intro_overlay.reset(hdr, ark, gameplay_hdr, gameplay_ark,
-                             loaded_song, intro_title, intro_artist);
+    song_intro_overlay.reset(
+        hdr, ark, gameplay_hdr, gameplay_ark, loaded_song, intro_title,
+        intro_artist, mgr.localize(Symbol("mtv_made_famous")));
     if (!song_intro_overlay.prepare()) {
       std::fprintf(stderr,
                    "[flow] song intro overlay preparation failed: song=%s "
@@ -9053,7 +9095,7 @@ int run_menu_mode(const std::string& hdr, const std::string& ark,
                    loaded_song.c_str(), intro_title.c_str(),
                    intro_artist.c_str());
     }
-    if (!gameplay.prepare_world(*win)) {
+    if (!practice_gameplay && !gameplay.prepare_world(*win)) {
       std::fprintf(stderr, "[flow] gameplay world preparation failed: %s\n",
                    loaded_song.c_str());
       return false;
@@ -9073,6 +9115,8 @@ int run_menu_mode(const std::string& hdr, const std::string& ark,
       }
     }
     if (Object* game = mgr.resolve_object(Symbol("game"))) {
+      loaded_restart_count = game->get_property(Symbol("restart_count"))
+                                 .as_int().value_or(0);
       game->set_property(
           Symbol("result_character"),
           DataNode::Str(std::string(gameplay.quickplay_character_outfit())));
@@ -9143,10 +9187,16 @@ int run_menu_mode(const std::string& hdr, const std::string& ark,
                  gameplay.longest_streak(), stars);
   };
   auto draw_gameplay = [&](bool show_you_rock) {
-    gameplay.draw(*win);
+    if (practice_gameplay) {
+      renderer.draw_scene_only();
+      gameplay.draw_highway_over_scene(*win);
+      renderer.draw_text_over_scene();
+    } else {
+      gameplay.draw(*win);
+    }
     if (!hide_song_intro_overlay)
       song_intro_overlay.draw(gameplay.intro_presentation_time());
-    if (hud_ready && !hide_gameplay_hud) {
+    if (hud_ready && !hide_gameplay_hud && !practice_gameplay) {
       ghogx::hud::HudState state;
       state.score = gameplay.score();
       state.streak = gameplay.streak();
@@ -9352,6 +9402,42 @@ int run_menu_mode(const std::string& hdr, const std::string& ark,
     if (fixed_dt > 0.0f && std::isfinite(fixed_dt)) dt = fixed_dt;
 
     phase_seconds += dt;
+    // Stock scripts own preview start/stop and optional Practice section bounds.
+    // Resolve only the latest request after script dispatch, avoiding a VGS load
+    // for every intermediate highlighted row in the same update.
+    if (preview_request_pending) {
+      preview_request_pending = false;
+      song_preview_audio.reset();
+      playing_preview_song = Symbol();
+      if (requested_preview_song.valid()) {
+        auto preview = std::make_unique<ghogx::game::AudioPlayer>();
+        std::string path = db.song_audio_path(requested_preview_song);
+        if (path.size() < 4 || path.substr(path.size() - 4) != ".vgs")
+          path += ".vgs";
+        if (preview->load_vgs(gameplay_hdr, gameplay_ark, path) &&
+            preview->seek(preview_start_seconds)) {
+          preview_end_seconds = std::min(preview_end_seconds, preview->duration_sec());
+          preview->play();
+          playing_preview_song = requested_preview_song;
+          song_preview_audio = std::move(preview);
+          std::fprintf(stderr,
+                       "[song-preview] playing song=%s start=%.3f end=%.3f path=%s\n",
+                       playing_preview_song.c_str(), preview_start_seconds,
+                       preview_end_seconds, path.c_str());
+        }
+      } else {
+        std::fprintf(stderr, "[song-preview] stopped\n");
+      }
+    }
+    if (song_preview_audio) {
+      if (song_preview_audio->position_sec() >= preview_end_seconds) {
+        if (song_preview_audio->seek(preview_start_seconds)) {
+          song_preview_audio->play();
+          std::fprintf(stderr, "[song-preview] loop song=%s\n",
+                       playing_preview_song.c_str());
+        }
+      }
+    }
     update_meta_music(dt);
 
     if (phase == RuntimePhase::BootLogos) {
@@ -9409,14 +9495,20 @@ int run_menu_mode(const std::string& hdr, const std::string& ark,
       }
     }
 
+    const char* proof_input = std::getenv("GHOGX_MENU_PROOF_INPUT");
+    bool proof_start = proof_input &&
+        ("," + std::string(proof_input) + ",").find(
+            "," + std::to_string(frame) + ":start,") != std::string::npos;
     if (phase == RuntimePhase::Gameplay) {
-      if (!disable_live_input && win->action_pressed(Action::Start)) {
+      if (proof_start || (!disable_live_input && win->action_pressed(Action::Start))) {
+        proof_start = false;
         gameplay.set_paused(true);
-        mgr.goto_screen(Symbol("pause_screen"));
+        mgr.goto_screen(Symbol(practice_gameplay ? "pract_pause_screen" : "pause_screen"));
         phase = RuntimePhase::Paused;
         phase_seconds = 0.0f;
         screen_seconds = 0.0f;
-        std::fprintf(stderr, "[flow] gameplay Start -> pause_screen\n");
+        std::fprintf(stderr, "[flow] gameplay Start -> %s\n",
+                     practice_gameplay ? "pract_pause_screen" : "pause_screen");
       } else {
         const uint32_t guitar_input =
             win->guitar_input_held() |
@@ -9433,10 +9525,22 @@ int run_menu_mode(const std::string& hdr, const std::string& ark,
           std::fprintf(stderr, "[flow] song failed -> lose_screen\n");
         } else if (gameplay.is_finished()) {
           gameplay.stop_audio();
+          if (practice_gameplay) {
+            if (Object* player = mgr.resolve_object(Symbol("player0"))) {
+              player->set_property(Symbol("gems_hit"), DataNode::Int(gameplay.hit_count()));
+              player->set_property(Symbol("gems_passed"), DataNode::Int(gameplay.miss_count()));
+            }
+            mgr.goto_screen(Symbol("practice_end_screen"));
+            phase = RuntimePhase::Paused;
+            phase_seconds = 0.0f;
+            screen_seconds = 0.0f;
+            std::fprintf(stderr, "[flow] practice complete -> practice_end_screen\n");
+          } else {
           commit_gameplay_results();
           phase = RuntimePhase::YouRock;
           phase_seconds = 0.0f;
           std::fprintf(stderr, "[flow] song complete -> YOU ROCK\n");
+          }
         }
         draw_gameplay(phase == RuntimePhase::YouRock);
         capture_frame();
@@ -9476,8 +9580,12 @@ int run_menu_mode(const std::string& hdr, const std::string& ark,
     // Load the selected song while their loading screen is visible, then send
     // exactly that event to enter game_screen.
     Object* live_screen = mgr.current_screen();
-    if (live_screen && live_screen->name() == Symbol("loading_screen") &&
+    if (live_screen &&
+        (live_screen->name() == Symbol("loading_screen") ||
+         live_screen->name() == Symbol("practice_loading_screen") ||
+         live_screen->name() == Symbol("practice_game_screen")) &&
         !gameplay_loaded && screen_seconds >= 0.15f) {
+      practice_gameplay = live_screen->name() != Symbol("loading_screen");
       if (prepare_gameplay()) {
         live_screen->handle_property(Symbol("TRANSITION_COMPLETE_MSG"),
                                      DataArray());
@@ -9527,8 +9635,8 @@ int run_menu_mode(const std::string& hdr, const std::string& ark,
       visual_dirty = true;
     }
     const bool pause_start =
-        phase == RuntimePhase::Paused && !disable_live_input &&
-        win->action_pressed(Action::Start);
+        phase == RuntimePhase::Paused &&
+        (proof_start || (!disable_live_input && win->action_pressed(Action::Start)));
     if (pause_start) {
       Object* screen = mgr.current_screen();
       Symbol panel_name =
@@ -9658,8 +9766,23 @@ int run_menu_mode(const std::string& hdr, const std::string& ark,
 
     mgr.update(dt);
 
+    if (practice_gameplay && gameplay_loaded) {
+      Object* game = mgr.resolve_object(Symbol("game"));
+      const int restart_count = game ? game->get_property(Symbol("restart_count"))
+                                          .as_int().value_or(0) : 0;
+      if (restart_count != loaded_restart_count) {
+        gameplay.stop_audio();
+        gameplay_loaded = false;
+        phase = RuntimePhase::Menus;
+        screen_seconds = 0.0f;
+        mgr.goto_screen(Symbol("practice_loading_screen"));
+        std::fprintf(stderr, "[flow] practice restart -> practice_loading_screen\n");
+      }
+    }
+
     if (phase == RuntimePhase::Paused && mgr.current_screen() &&
-        mgr.current_screen()->name() == Symbol("game_screen")) {
+        (mgr.current_screen()->name() == Symbol("game_screen") ||
+         mgr.current_screen()->name() == Symbol("practice_game_screen"))) {
       gameplay.set_paused(false);
       phase = RuntimePhase::Gameplay;
       phase_seconds = 0.0f;
@@ -9696,6 +9819,12 @@ int run_menu_mode(const std::string& hdr, const std::string& ark,
         outgoing_menu_animation_sources.clear();
       }
       shown = mgr.current_screen();
+      if (practice_gameplay && gameplay_loaded && shown &&
+          !screen_has_panel(shown, Symbol("practice_panel"))) {
+        gameplay.stop_audio();
+        gameplay_loaded = false;
+        phase = RuntimePhase::Menus;
+      }
       screen_seconds = 0.0f;
       automated_screen.clear();
       automated_song_selected = false;

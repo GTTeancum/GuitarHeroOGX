@@ -9061,10 +9061,14 @@ int main() {
                  "v.r=r.f32();v.g=r.f32();v.b=r.f32();v.a=r.f32();",
                  "GH2 v28 Mesh decoder retains the shared PS2 floats until bone resolution");
   ok &= contains(milo_scene_cpp_c,
-                 "if(!mesh.bones.empty()){for(Vertex&vertex:mesh.verts){vertex.w[0]=vertex.r;",
+                 "if(!mesh.bones.empty()){std::size_tweighted_vertex=0;"
+                 "for(Vertex&vertex:mesh.verts){"
+                 "if(loading_pump&&(++weighted_vertex&2047u)==0)loading_pump();"
+                 "vertex.w[0]=vertex.r;",
                  "GH2 v28 Mesh PostLoad preserves shared floats as weights for skinned geometry");
   ok &= contains(milo_scene_cpp_c,
-                 "}else{for(Vertex&vertex:mesh.verts){vertex.r="
+                 "}else{std::size_tcolored_vertex=0;for(Vertex&vertex:mesh.verts){"
+                 "if(loading_pump&&(++colored_vertex&2047u)==0)loading_pump();vertex.r="
                  "source_hmx_color32_channel(vertex.r);",
                  "GH2 v28 Mesh PostLoad packs Color32 only for unskinned geometry");
   ok &= contains(milo_scene_cpp_c,
@@ -15825,7 +15829,7 @@ int main() {
                "missing CamShot crowd selection must not promote every crowd placement to full 3D");
   ok &= contains(draw_worldcrowd_runtime_c,
                  "constbooldraw_as_3d=selected_3d[placement_index]!=0;",
-                 "only exact pre-resolved CamShot actor and placement pairs are promoted to full 3D");
+                 "source-selected population remains distinct from the presentation replacement population");
   ok &= contains(draw_worldcrowd_runtime_c,
                  "character_world[14]-=placement_source_height("
                  "placement_index)*0.5f;",
@@ -15836,7 +15840,7 @@ int main() {
                        "CamShot 3D extraction occurs before native fullness is reapplied");
   ok &= contains(draw_worldcrowd_runtime_c,
                  "flat_worlds_by_set[key].push_back(placement_world);",
-                 "unselected crowd placements remain in the source flat-impostor path");
+                 "retail impostor reference path remains available for source comparison");
   ok &= contains(draw_worldcrowd_runtime_c,
                  "runtime.renderer->refresh_worldcrowd_impostor("
                  "cam,source_character_world,source_height,"

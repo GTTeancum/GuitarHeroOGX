@@ -1,0 +1,49 @@
+{
+  "scope": "Extracted MILO object names and exact bytes, excluding rebuilt container _payload.bin.",
+  "release": "release/packages/project.gh1.converted",
+  "live": "C:\\Programming\\GitHub\\Guitar Hero II\\gh2_ps2_hybrid_assets\\DLC\\project.gh1.converted",
+  "venues": [
+    {
+      "venue": "gh1_basement",
+      "object_count": 316,
+      "names_and_body_hashes_equal": true,
+      "objects_sha256": "6b2bf73ccb0814c8777fa3bebffff9450344f24cb86d530eee21d64e6e84afc8"
+    },
+    {
+      "venue": "gh1_small_club",
+      "object_count": 469,
+      "names_and_body_hashes_equal": true,
+      "objects_sha256": "da4229f5bb04bf310cdc8cc04975cacbf477ba9771fa67024a3897c24a0e3a1c"
+    },
+    {
+      "venue": "gh1_small_club_multi",
+      "object_count": 214,
+      "names_and_body_hashes_equal": true,
+      "objects_sha256": "dbeb167702423cc6de675f53478931e9b0c4c4fbd2246104d3aa686f51e80cff"
+    },
+    {
+      "venue": "gh1_big_club",
+      "object_count": 381,
+      "names_and_body_hashes_equal": true,
+      "objects_sha256": "d3cdbfad7364c00b23f14d403e6b00fff5ff29cd46a590a1b409e46c9b23d385"
+    },
+    {
+      "venue": "gh1_theatre",
+      "object_count": 463,
+      "names_and_body_hashes_equal": true,
+      "objects_sha256": "3402c5864825a2e624902f615608bab51838d405a947cb9f4f3b3405b183cf62"
+    },
+    {
+      "venue": "gh1_fest",
+      "object_count": 449,
+      "names_and_body_hashes_equal": true,
+      "objects_sha256": "a51c97cc92433409fc6b812b5df206e8597c179ae85e5ced7814898ba2180bf1"
+    },
+    {
+      "venue": "gh1_arena",
+      "object_count": 671,
+      "names_and_body_hashes_equal": true,
+      "objects_sha256": "5b8be7725f84a9a0c8a7d3c13edb263bf261af2f8aee09201a75995c5b5de40b"
+    }
+  ]
+}

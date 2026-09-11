@@ -835,6 +835,10 @@ DataNode Interp::bi_sprintf(const Node& c, Env& env) {
           ++i;
         }
       }
+      if (sp == '%') {
+        out += '%';
+        continue;
+      }
       DataNode a = argi < k.size() ? eval(*k[argi++], env) : DataNode();
       if (sp == 's') out += std::string(a.as_string().value_or(""));
       else if (sp == 'd' || sp == 'i' || sp == 'D') {
@@ -851,7 +855,6 @@ DataNode Interp::bi_sprintf(const Node& c, Env& env) {
         }
         out += text;
       }
-      else if (sp == '%') out += '%';
       else { out += '%'; out += sp; }
     } else {
       out += fmt[i];

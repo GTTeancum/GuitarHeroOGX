@@ -1,0 +1,1708 @@
+{
+  "exe_sha256": "c474acbf47c8cb124fa27b879af0992ed4b795d3a435be83b1de3754fa1c9fea",
+  "venues": [
+    {
+      "venue": "battle",
+      "smoke_pass": true,
+      "motion": {
+        "venue": "battle",
+        "exe_sha256": "c474acbf47c8cb124fa27b879af0992ed4b795d3a435be83b1de3754fa1c9fea",
+        "integrity_pass": true,
+        "errors": [],
+        "parsed_samples": 361,
+        "segments": [
+          {
+            "shots": [
+              "flr_near_lft02",
+              "flr_near_lft02"
+            ],
+            "start_sample": 0,
+            "start_local_frames": [
+              0.0,
+              0.0
+            ],
+            "start_presentation_frame": 1200.0,
+            "end_sample": 195,
+            "sample_count": 196
+          },
+          {
+            "shots": [
+              "flr_far_rt01",
+              "flr_far_rt01"
+            ],
+            "start_sample": 196,
+            "start_local_frames": [
+              0.0,
+              0.0
+            ],
+            "start_presentation_frame": 1298.0,
+            "end_sample": 360,
+            "sample_count": 165
+          }
+        ],
+        "cuts": [
+          {
+            "sample": 196,
+            "position_delta": 364.487238075476,
+            "forward_degrees": 55.64895853833487,
+            "up_degrees": 22.631820793022786,
+            "fov_delta": 0.23470133599999998
+          }
+        ],
+        "noncut_peak_steps": {
+          "position_delta": {
+            "value": 0.023850152547346026,
+            "sample": 279
+          },
+          "forward_degrees": {
+            "value": 0.03394098036460942,
+            "sample": 312
+          },
+          "up_degrees": {
+            "value": 0.007752981220643354,
+            "sample": 312
+          },
+          "fov_delta": {
+            "value": 0.0,
+            "sample": 1
+          }
+        },
+        "one_update_islands": [],
+        "aba_shot_returns": [],
+        "fixed_dt": 0.016666666666666666,
+        "time_note": "sample * fixed_dt is elapsed capture time; presentation_frame changes clock domain at song start",
+        "scope": "native trace integrity and review locations only; no retail pose or visual acceptance claim"
+      },
+      "camera_samples_match_before_replacement": true,
+      "steady_fps": 59.816,
+      "crowd_samples": [
+        "[world] WorldCrowd draw: enabled=1 actors=8 placements=103 drawn_3d=0 drawn_flat=0 selection=0::0 entries=0 total_pairs=0 culled_fullness=51 hidden_flat=52 missing_impostor=0 basis=placement face_camera=0 event=excitement_okay groups=great:2,ok:6 eye=(43.471 -3.340 45.902) t=40.000",
+        "[world] WorldCrowd draw: enabled=1 actors=8 placements=103 drawn_3d=0 drawn_flat=0 selection=0::0 entries=0 total_pairs=0 culled_fullness=51 hidden_flat=52 missing_impostor=0 basis=placement face_camera=0 event=excitement_okay groups=great:2,ok:6 eye=(17.835 10.877 37.812) t=40.500",
+        "[world] WorldCrowd draw: enabled=1 actors=8 placements=103 drawn_3d=0 drawn_flat=0 selection=0::0 entries=0 total_pairs=0 culled_fullness=51 hidden_flat=52 missing_impostor=0 basis=placement face_camera=0 event=excitement_okay groups=great:2,ok:6 eye=(17.868 10.917 37.824) t=41.000",
+        "[world] WorldCrowd draw: enabled=1 actors=8 placements=103 drawn_3d=0 drawn_flat=0 selection=0::0 entries=0 total_pairs=0 culled_fullness=51 hidden_flat=52 missing_impostor=0 basis=placement face_camera=0 event=excitement_okay groups=great:2,ok:6 eye=(17.843 10.869 37.814) t=41.500",
+        "[world] WorldCrowd draw: enabled=1 actors=8 placements=103 drawn_3d=0 drawn_flat=0 selection=0::0 entries=0 total_pairs=0 culled_fullness=51 hidden_flat=52 missing_impostor=0 basis=placement face_camera=0 event=excitement_okay groups=great:2,ok:6 eye=(17.997 10.933 37.868) t=42.000",
+        "[world] WorldCrowd draw: enabled=1 actors=8 placements=103 drawn_3d=0 drawn_flat=0 selection=0::0 entries=0 total_pairs=0 culled_fullness=51 hidden_flat=52 missing_impostor=0 basis=placement face_camera=0 event=excitement_okay groups=great:2,ok:6 eye=(18.070 11.027 37.896) t=42.500",
+        "[world] WorldCrowd draw: enabled=1 actors=8 placements=103 drawn_3d=0 drawn_flat=0 selection=0::0 entries=0 total_pairs=0 culled_fullness=51 hidden_flat=52 missing_impostor=0 basis=placement face_camera=0 event=excitement_okay groups=great:2,ok:6 eye=(18.024 11.020 37.880) t=43.000",
+        "[world] WorldCrowd draw: enabled=1 actors=8 placements=103 drawn_3d=53 drawn_flat=0 selection=1:crowd:9 entries=1 total_pairs=9 culled_fullness=50 hidden_flat=0 missing_impostor=0 basis=placement face_camera=0 event=excitement_okay groups=great:2,ok:6 eye=(243.723 -263.797 117.628) t=43.500",
+        "[world] WorldCrowd draw: enabled=1 actors=8 placements=103 drawn_3d=53 drawn_flat=0 selection=1:crowd:9 entries=1 total_pairs=9 culled_fullness=50 hidden_flat=0 missing_impostor=0 basis=placement face_camera=0 event=excitement_okay groups=great:2,ok:6 eye=(243.599 -263.921 117.604) t=44.000",
+        "[world] WorldCrowd draw: enabled=1 actors=8 placements=103 drawn_3d=53 drawn_flat=0 selection=1:crowd:9 entries=1 total_pairs=9 culled_fullness=50 hidden_flat=0 missing_impostor=0 basis=placement face_camera=0 event=excitement_okay groups=great:2,ok:6 eye=(243.726 -263.761 117.738) t=44.500",
+        "[world] WorldCrowd draw: enabled=1 actors=8 placements=103 drawn_3d=53 drawn_flat=0 selection=1:crowd:9 entries=1 total_pairs=9 culled_fullness=50 hidden_flat=0 missing_impostor=0 basis=placement face_camera=0 event=excitement_okay groups=great:2,ok:6 eye=(243.593 -263.905 117.675) t=45.000",
+        "[world] WorldCrowd draw: enabled=1 actors=8 placements=103 drawn_3d=53 drawn_flat=0 selection=1:crowd:9 entries=1 total_pairs=9 culled_fullness=50 hidden_flat=0 missing_impostor=0 basis=placement face_camera=0 event=excitement_okay groups=great:2,ok:6 eye=(243.673 -263.828 117.681) t=45.500",
+        "[world] WorldCrowd draw: enabled=1 actors=8 placements=103 drawn_3d=53 drawn_flat=0 selection=1:crowd:9 entries=1 total_pairs=9 culled_fullness=50 hidden_flat=0 missing_impostor=0 basis=placement face_camera=0 event=excitement_okay groups=great:2,ok:6 eye=(243.637 -263.869 117.657) t=46.000"
+      ],
+      "maximum_sprite_draws": 0,
+      "command": [
+        "C:\\Users\\smmel\\AppData\\Local\\Temp\\ghogx-menu-camera-goal-20260910\\build\\src\\app\\ghogx_app.exe",
+        "--ark-dir",
+        "C:\\Programming\\GitHub\\Guitar Hero II\\gh2_ps2_hybrid_assets\\GEN",
+        "--auto-start",
+        "--diagnostic-character",
+        "funk1",
+        "--diagnostic-venue",
+        "battle",
+        "--diagnostic-autoplay",
+        "--diagnostic-song-start",
+        "40.0",
+        "--mute-audio",
+        "--fixed-dt",
+        "0.016666666666666666",
+        "--frames",
+        "361",
+        "--screenshot-dir",
+        "C:\\Users\\smmel\\AppData\\Local\\Temp\\ghogx-menu-camera-goal-20260910\\crowd-all-venues\\battle",
+        "--screenshot-frames",
+        "0,180,360"
+      ]
+    },
+    {
+      "venue": "small1",
+      "smoke_pass": true,
+      "motion": {
+        "venue": "small1",
+        "exe_sha256": "c474acbf47c8cb124fa27b879af0992ed4b795d3a435be83b1de3754fa1c9fea",
+        "integrity_pass": true,
+        "errors": [],
+        "parsed_samples": 361,
+        "segments": [
+          {
+            "shots": [
+              "flr_near_rt01",
+              "flr_near_rt01"
+            ],
+            "start_sample": 0,
+            "start_local_frames": [
+              0.0,
+              0.0
+            ],
+            "start_presentation_frame": 1200.0,
+            "end_sample": 195,
+            "sample_count": 196
+          },
+          {
+            "shots": [
+              "flr_near_lft01",
+              "flr_near_lft01"
+            ],
+            "start_sample": 196,
+            "start_local_frames": [
+              0.0,
+              0.0
+            ],
+            "start_presentation_frame": 1298.0,
+            "end_sample": 360,
+            "sample_count": 165
+          }
+        ],
+        "cuts": [
+          {
+            "sample": 196,
+            "position_delta": 98.25068654184344,
+            "forward_degrees": 75.30158112073745,
+            "up_degrees": 10.68287518291222,
+            "fov_delta": 0.229921877
+          }
+        ],
+        "noncut_peak_steps": {
+          "position_delta": {
+            "value": 0.36259773350652846,
+            "sample": 294
+          },
+          "forward_degrees": {
+            "value": 0.2824009161047481,
+            "sample": 331
+          },
+          "up_degrees": {
+            "value": 0.12248743375483225,
+            "sample": 339
+          },
+          "fov_delta": {
+            "value": 0.0,
+            "sample": 1
+          }
+        },
+        "one_update_islands": [],
+        "aba_shot_returns": [],
+        "fixed_dt": 0.016666666666666666,
+        "time_note": "sample * fixed_dt is elapsed capture time; presentation_frame changes clock domain at song start",
+        "scope": "native trace integrity and review locations only; no retail pose or visual acceptance claim"
+      },
+      "camera_samples_match_before_replacement": true,
+      "steady_fps": 59.871,
+      "crowd_samples": [
+        "[world] WorldCrowd draw: enabled=1 actors=8 placements=146 drawn_3d=3 drawn_flat=0 selection=1:crowd:5 entries=1 total_pairs=5 culled_fullness=73 hidden_flat=70 missing_impostor=0 basis=placement face_camera=0 event=excitement_okay groups=great:2,ok:6 eye=(91.210 -64.380 45.531) t=40.000",
+        "[world] WorldCrowd draw: enabled=1 actors=8 placements=146 drawn_3d=3 drawn_flat=0 selection=1:crowd:5 entries=1 total_pairs=5 culled_fullness=73 hidden_flat=70 missing_impostor=0 basis=placement face_camera=0 event=excitement_okay groups=great:2,ok:6 eye=(91.464 -64.583 45.586) t=40.500",
+        "[world] WorldCrowd draw: enabled=1 actors=8 placements=146 drawn_3d=3 drawn_flat=0 selection=1:crowd:5 entries=1 total_pairs=5 culled_fullness=73 hidden_flat=70 missing_impostor=0 basis=placement face_camera=0 event=excitement_okay groups=great:2,ok:6 eye=(91.841 -64.754 45.613) t=41.000",
+        "[world] WorldCrowd draw: enabled=1 actors=8 placements=146 drawn_3d=3 drawn_flat=0 selection=1:crowd:5 entries=1 total_pairs=5 culled_fullness=73 hidden_flat=70 missing_impostor=0 basis=placement face_camera=0 event=excitement_okay groups=great:2,ok:6 eye=(92.299 -64.926 45.702) t=41.500",
+        "[world] WorldCrowd draw: enabled=1 actors=8 placements=146 drawn_3d=3 drawn_flat=0 selection=1:crowd:5 entries=1 total_pairs=5 culled_fullness=73 hidden_flat=70 missing_impostor=0 basis=placement face_camera=0 event=excitement_okay groups=great:2,ok:6 eye=(92.941 -64.991 45.510) t=42.000",
+        "[world] WorldCrowd draw: enabled=1 actors=8 placements=146 drawn_3d=3 drawn_flat=0 selection=1:crowd:5 entries=1 total_pairs=5 culled_fullness=73 hidden_flat=70 missing_impostor=0 basis=placement face_camera=0 event=excitement_okay groups=great:2,ok:6 eye=(93.382 -65.575 45.601) t=42.500",
+        "[world] WorldCrowd draw: enabled=1 actors=8 placements=146 drawn_3d=3 drawn_flat=0 selection=1:crowd:5 entries=1 total_pairs=5 culled_fullness=73 hidden_flat=70 missing_impostor=0 basis=placement face_camera=0 event=excitement_okay groups=great:2,ok:6 eye=(93.921 -65.643 45.721) t=43.000",
+        "[world] WorldCrowd draw: enabled=1 actors=8 placements=146 drawn_3d=0 drawn_flat=0 selection=0::0 entries=0 total_pairs=0 culled_fullness=76 hidden_flat=70 missing_impostor=0 basis=placement face_camera=0 event=excitement_okay groups=great:2,ok:6 eye=(15.440 -7.676 55.769) t=43.500",
+        "[world] WorldCrowd draw: enabled=1 actors=8 placements=146 drawn_3d=0 drawn_flat=0 selection=0::0 entries=0 total_pairs=0 culled_fullness=76 hidden_flat=70 missing_impostor=0 basis=placement face_camera=0 event=excitement_okay groups=great:2,ok:6 eye=(15.437 -7.646 55.380) t=44.000",
+        "[world] WorldCrowd draw: enabled=1 actors=8 placements=146 drawn_3d=0 drawn_flat=0 selection=0::0 entries=0 total_pairs=0 culled_fullness=76 hidden_flat=70 missing_impostor=0 basis=placement face_camera=0 event=excitement_okay groups=great:2,ok:6 eye=(14.947 -8.225 56.874) t=44.500",
+        "[world] WorldCrowd draw: enabled=1 actors=8 placements=146 drawn_3d=0 drawn_flat=0 selection=0::0 entries=0 total_pairs=0 culled_fullness=76 hidden_flat=70 missing_impostor=0 basis=placement face_camera=0 event=excitement_okay groups=great:2,ok:6 eye=(9.625 -10.901 62.785) t=45.000",
+        "[world] WorldCrowd draw: enabled=1 actors=8 placements=146 drawn_3d=0 drawn_flat=0 selection=0::0 entries=0 total_pairs=0 culled_fullness=76 hidden_flat=70 missing_impostor=0 basis=placement face_camera=0 event=excitement_okay groups=great:2,ok:6 eye=(6.275 -14.121 65.395) t=45.500",
+        "[world] WorldCrowd draw: enabled=1 actors=8 placements=146 drawn_3d=0 drawn_flat=0 selection=0::0 entries=0 total_pairs=0 culled_fullness=76 hidden_flat=70 missing_impostor=0 basis=placement face_camera=0 event=excitement_okay groups=great:2,ok:6 eye=(11.590 -16.361 66.339) t=46.000"
+      ],
+      "maximum_sprite_draws": 0,
+      "command": [
+        "C:\\Users\\smmel\\AppData\\Local\\Temp\\ghogx-menu-camera-goal-20260910\\build\\src\\app\\ghogx_app.exe",
+        "--ark-dir",
+        "C:\\Programming\\GitHub\\Guitar Hero II\\gh2_ps2_hybrid_assets\\GEN",
+        "--auto-start",
+        "--diagnostic-character",
+        "funk1",
+        "--diagnostic-venue",
+        "small1",
+        "--diagnostic-autoplay",
+        "--diagnostic-song-start",
+        "40.0",
+        "--mute-audio",
+        "--fixed-dt",
+        "0.016666666666666666",
+        "--frames",
+        "361",
+        "--screenshot-dir",
+        "C:\\Users\\smmel\\AppData\\Local\\Temp\\ghogx-menu-camera-goal-20260910\\crowd-all-venues\\small1",
+        "--screenshot-frames",
+        "0,180,360"
+      ]
+    },
+    {
+      "venue": "small2",
+      "smoke_pass": true,
+      "motion": {
+        "venue": "small2",
+        "exe_sha256": "c474acbf47c8cb124fa27b879af0992ed4b795d3a435be83b1de3754fa1c9fea",
+        "integrity_pass": true,
+        "errors": [],
+        "parsed_samples": 361,
+        "segments": [
+          {
+            "shots": [
+              "flr_near_lft02",
+              "flr_near_lft02"
+            ],
+            "start_sample": 0,
+            "start_local_frames": [
+              0.0,
+              0.0
+            ],
+            "start_presentation_frame": 1200.0,
+            "end_sample": 195,
+            "sample_count": 196
+          },
+          {
+            "shots": [
+              "flr_far_rt01",
+              "flr_far_rt01"
+            ],
+            "start_sample": 196,
+            "start_local_frames": [
+              0.0,
+              0.0
+            ],
+            "start_presentation_frame": 1298.0,
+            "end_sample": 360,
+            "sample_count": 165
+          }
+        ],
+        "cuts": [
+          {
+            "sample": 196,
+            "position_delta": 200.24260314150683,
+            "forward_degrees": 94.11080122501681,
+            "up_degrees": 8.711104299526077,
+            "fov_delta": 0.42451894300000004
+          }
+        ],
+        "noncut_peak_steps": {
+          "position_delta": {
+            "value": 0.10241917894730466,
+            "sample": 185
+          },
+          "forward_degrees": {
+            "value": 0.1053938190409823,
+            "sample": 179
+          },
+          "up_degrees": {
+            "value": 0.053932203729135895,
+            "sample": 78
+          },
+          "fov_delta": {
+            "value": 7.999000000014078e-05,
+            "sample": 158
+          }
+        },
+        "one_update_islands": [],
+        "aba_shot_returns": [],
+        "fixed_dt": 0.016666666666666666,
+        "time_note": "sample * fixed_dt is elapsed capture time; presentation_frame changes clock domain at song start",
+        "scope": "native trace integrity and review locations only; no retail pose or visual acceptance claim"
+      },
+      "camera_samples_match_before_replacement": true,
+      "steady_fps": 59.818,
+      "crowd_samples": [
+        "[world] WorldCrowd draw: enabled=1 actors=5 placements=91 drawn_3d=47 drawn_flat=0 selection=1:crowd:4 entries=1 total_pairs=4 culled_fullness=44 hidden_flat=0 missing_impostor=0 basis=placement face_camera=0 event=excitement_okay groups=great:1,ok:4 eye=(-40.559 48.590 63.797) t=40.000",
+        "[world] WorldCrowd draw: enabled=1 actors=5 placements=91 drawn_3d=47 drawn_flat=0 selection=1:crowd:4 entries=1 total_pairs=4 culled_fullness=44 hidden_flat=0 missing_impostor=0 basis=placement face_camera=0 event=excitement_okay groups=great:1,ok:4 eye=(-31.367 15.771 63.926) t=40.500",
+        "[world] WorldCrowd draw: enabled=1 actors=5 placements=91 drawn_3d=47 drawn_flat=0 selection=1:crowd:4 entries=1 total_pairs=4 culled_fullness=44 hidden_flat=0 missing_impostor=0 basis=placement face_camera=0 event=excitement_okay groups=great:1,ok:4 eye=(-30.833 14.501 64.196) t=41.000",
+        "[world] WorldCrowd draw: enabled=1 actors=5 placements=91 drawn_3d=47 drawn_flat=0 selection=1:crowd:4 entries=1 total_pairs=4 culled_fullness=44 hidden_flat=0 missing_impostor=0 basis=placement face_camera=0 event=excitement_okay groups=great:1,ok:4 eye=(-29.857 12.701 64.450) t=41.500",
+        "[world] WorldCrowd draw: enabled=1 actors=5 placements=91 drawn_3d=47 drawn_flat=0 selection=1:crowd:4 entries=1 total_pairs=4 culled_fullness=44 hidden_flat=0 missing_impostor=0 basis=placement face_camera=0 event=excitement_okay groups=great:1,ok:4 eye=(-28.939 10.900 64.992) t=42.000",
+        "[world] WorldCrowd draw: enabled=1 actors=5 placements=91 drawn_3d=47 drawn_flat=0 selection=1:crowd:4 entries=1 total_pairs=4 culled_fullness=44 hidden_flat=0 missing_impostor=0 basis=placement face_camera=0 event=excitement_okay groups=great:1,ok:4 eye=(-27.888 8.537 65.550) t=42.500",
+        "[world] WorldCrowd draw: enabled=1 actors=5 placements=91 drawn_3d=47 drawn_flat=0 selection=1:crowd:4 entries=1 total_pairs=4 culled_fullness=44 hidden_flat=0 missing_impostor=0 basis=placement face_camera=0 event=excitement_okay groups=great:1,ok:4 eye=(-26.723 6.229 66.070) t=43.000",
+        "[world] WorldCrowd draw: enabled=1 actors=5 placements=91 drawn_3d=48 drawn_flat=0 selection=1:crowd:7 entries=1 total_pairs=7 culled_fullness=43 hidden_flat=0 missing_impostor=0 basis=placement face_camera=0 event=excitement_okay groups=great:1,ok:4 eye=(92.952 -154.815 89.623) t=43.500",
+        "[world] WorldCrowd draw: enabled=1 actors=5 placements=91 drawn_3d=48 drawn_flat=0 selection=1:crowd:7 entries=1 total_pairs=7 culled_fullness=43 hidden_flat=0 missing_impostor=0 basis=placement face_camera=0 event=excitement_okay groups=great:1,ok:4 eye=(94.593 -154.540 89.647) t=44.000",
+        "[world] WorldCrowd draw: enabled=1 actors=5 placements=91 drawn_3d=48 drawn_flat=0 selection=1:crowd:7 entries=1 total_pairs=7 culled_fullness=43 hidden_flat=0 missing_impostor=0 basis=placement face_camera=0 event=excitement_okay groups=great:1,ok:4 eye=(96.255 -154.215 89.862) t=44.500",
+        "[world] WorldCrowd draw: enabled=1 actors=5 placements=91 drawn_3d=48 drawn_flat=0 selection=1:crowd:7 entries=1 total_pairs=7 culled_fullness=43 hidden_flat=0 missing_impostor=0 basis=placement face_camera=0 event=excitement_okay groups=great:1,ok:4 eye=(97.851 -153.981 89.928) t=45.000",
+        "[world] WorldCrowd draw: enabled=1 actors=5 placements=91 drawn_3d=48 drawn_flat=0 selection=1:crowd:7 entries=1 total_pairs=7 culled_fullness=43 hidden_flat=0 missing_impostor=0 basis=placement face_camera=0 event=excitement_okay groups=great:1,ok:4 eye=(99.407 -153.807 89.874) t=45.500",
+        "[world] WorldCrowd draw: enabled=1 actors=5 placements=91 drawn_3d=48 drawn_flat=0 selection=1:crowd:7 entries=1 total_pairs=7 culled_fullness=43 hidden_flat=0 missing_impostor=0 basis=placement face_camera=0 event=excitement_okay groups=great:1,ok:4 eye=(101.058 -153.500 90.022) t=46.000"
+      ],
+      "maximum_sprite_draws": 0,
+      "command": [
+        "C:\\Users\\smmel\\AppData\\Local\\Temp\\ghogx-menu-camera-goal-20260910\\build\\src\\app\\ghogx_app.exe",
+        "--ark-dir",
+        "C:\\Programming\\GitHub\\Guitar Hero II\\gh2_ps2_hybrid_assets\\GEN",
+        "--auto-start",
+        "--diagnostic-character",
+        "funk1",
+        "--diagnostic-venue",
+        "small2",
+        "--diagnostic-autoplay",
+        "--diagnostic-song-start",
+        "40.0",
+        "--mute-audio",
+        "--fixed-dt",
+        "0.016666666666666666",
+        "--frames",
+        "361",
+        "--screenshot-dir",
+        "C:\\Users\\smmel\\AppData\\Local\\Temp\\ghogx-menu-camera-goal-20260910\\crowd-all-venues\\small2",
+        "--screenshot-frames",
+        "0,180,360"
+      ]
+    },
+    {
+      "venue": "big",
+      "smoke_pass": true,
+      "motion": {
+        "venue": "big",
+        "exe_sha256": "c474acbf47c8cb124fa27b879af0992ed4b795d3a435be83b1de3754fa1c9fea",
+        "integrity_pass": true,
+        "errors": [],
+        "parsed_samples": 361,
+        "segments": [
+          {
+            "shots": [
+              "flr_near_rt01",
+              "flr_near_rt01"
+            ],
+            "start_sample": 0,
+            "start_local_frames": [
+              0.0,
+              0.0
+            ],
+            "start_presentation_frame": 1200.0,
+            "end_sample": 195,
+            "sample_count": 196
+          },
+          {
+            "shots": [
+              "flr_near_lft_04",
+              "flr_near_lft_04"
+            ],
+            "start_sample": 196,
+            "start_local_frames": [
+              0.0,
+              0.0
+            ],
+            "start_presentation_frame": 1298.0,
+            "end_sample": 360,
+            "sample_count": 165
+          }
+        ],
+        "cuts": [
+          {
+            "sample": 196,
+            "position_delta": 129.15312971216983,
+            "forward_degrees": 64.64767245963672,
+            "up_degrees": 7.0788721845438385,
+            "fov_delta": 0.11252832400000001
+          }
+        ],
+        "noncut_peak_steps": {
+          "position_delta": {
+            "value": 0.25976440858526806,
+            "sample": 355
+          },
+          "forward_degrees": {
+            "value": 0.15150661560448309,
+            "sample": 333
+          },
+          "up_degrees": {
+            "value": 0.06265017155545548,
+            "sample": 337
+          },
+          "fov_delta": {
+            "value": 0.0,
+            "sample": 1
+          }
+        },
+        "one_update_islands": [],
+        "aba_shot_returns": [],
+        "fixed_dt": 0.016666666666666666,
+        "time_note": "sample * fixed_dt is elapsed capture time; presentation_frame changes clock domain at song start",
+        "scope": "native trace integrity and review locations only; no retail pose or visual acceptance claim"
+      },
+      "camera_samples_match_before_replacement": true,
+      "steady_fps": 59.926,
+      "crowd_samples": [
+        "[world] WorldCrowd draw: enabled=1 actors=6 placements=150 drawn_3d=0 drawn_flat=0 selection=0::0 entries=0 total_pairs=0 culled_fullness=78 hidden_flat=72 missing_impostor=0 basis=placement face_camera=0 event=excitement_okay groups=great:1,ok:5 eye=(220.891 -15.426 18.390) t=40.000",
+        "[world] WorldCrowd draw: enabled=1 actors=6 placements=150 drawn_3d=0 drawn_flat=0 selection=0::0 entries=0 total_pairs=0 culled_fullness=78 hidden_flat=72 missing_impostor=0 basis=placement face_camera=0 event=excitement_okay groups=great:1,ok:5 eye=(220.891 -15.426 18.390) t=40.500",
+        "[world] WorldCrowd draw: enabled=1 actors=6 placements=150 drawn_3d=0 drawn_flat=0 selection=0::0 entries=0 total_pairs=0 culled_fullness=78 hidden_flat=72 missing_impostor=0 basis=placement face_camera=0 event=excitement_okay groups=great:1,ok:5 eye=(220.891 -15.426 18.390) t=41.000",
+        "[world] WorldCrowd draw: enabled=1 actors=6 placements=150 drawn_3d=0 drawn_flat=0 selection=0::0 entries=0 total_pairs=0 culled_fullness=78 hidden_flat=72 missing_impostor=0 basis=placement face_camera=0 event=excitement_okay groups=great:1,ok:5 eye=(220.891 -15.426 18.390) t=41.500",
+        "[world] WorldCrowd draw: enabled=1 actors=6 placements=150 drawn_3d=0 drawn_flat=0 selection=0::0 entries=0 total_pairs=0 culled_fullness=78 hidden_flat=72 missing_impostor=0 basis=placement face_camera=0 event=excitement_okay groups=great:1,ok:5 eye=(220.891 -15.426 18.390) t=42.000",
+        "[world] WorldCrowd draw: enabled=1 actors=6 placements=150 drawn_3d=0 drawn_flat=0 selection=0::0 entries=0 total_pairs=0 culled_fullness=78 hidden_flat=72 missing_impostor=0 basis=placement face_camera=0 event=excitement_okay groups=great:1,ok:5 eye=(220.891 -15.426 18.390) t=42.500",
+        "[world] WorldCrowd draw: enabled=1 actors=6 placements=150 drawn_3d=0 drawn_flat=0 selection=0::0 entries=0 total_pairs=0 culled_fullness=78 hidden_flat=72 missing_impostor=0 basis=placement face_camera=0 event=excitement_okay groups=great:1,ok:5 eye=(220.891 -15.426 18.390) t=43.000",
+        "[world] WorldCrowd draw: enabled=1 actors=6 placements=150 drawn_3d=72 drawn_flat=0 selection=0::0 entries=0 total_pairs=0 culled_fullness=78 hidden_flat=0 missing_impostor=0 basis=placement face_camera=0 event=excitement_okay groups=great:1,ok:5 eye=(94.718 -12.128 45.814) t=43.500",
+        "[world] WorldCrowd draw: enabled=1 actors=6 placements=150 drawn_3d=72 drawn_flat=0 selection=0::0 entries=0 total_pairs=0 culled_fullness=78 hidden_flat=0 missing_impostor=0 basis=placement face_camera=0 event=excitement_okay groups=great:1,ok:5 eye=(94.752 -12.201 45.797) t=44.000",
+        "[world] WorldCrowd draw: enabled=1 actors=6 placements=150 drawn_3d=72 drawn_flat=0 selection=0::0 entries=0 total_pairs=0 culled_fullness=78 hidden_flat=0 missing_impostor=0 basis=placement face_camera=0 event=excitement_okay groups=great:1,ok:5 eye=(94.676 -12.177 45.818) t=44.500",
+        "[world] WorldCrowd draw: enabled=1 actors=6 placements=150 drawn_3d=72 drawn_flat=0 selection=0::0 entries=0 total_pairs=0 culled_fullness=78 hidden_flat=0 missing_impostor=0 basis=placement face_camera=0 event=excitement_okay groups=great:1,ok:5 eye=(94.747 -12.506 45.758) t=45.000",
+        "[world] WorldCrowd draw: enabled=1 actors=6 placements=150 drawn_3d=72 drawn_flat=0 selection=0::0 entries=0 total_pairs=0 culled_fullness=78 hidden_flat=0 missing_impostor=0 basis=placement face_camera=0 event=excitement_okay groups=great:1,ok:5 eye=(94.691 -12.824 45.697) t=45.500",
+        "[world] WorldCrowd draw: enabled=1 actors=6 placements=150 drawn_3d=72 drawn_flat=0 selection=0::0 entries=0 total_pairs=0 culled_fullness=78 hidden_flat=0 missing_impostor=0 basis=placement face_camera=0 event=excitement_okay groups=great:1,ok:5 eye=(112.676 -15.126 41.042) t=46.000"
+      ],
+      "maximum_sprite_draws": 0,
+      "command": [
+        "C:\\Users\\smmel\\AppData\\Local\\Temp\\ghogx-menu-camera-goal-20260910\\build\\src\\app\\ghogx_app.exe",
+        "--ark-dir",
+        "C:\\Programming\\GitHub\\Guitar Hero II\\gh2_ps2_hybrid_assets\\GEN",
+        "--auto-start",
+        "--diagnostic-character",
+        "funk1",
+        "--diagnostic-venue",
+        "big",
+        "--diagnostic-autoplay",
+        "--diagnostic-song-start",
+        "40.0",
+        "--mute-audio",
+        "--fixed-dt",
+        "0.016666666666666666",
+        "--frames",
+        "361",
+        "--screenshot-dir",
+        "C:\\Users\\smmel\\AppData\\Local\\Temp\\ghogx-menu-camera-goal-20260910\\crowd-all-venues\\big",
+        "--screenshot-frames",
+        "0,180,360"
+      ]
+    },
+    {
+      "venue": "theatre",
+      "smoke_pass": true,
+      "motion": {
+        "venue": "theatre",
+        "exe_sha256": "c474acbf47c8cb124fa27b879af0992ed4b795d3a435be83b1de3754fa1c9fea",
+        "integrity_pass": true,
+        "errors": [],
+        "parsed_samples": 361,
+        "segments": [
+          {
+            "shots": [
+              "flr_near_rt01x2",
+              "flr_near_rt01x2"
+            ],
+            "start_sample": 0,
+            "start_local_frames": [
+              0.0,
+              0.0
+            ],
+            "start_presentation_frame": 1200.0,
+            "end_sample": 195,
+            "sample_count": 196
+          },
+          {
+            "shots": [
+              "flr_near_lft02",
+              "flr_near_lft02"
+            ],
+            "start_sample": 196,
+            "start_local_frames": [
+              0.0,
+              0.0
+            ],
+            "start_presentation_frame": 1298.0,
+            "end_sample": 360,
+            "sample_count": 165
+          }
+        ],
+        "cuts": [
+          {
+            "sample": 196,
+            "position_delta": 32.89331719176599,
+            "forward_degrees": 21.002047183881274,
+            "up_degrees": 16.19450013398081,
+            "fov_delta": 0.08726644500000003
+          }
+        ],
+        "noncut_peak_steps": {
+          "position_delta": {
+            "value": 0.10697909448787932,
+            "sample": 353
+          },
+          "forward_degrees": {
+            "value": 0.11339707664633433,
+            "sample": 259
+          },
+          "up_degrees": {
+            "value": 0.07399234359433284,
+            "sample": 321
+          },
+          "fov_delta": {
+            "value": 0.0,
+            "sample": 1
+          }
+        },
+        "one_update_islands": [],
+        "aba_shot_returns": [],
+        "fixed_dt": 0.016666666666666666,
+        "time_note": "sample * fixed_dt is elapsed capture time; presentation_frame changes clock domain at song start",
+        "scope": "native trace integrity and review locations only; no retail pose or visual acceptance claim"
+      },
+      "camera_samples_match_before_replacement": true,
+      "steady_fps": 59.92,
+      "crowd_samples": [
+        "[world] WorldCrowd draw: enabled=1 actors=8 placements=764 drawn_3d=386 drawn_flat=0 selection=1:crowd:0 entries=1 total_pairs=0 culled_fullness=378 hidden_flat=0 missing_impostor=0 basis=placement face_camera=0 event=excitement_okay groups=great:2,ok:6 eye=(195.791 378.106 31.900) t=40.000",
+        "[world] WorldCrowd draw: enabled=1 actors=8 placements=764 drawn_3d=386 drawn_flat=0 selection=1:crowd:0 entries=1 total_pairs=0 culled_fullness=378 hidden_flat=0 missing_impostor=0 basis=placement face_camera=0 event=excitement_okay groups=great:2,ok:6 eye=(226.083 391.013 23.951) t=40.500",
+        "[world] WorldCrowd draw: enabled=1 actors=8 placements=764 drawn_3d=386 drawn_flat=0 selection=1:crowd:0 entries=1 total_pairs=0 culled_fullness=378 hidden_flat=0 missing_impostor=0 basis=placement face_camera=0 event=excitement_okay groups=great:2,ok:6 eye=(225.118 389.232 23.508) t=41.000",
+        "[world] WorldCrowd draw: enabled=1 actors=8 placements=764 drawn_3d=386 drawn_flat=0 selection=1:crowd:0 entries=1 total_pairs=0 culled_fullness=378 hidden_flat=0 missing_impostor=0 basis=placement face_camera=0 event=excitement_okay groups=great:2,ok:6 eye=(224.386 387.615 22.846) t=41.500",
+        "[world] WorldCrowd draw: enabled=1 actors=8 placements=764 drawn_3d=386 drawn_flat=0 selection=1:crowd:0 entries=1 total_pairs=0 culled_fullness=378 hidden_flat=0 missing_impostor=0 basis=placement face_camera=0 event=excitement_okay groups=great:2,ok:6 eye=(223.156 385.704 22.561) t=42.000",
+        "[world] WorldCrowd draw: enabled=1 actors=8 placements=764 drawn_3d=386 drawn_flat=0 selection=1:crowd:0 entries=1 total_pairs=0 culled_fullness=378 hidden_flat=0 missing_impostor=0 basis=placement face_camera=0 event=excitement_okay groups=great:2,ok:6 eye=(222.270 384.101 22.246) t=42.500",
+        "[world] WorldCrowd draw: enabled=1 actors=8 placements=764 drawn_3d=386 drawn_flat=0 selection=1:crowd:0 entries=1 total_pairs=0 culled_fullness=378 hidden_flat=0 missing_impostor=0 basis=placement face_camera=0 event=excitement_okay groups=great:2,ok:6 eye=(221.339 382.335 21.716) t=43.000",
+        "[world] WorldCrowd draw: enabled=1 actors=8 placements=764 drawn_3d=0 drawn_flat=0 selection=0::0 entries=0 total_pairs=0 culled_fullness=378 hidden_flat=386 missing_impostor=0 basis=placement face_camera=0 event=excitement_okay groups=great:2,ok:6 eye=(198.539 357.713 18.103) t=43.500",
+        "[world] WorldCrowd draw: enabled=1 actors=8 placements=764 drawn_3d=0 drawn_flat=0 selection=0::0 entries=0 total_pairs=0 culled_fullness=378 hidden_flat=386 missing_impostor=0 basis=placement face_camera=0 event=excitement_okay groups=great:2,ok:6 eye=(198.464 357.665 18.203) t=44.000",
+        "[world] WorldCrowd draw: enabled=1 actors=8 placements=764 drawn_3d=0 drawn_flat=0 selection=0::0 entries=0 total_pairs=0 culled_fullness=378 hidden_flat=386 missing_impostor=0 basis=placement face_camera=0 event=excitement_okay groups=great:2,ok:6 eye=(198.529 357.703 18.332) t=44.500",
+        "[world] WorldCrowd draw: enabled=1 actors=8 placements=764 drawn_3d=0 drawn_flat=0 selection=0::0 entries=0 total_pairs=0 culled_fullness=378 hidden_flat=386 missing_impostor=0 basis=placement face_camera=0 event=excitement_okay groups=great:2,ok:6 eye=(198.533 357.725 18.171) t=45.000",
+        "[world] WorldCrowd draw: enabled=1 actors=8 placements=764 drawn_3d=0 drawn_flat=0 selection=0::0 entries=0 total_pairs=0 culled_fullness=378 hidden_flat=386 missing_impostor=0 basis=placement face_camera=0 event=excitement_okay groups=great:2,ok:6 eye=(198.604 357.802 18.282) t=45.500",
+        "[world] WorldCrowd draw: enabled=1 actors=8 placements=764 drawn_3d=0 drawn_flat=0 selection=0::0 entries=0 total_pairs=0 culled_fullness=378 hidden_flat=386 missing_impostor=0 basis=placement face_camera=0 event=excitement_okay groups=great:2,ok:6 eye=(198.797 358.607 18.036) t=46.000"
+      ],
+      "maximum_sprite_draws": 0,
+      "command": [
+        "C:\\Users\\smmel\\AppData\\Local\\Temp\\ghogx-menu-camera-goal-20260910\\build\\src\\app\\ghogx_app.exe",
+        "--ark-dir",
+        "C:\\Programming\\GitHub\\Guitar Hero II\\gh2_ps2_hybrid_assets\\GEN",
+        "--auto-start",
+        "--diagnostic-character",
+        "funk1",
+        "--diagnostic-venue",
+        "theatre",
+        "--diagnostic-autoplay",
+        "--diagnostic-song-start",
+        "40.0",
+        "--mute-audio",
+        "--fixed-dt",
+        "0.016666666666666666",
+        "--frames",
+        "361",
+        "--screenshot-dir",
+        "C:\\Users\\smmel\\AppData\\Local\\Temp\\ghogx-menu-camera-goal-20260910\\crowd-all-venues\\theatre",
+        "--screenshot-frames",
+        "0,180,360"
+      ]
+    },
+    {
+      "venue": "fest",
+      "smoke_pass": true,
+      "motion": {
+        "venue": "fest",
+        "exe_sha256": "c474acbf47c8cb124fa27b879af0992ed4b795d3a435be83b1de3754fa1c9fea",
+        "integrity_pass": true,
+        "errors": [],
+        "parsed_samples": 361,
+        "segments": [
+          {
+            "shots": [
+              "flr_near_lft02x1w",
+              "flr_near_lft02x1w"
+            ],
+            "start_sample": 0,
+            "start_local_frames": [
+              0.0,
+              0.0
+            ],
+            "start_presentation_frame": 1200.0,
+            "end_sample": 195,
+            "sample_count": 196
+          },
+          {
+            "shots": [
+              "flr_far_rt03",
+              "flr_far_rt03"
+            ],
+            "start_sample": 196,
+            "start_local_frames": [
+              0.0,
+              0.0
+            ],
+            "start_presentation_frame": 1298.0,
+            "end_sample": 360,
+            "sample_count": 165
+          }
+        ],
+        "cuts": [
+          {
+            "sample": 196,
+            "position_delta": 242.34161614739762,
+            "forward_degrees": 68.34678787829209,
+            "up_degrees": 18.235036849135433,
+            "fov_delta": 0.210593641
+          }
+        ],
+        "noncut_peak_steps": {
+          "position_delta": {
+            "value": 0.12915960837711743,
+            "sample": 359
+          },
+          "forward_degrees": {
+            "value": 0.06832493932080533,
+            "sample": 116
+          },
+          "up_degrees": {
+            "value": 0.05698381375977763,
+            "sample": 116
+          },
+          "fov_delta": {
+            "value": 0.0006693599999999522,
+            "sample": 195
+          }
+        },
+        "one_update_islands": [],
+        "aba_shot_returns": [],
+        "fixed_dt": 0.016666666666666666,
+        "time_note": "sample * fixed_dt is elapsed capture time; presentation_frame changes clock domain at song start",
+        "scope": "native trace integrity and review locations only; no retail pose or visual acceptance claim"
+      },
+      "camera_samples_match_before_replacement": true,
+      "steady_fps": 59.921,
+      "crowd_samples": [
+        "[world] WorldCrowd draw: enabled=1 actors=6 placements=615 drawn_3d=0 drawn_flat=0 selection=0::0 entries=0 total_pairs=0 culled_fullness=305 hidden_flat=310 missing_impostor=0 basis=placement face_camera=0 event=excitement_okay groups=great:1,ok:5 eye=(125.740 -152.662 28.577) t=40.000",
+        "[world] WorldCrowd draw: enabled=1 actors=6 placements=615 drawn_3d=0 drawn_flat=0 selection=0::0 entries=0 total_pairs=0 culled_fullness=305 hidden_flat=310 missing_impostor=0 basis=placement face_camera=0 event=excitement_okay groups=great:1,ok:5 eye=(112.977 -143.398 28.288) t=40.500",
+        "[world] WorldCrowd draw: enabled=1 actors=6 placements=615 drawn_3d=0 drawn_flat=0 selection=0::0 entries=0 total_pairs=0 culled_fullness=305 hidden_flat=310 missing_impostor=0 basis=placement face_camera=0 event=excitement_okay groups=great:1,ok:5 eye=(113.161 -143.455 28.301) t=41.000",
+        "[world] WorldCrowd draw: enabled=1 actors=6 placements=615 drawn_3d=0 drawn_flat=0 selection=0::0 entries=0 total_pairs=0 culled_fullness=305 hidden_flat=310 missing_impostor=0 basis=placement face_camera=0 event=excitement_okay groups=great:1,ok:5 eye=(113.021 -143.229 28.115) t=41.500",
+        "[world] WorldCrowd draw: enabled=1 actors=6 placements=615 drawn_3d=0 drawn_flat=0 selection=0::0 entries=0 total_pairs=0 culled_fullness=305 hidden_flat=310 missing_impostor=0 basis=placement face_camera=0 event=excitement_okay groups=great:1,ok:5 eye=(112.748 -143.099 28.050) t=42.000",
+        "[world] WorldCrowd draw: enabled=1 actors=6 placements=615 drawn_3d=0 drawn_flat=0 selection=0::0 entries=0 total_pairs=0 culled_fullness=305 hidden_flat=310 missing_impostor=0 basis=placement face_camera=0 event=excitement_okay groups=great:1,ok:5 eye=(112.434 -142.960 27.814) t=42.500",
+        "[world] WorldCrowd draw: enabled=1 actors=6 placements=615 drawn_3d=0 drawn_flat=0 selection=0::0 entries=0 total_pairs=0 culled_fullness=305 hidden_flat=310 missing_impostor=0 basis=placement face_camera=0 event=excitement_okay groups=great:1,ok:5 eye=(112.011 -142.806 27.692) t=43.000",
+        "[world] WorldCrowd draw: enabled=1 actors=6 placements=615 drawn_3d=310 drawn_flat=0 selection=0::0 entries=0 total_pairs=0 culled_fullness=305 hidden_flat=0 missing_impostor=0 basis=placement face_camera=0 event=excitement_okay groups=great:1,ok:5 eye=(309.589 -282.274 29.601) t=43.500",
+        "[world] WorldCrowd draw: enabled=1 actors=6 placements=615 drawn_3d=310 drawn_flat=0 selection=0::0 entries=0 total_pairs=0 culled_fullness=305 hidden_flat=0 missing_impostor=0 basis=placement face_camera=0 event=excitement_okay groups=great:1,ok:5 eye=(308.004 -282.715 30.215) t=44.000",
+        "[world] WorldCrowd draw: enabled=1 actors=6 placements=615 drawn_3d=310 drawn_flat=0 selection=0::0 entries=0 total_pairs=0 culled_fullness=305 hidden_flat=0 missing_impostor=0 basis=placement face_camera=0 event=excitement_okay groups=great:1,ok:5 eye=(306.425 -283.144 30.829) t=44.500",
+        "[world] WorldCrowd draw: enabled=1 actors=6 placements=615 drawn_3d=310 drawn_flat=0 selection=0::0 entries=0 total_pairs=0 culled_fullness=305 hidden_flat=0 missing_impostor=0 basis=placement face_camera=0 event=excitement_okay groups=great:1,ok:5 eye=(304.860 -283.528 31.443) t=45.000",
+        "[world] WorldCrowd draw: enabled=1 actors=6 placements=615 drawn_3d=310 drawn_flat=0 selection=0::0 entries=0 total_pairs=0 culled_fullness=305 hidden_flat=0 missing_impostor=0 basis=placement face_camera=0 event=excitement_okay groups=great:1,ok:5 eye=(303.220 -284.041 32.056) t=45.500",
+        "[world] WorldCrowd draw: enabled=1 actors=6 placements=615 drawn_3d=310 drawn_flat=0 selection=0::0 entries=0 total_pairs=0 culled_fullness=305 hidden_flat=0 missing_impostor=0 basis=placement face_camera=0 event=excitement_okay groups=great:1,ok:5 eye=(302.716 -283.359 32.670) t=46.000"
+      ],
+      "maximum_sprite_draws": 0,
+      "command": [
+        "C:\\Users\\smmel\\AppData\\Local\\Temp\\ghogx-menu-camera-goal-20260910\\build\\src\\app\\ghogx_app.exe",
+        "--ark-dir",
+        "C:\\Programming\\GitHub\\Guitar Hero II\\gh2_ps2_hybrid_assets\\GEN",
+        "--auto-start",
+        "--diagnostic-character",
+        "funk1",
+        "--diagnostic-venue",
+        "fest",
+        "--diagnostic-autoplay",
+        "--diagnostic-song-start",
+        "40.0",
+        "--mute-audio",
+        "--fixed-dt",
+        "0.016666666666666666",
+        "--frames",
+        "361",
+        "--screenshot-dir",
+        "C:\\Users\\smmel\\AppData\\Local\\Temp\\ghogx-menu-camera-goal-20260910\\crowd-all-venues\\fest",
+        "--screenshot-frames",
+        "0,180,360"
+      ]
+    },
+    {
+      "venue": "arena",
+      "smoke_pass": true,
+      "motion": {
+        "venue": "arena",
+        "exe_sha256": "c474acbf47c8cb124fa27b879af0992ed4b795d3a435be83b1de3754fa1c9fea",
+        "integrity_pass": true,
+        "errors": [],
+        "parsed_samples": 361,
+        "segments": [
+          {
+            "shots": [
+              "flr_near_lft01",
+              "flr_near_lft01"
+            ],
+            "start_sample": 0,
+            "start_local_frames": [
+              0.0,
+              0.0
+            ],
+            "start_presentation_frame": 1200.0,
+            "end_sample": 195,
+            "sample_count": 196
+          },
+          {
+            "shots": [
+              "flr_far_rt02x3",
+              "flr_far_rt02x3"
+            ],
+            "start_sample": 196,
+            "start_local_frames": [
+              0.0,
+              0.0
+            ],
+            "start_presentation_frame": 1298.0,
+            "end_sample": 360,
+            "sample_count": 165
+          }
+        ],
+        "cuts": [
+          {
+            "sample": 196,
+            "position_delta": 808.8465475904203,
+            "forward_degrees": 69.8460669865434,
+            "up_degrees": 25.164609380843697,
+            "fov_delta": 0.44478184
+          }
+        ],
+        "noncut_peak_steps": {
+          "position_delta": {
+            "value": 0.2565684360275268,
+            "sample": 317
+          },
+          "forward_degrees": {
+            "value": 0.012999598499229697,
+            "sample": 339
+          },
+          "up_degrees": {
+            "value": 0.002356593281275042,
+            "sample": 357
+          },
+          "fov_delta": {
+            "value": 0.0,
+            "sample": 1
+          }
+        },
+        "one_update_islands": [],
+        "aba_shot_returns": [],
+        "fixed_dt": 0.016666666666666666,
+        "time_note": "sample * fixed_dt is elapsed capture time; presentation_frame changes clock domain at song start",
+        "scope": "native trace integrity and review locations only; no retail pose or visual acceptance claim"
+      },
+      "camera_samples_match_before_replacement": true,
+      "steady_fps": 59.853,
+      "crowd_samples": [
+        "[world] WorldCrowd draw: enabled=1 actors=5 placements=450 drawn_3d=0 drawn_flat=0 selection=0::0 entries=0 total_pairs=0 culled_fullness=225 hidden_flat=225 missing_impostor=0 basis=placement face_camera=0 event=excitement_okay groups=great:1,ok:4 eye=(151.088 -31.202 -263.997) t=40.000",
+        "[world] WorldCrowd draw: enabled=1 actors=5 placements=450 drawn_3d=0 drawn_flat=0 selection=0::0 entries=0 total_pairs=0 culled_fullness=225 hidden_flat=225 missing_impostor=0 basis=placement face_camera=0 event=excitement_okay groups=great:1,ok:4 eye=(151.091 -31.209 -263.997) t=40.500",
+        "[world] WorldCrowd draw: enabled=1 actors=5 placements=450 drawn_3d=0 drawn_flat=0 selection=0::0 entries=0 total_pairs=0 culled_fullness=225 hidden_flat=225 missing_impostor=0 basis=placement face_camera=0 event=excitement_okay groups=great:1,ok:4 eye=(151.091 -31.219 -263.997) t=41.000",
+        "[world] WorldCrowd draw: enabled=1 actors=5 placements=450 drawn_3d=0 drawn_flat=0 selection=0::0 entries=0 total_pairs=0 culled_fullness=225 hidden_flat=225 missing_impostor=0 basis=placement face_camera=0 event=excitement_okay groups=great:1,ok:4 eye=(151.092 -31.229 -263.997) t=41.500",
+        "[world] WorldCrowd draw: enabled=1 actors=5 placements=450 drawn_3d=0 drawn_flat=0 selection=0::0 entries=0 total_pairs=0 culled_fullness=225 hidden_flat=225 missing_impostor=0 basis=placement face_camera=0 event=excitement_okay groups=great:1,ok:4 eye=(151.091 -31.233 -263.997) t=42.000",
+        "[world] WorldCrowd draw: enabled=1 actors=5 placements=450 drawn_3d=0 drawn_flat=0 selection=0::0 entries=0 total_pairs=0 culled_fullness=225 hidden_flat=225 missing_impostor=0 basis=placement face_camera=0 event=excitement_okay groups=great:1,ok:4 eye=(151.101 -31.234 -263.997) t=42.500",
+        "[world] WorldCrowd draw: enabled=1 actors=5 placements=450 drawn_3d=0 drawn_flat=0 selection=0::0 entries=0 total_pairs=0 culled_fullness=225 hidden_flat=225 missing_impostor=0 basis=placement face_camera=0 event=excitement_okay groups=great:1,ok:4 eye=(151.096 -31.226 -263.997) t=43.000",
+        "[world] WorldCrowd draw: enabled=1 actors=5 placements=450 drawn_3d=225 drawn_flat=0 selection=1:crowd:0 entries=1 total_pairs=0 culled_fullness=225 hidden_flat=0 missing_impostor=0 basis=placement face_camera=0 event=excitement_okay groups=great:1,ok:4 eye=(508.454 -760.670 -260.118) t=43.500",
+        "[world] WorldCrowd draw: enabled=1 actors=5 placements=450 drawn_3d=225 drawn_flat=0 selection=1:crowd:0 entries=1 total_pairs=0 culled_fullness=225 hidden_flat=0 missing_impostor=0 basis=placement face_camera=0 event=excitement_okay groups=great:1,ok:4 eye=(513.402 -766.461 -260.871) t=44.000",
+        "[world] WorldCrowd draw: enabled=1 actors=5 placements=450 drawn_3d=225 drawn_flat=0 selection=1:crowd:0 entries=1 total_pairs=0 culled_fullness=225 hidden_flat=0 missing_impostor=0 basis=placement face_camera=0 event=excitement_okay groups=great:1,ok:4 eye=(518.350 -772.253 -261.623) t=44.500",
+        "[world] WorldCrowd draw: enabled=1 actors=5 placements=450 drawn_3d=225 drawn_flat=0 selection=1:crowd:0 entries=1 total_pairs=0 culled_fullness=225 hidden_flat=0 missing_impostor=0 basis=placement face_camera=0 event=excitement_okay groups=great:1,ok:4 eye=(523.298 -778.045 -262.375) t=45.000",
+        "[world] WorldCrowd draw: enabled=1 actors=5 placements=450 drawn_3d=225 drawn_flat=0 selection=1:crowd:0 entries=1 total_pairs=0 culled_fullness=225 hidden_flat=0 missing_impostor=0 basis=placement face_camera=0 event=excitement_okay groups=great:1,ok:4 eye=(528.247 -783.837 -263.128) t=45.500",
+        "[world] WorldCrowd draw: enabled=1 actors=5 placements=450 drawn_3d=225 drawn_flat=0 selection=1:crowd:0 entries=1 total_pairs=0 culled_fullness=225 hidden_flat=0 missing_impostor=0 basis=placement face_camera=0 event=excitement_okay groups=great:1,ok:4 eye=(540.017 -786.358 -267.336) t=46.000"
+      ],
+      "maximum_sprite_draws": 0,
+      "command": [
+        "C:\\Users\\smmel\\AppData\\Local\\Temp\\ghogx-menu-camera-goal-20260910\\build\\src\\app\\ghogx_app.exe",
+        "--ark-dir",
+        "C:\\Programming\\GitHub\\Guitar Hero II\\gh2_ps2_hybrid_assets\\GEN",
+        "--auto-start",
+        "--diagnostic-character",
+        "funk1",
+        "--diagnostic-venue",
+        "arena",
+        "--diagnostic-autoplay",
+        "--diagnostic-song-start",
+        "40.0",
+        "--mute-audio",
+        "--fixed-dt",
+        "0.016666666666666666",
+        "--frames",
+        "361",
+        "--screenshot-dir",
+        "C:\\Users\\smmel\\AppData\\Local\\Temp\\ghogx-menu-camera-goal-20260910\\crowd-all-venues\\arena",
+        "--screenshot-frames",
+        "0,180,360"
+      ]
+    },
+    {
+      "venue": "stone",
+      "smoke_pass": true,
+      "motion": {
+        "venue": "stone",
+        "exe_sha256": "c474acbf47c8cb124fa27b879af0992ed4b795d3a435be83b1de3754fa1c9fea",
+        "integrity_pass": true,
+        "errors": [],
+        "parsed_samples": 361,
+        "segments": [
+          {
+            "shots": [
+              "flr_near_rt02",
+              "flr_near_rt02"
+            ],
+            "start_sample": 0,
+            "start_local_frames": [
+              0.0,
+              0.0
+            ],
+            "start_presentation_frame": 1200.0,
+            "end_sample": 195,
+            "sample_count": 196
+          },
+          {
+            "shots": [
+              "flr_far_lft01",
+              "flr_far_lft01"
+            ],
+            "start_sample": 196,
+            "start_local_frames": [
+              0.0,
+              0.0
+            ],
+            "start_presentation_frame": 1298.0,
+            "end_sample": 360,
+            "sample_count": 165
+          }
+        ],
+        "cuts": [
+          {
+            "sample": 196,
+            "position_delta": 806.8572382852436,
+            "forward_degrees": 36.5872804191524,
+            "up_degrees": 14.393992435620433,
+            "fov_delta": 0.16288542700000008
+          }
+        ],
+        "noncut_peak_steps": {
+          "position_delta": {
+            "value": 0.891206533539561,
+            "sample": 360
+          },
+          "forward_degrees": {
+            "value": 0.06805923982392927,
+            "sample": 352
+          },
+          "up_degrees": {
+            "value": 0.03767294276454409,
+            "sample": 313
+          },
+          "fov_delta": {
+            "value": 0.0,
+            "sample": 1
+          }
+        },
+        "one_update_islands": [],
+        "aba_shot_returns": [],
+        "fixed_dt": 0.016666666666666666,
+        "time_note": "sample * fixed_dt is elapsed capture time; presentation_frame changes clock domain at song start",
+        "scope": "native trace integrity and review locations only; no retail pose or visual acceptance claim"
+      },
+      "camera_samples_match_before_replacement": true,
+      "steady_fps": 58.561,
+      "crowd_samples": [
+        "[world] WorldCrowd draw: enabled=1 actors=3 placements=1761 drawn_3d=881 drawn_flat=0 selection=1:crowd:0 entries=1 total_pairs=0 culled_fullness=880 hidden_flat=0 missing_impostor=0 basis=placement face_camera=0 event=excitement_okay groups=great:1,ok:2 eye=(190.783 -332.729 -291.684) t=40.000",
+        "[world] WorldCrowd draw: enabled=1 actors=3 placements=1761 drawn_3d=881 drawn_flat=0 selection=1:crowd:0 entries=1 total_pairs=0 culled_fullness=880 hidden_flat=0 missing_impostor=0 basis=placement face_camera=0 event=excitement_okay groups=great:1,ok:2 eye=(216.707 -325.578 -295.241) t=40.500",
+        "[world] WorldCrowd draw: enabled=1 actors=3 placements=1761 drawn_3d=881 drawn_flat=0 selection=1:crowd:0 entries=1 total_pairs=0 culled_fullness=880 hidden_flat=0 missing_impostor=0 basis=placement face_camera=0 event=excitement_okay groups=great:1,ok:2 eye=(216.673 -325.602 -295.236) t=41.000",
+        "[world] WorldCrowd draw: enabled=1 actors=3 placements=1761 drawn_3d=881 drawn_flat=0 selection=1:crowd:0 entries=1 total_pairs=0 culled_fullness=880 hidden_flat=0 missing_impostor=0 basis=placement face_camera=0 event=excitement_okay groups=great:1,ok:2 eye=(216.724 -325.562 -295.246) t=41.500",
+        "[world] WorldCrowd draw: enabled=1 actors=3 placements=1761 drawn_3d=881 drawn_flat=0 selection=1:crowd:0 entries=1 total_pairs=0 culled_fullness=880 hidden_flat=0 missing_impostor=0 basis=placement face_camera=0 event=excitement_okay groups=great:1,ok:2 eye=(216.567 -325.574 -295.225) t=42.000",
+        "[world] WorldCrowd draw: enabled=1 actors=3 placements=1761 drawn_3d=881 drawn_flat=0 selection=1:crowd:0 entries=1 total_pairs=0 culled_fullness=880 hidden_flat=0 missing_impostor=0 basis=placement face_camera=0 event=excitement_okay groups=great:1,ok:2 eye=(216.503 -325.584 -295.217) t=42.500",
+        "[world] WorldCrowd draw: enabled=1 actors=3 placements=1761 drawn_3d=881 drawn_flat=0 selection=1:crowd:0 entries=1 total_pairs=0 culled_fullness=880 hidden_flat=0 missing_impostor=0 basis=placement face_camera=0 event=excitement_okay groups=great:1,ok:2 eye=(216.539 -325.606 -295.220) t=43.000",
+        "[world] WorldCrowd draw: enabled=1 actors=3 placements=1761 drawn_3d=881 drawn_flat=0 selection=1:crowd:0 entries=1 total_pairs=0 culled_fullness=880 hidden_flat=0 missing_impostor=0 basis=placement face_camera=0 event=excitement_okay groups=great:1,ok:2 eye=(-262.380 -971.261 -329.261) t=43.500",
+        "[world] WorldCrowd draw: enabled=1 actors=3 placements=1761 drawn_3d=881 drawn_flat=0 selection=1:crowd:0 entries=1 total_pairs=0 culled_fullness=880 hidden_flat=0 missing_impostor=0 basis=placement face_camera=0 event=excitement_okay groups=great:1,ok:2 eye=(-263.136 -963.491 -328.967) t=44.000",
+        "[world] WorldCrowd draw: enabled=1 actors=3 placements=1761 drawn_3d=881 drawn_flat=0 selection=1:crowd:0 entries=1 total_pairs=0 culled_fullness=880 hidden_flat=0 missing_impostor=0 basis=placement face_camera=0 event=excitement_okay groups=great:1,ok:2 eye=(-264.208 -953.487 -328.706) t=44.500",
+        "[world] WorldCrowd draw: enabled=1 actors=3 placements=1761 drawn_3d=881 drawn_flat=0 selection=1:crowd:0 entries=1 total_pairs=0 culled_fullness=880 hidden_flat=0 missing_impostor=0 basis=placement face_camera=0 event=excitement_okay groups=great:1,ok:2 eye=(-265.601 -940.355 -328.158) t=45.000",
+        "[world] WorldCrowd draw: enabled=1 actors=3 placements=1761 drawn_3d=881 drawn_flat=0 selection=1:crowd:0 entries=1 total_pairs=0 culled_fullness=880 hidden_flat=0 missing_impostor=0 basis=placement face_camera=0 event=excitement_okay groups=great:1,ok:2 eye=(-267.466 -922.836 -327.524) t=45.500",
+        "[world] WorldCrowd draw: enabled=1 actors=3 placements=1761 drawn_3d=881 drawn_flat=0 selection=1:crowd:0 entries=1 total_pairs=0 culled_fullness=880 hidden_flat=0 missing_impostor=0 basis=placement face_camera=0 event=excitement_okay groups=great:1,ok:2 eye=(-269.857 -899.387 -326.501) t=46.000"
+      ],
+      "maximum_sprite_draws": 0,
+      "command": [
+        "C:\\Users\\smmel\\AppData\\Local\\Temp\\ghogx-menu-camera-goal-20260910\\build\\src\\app\\ghogx_app.exe",
+        "--ark-dir",
+        "C:\\Programming\\GitHub\\Guitar Hero II\\gh2_ps2_hybrid_assets\\GEN",
+        "--auto-start",
+        "--diagnostic-character",
+        "funk1",
+        "--diagnostic-venue",
+        "stone",
+        "--diagnostic-autoplay",
+        "--diagnostic-song-start",
+        "40.0",
+        "--mute-audio",
+        "--fixed-dt",
+        "0.016666666666666666",
+        "--frames",
+        "361",
+        "--screenshot-dir",
+        "C:\\Users\\smmel\\AppData\\Local\\Temp\\ghogx-menu-camera-goal-20260910\\crowd-all-venues\\stone",
+        "--screenshot-frames",
+        "0,180,360"
+      ]
+    },
+    {
+      "venue": "gh1_basement",
+      "smoke_pass": true,
+      "motion": {
+        "venue": "gh1_basement",
+        "exe_sha256": "c474acbf47c8cb124fa27b879af0992ed4b795d3a435be83b1de3754fa1c9fea",
+        "integrity_pass": true,
+        "errors": [],
+        "parsed_samples": 361,
+        "segments": [
+          {
+            "shots": [
+              "flr_near_lft03",
+              "flr_near_lft03"
+            ],
+            "start_sample": 0,
+            "start_local_frames": [
+              0.0,
+              0.0
+            ],
+            "start_presentation_frame": 1200.0,
+            "end_sample": 195,
+            "sample_count": 196
+          },
+          {
+            "shots": [
+              "flr_far_lft02",
+              "flr_far_lft02"
+            ],
+            "start_sample": 196,
+            "start_local_frames": [
+              0.0,
+              0.0
+            ],
+            "start_presentation_frame": 1298.0,
+            "end_sample": 360,
+            "sample_count": 165
+          }
+        ],
+        "cuts": [
+          {
+            "sample": 196,
+            "position_delta": 82.38318765108689,
+            "forward_degrees": 8.718442991913975,
+            "up_degrees": 0.35506308075262577,
+            "fov_delta": 0.0
+          }
+        ],
+        "noncut_peak_steps": {
+          "position_delta": {
+            "value": 0.10464151663346932,
+            "sample": 121
+          },
+          "forward_degrees": {
+            "value": 0.14988493441527972,
+            "sample": 84
+          },
+          "up_degrees": {
+            "value": 0.12121290335624962,
+            "sample": 121
+          },
+          "fov_delta": {
+            "value": 0.0,
+            "sample": 1
+          }
+        },
+        "one_update_islands": [],
+        "aba_shot_returns": [],
+        "fixed_dt": 0.016666666666666666,
+        "time_note": "sample * fixed_dt is elapsed capture time; presentation_frame changes clock domain at song start",
+        "scope": "native trace integrity and review locations only; no retail pose or visual acceptance claim"
+      },
+      "camera_samples_match_before_replacement": true,
+      "steady_fps": 59.878,
+      "crowd_samples": [
+        "[world] WorldCrowd draw: enabled=1 actors=16 placements=16 drawn_3d=8 drawn_flat=0 selection=0::0 entries=0 total_pairs=0 culled_fullness=0 hidden_flat=0 missing_impostor=0 basis=placement face_camera=0 event=excitement_okay groups=great:3,ok:13 eye=(39.209 16.476 64.354) t=40.000",
+        "[world] WorldCrowd draw: enabled=1 actors=16 placements=16 drawn_3d=8 drawn_flat=0 selection=0::0 entries=0 total_pairs=0 culled_fullness=0 hidden_flat=0 missing_impostor=0 basis=placement face_camera=0 event=excitement_okay groups=great:3,ok:13 eye=(39.182 16.525 64.441) t=40.500",
+        "[world] WorldCrowd draw: enabled=1 actors=16 placements=16 drawn_3d=8 drawn_flat=0 selection=0::0 entries=0 total_pairs=0 culled_fullness=0 hidden_flat=0 missing_impostor=0 basis=placement face_camera=0 event=excitement_okay groups=great:3,ok:13 eye=(39.175 16.522 64.460) t=41.000",
+        "[world] WorldCrowd draw: enabled=1 actors=16 placements=16 drawn_3d=8 drawn_flat=0 selection=0::0 entries=0 total_pairs=0 culled_fullness=0 hidden_flat=0 missing_impostor=0 basis=placement face_camera=0 event=excitement_okay groups=great:3,ok:13 eye=(39.237 16.441 64.263) t=41.500",
+        "[world] WorldCrowd draw: enabled=1 actors=16 placements=16 drawn_3d=8 drawn_flat=0 selection=0::0 entries=0 total_pairs=0 culled_fullness=0 hidden_flat=0 missing_impostor=0 basis=placement face_camera=0 event=excitement_okay groups=great:3,ok:13 eye=(39.319 16.367 64.014) t=42.000",
+        "[world] WorldCrowd draw: enabled=1 actors=16 placements=16 drawn_3d=8 drawn_flat=0 selection=0::0 entries=0 total_pairs=0 culled_fullness=0 hidden_flat=0 missing_impostor=0 basis=placement face_camera=0 event=excitement_okay groups=great:3,ok:13 eye=(39.451 16.209 63.620) t=42.500",
+        "[world] WorldCrowd draw: enabled=1 actors=16 placements=16 drawn_3d=8 drawn_flat=0 selection=0::0 entries=0 total_pairs=0 culled_fullness=0 hidden_flat=0 missing_impostor=0 basis=placement face_camera=0 event=excitement_okay groups=great:3,ok:13 eye=(39.436 16.252 63.664) t=43.000",
+        "[world] WorldCrowd draw: enabled=1 actors=16 placements=16 drawn_3d=8 drawn_flat=0 selection=0::0 entries=0 total_pairs=0 culled_fullness=0 hidden_flat=0 missing_impostor=0 basis=placement face_camera=0 event=excitement_okay groups=great:3,ok:13 eye=(-24.131 -36.162 65.674) t=43.500",
+        "[world] WorldCrowd draw: enabled=1 actors=16 placements=16 drawn_3d=8 drawn_flat=0 selection=0::0 entries=0 total_pairs=0 culled_fullness=0 hidden_flat=0 missing_impostor=0 basis=placement face_camera=0 event=excitement_okay groups=great:3,ok:13 eye=(-24.230 -36.171 65.736) t=44.000",
+        "[world] WorldCrowd draw: enabled=1 actors=16 placements=16 drawn_3d=8 drawn_flat=0 selection=0::0 entries=0 total_pairs=0 culled_fullness=0 hidden_flat=0 missing_impostor=0 basis=placement face_camera=0 event=excitement_okay groups=great:3,ok:13 eye=(-24.272 -36.204 65.680) t=44.500",
+        "[world] WorldCrowd draw: enabled=1 actors=16 placements=16 drawn_3d=8 drawn_flat=0 selection=0::0 entries=0 total_pairs=0 culled_fullness=0 hidden_flat=0 missing_impostor=0 basis=placement face_camera=0 event=excitement_okay groups=great:3,ok:13 eye=(-24.198 -36.229 65.543) t=45.000",
+        "[world] WorldCrowd draw: enabled=1 actors=16 placements=16 drawn_3d=8 drawn_flat=0 selection=0::0 entries=0 total_pairs=0 culled_fullness=0 hidden_flat=0 missing_impostor=0 basis=placement face_camera=0 event=excitement_okay groups=great:3,ok:13 eye=(-24.077 -36.175 65.587) t=45.500",
+        "[world] WorldCrowd draw: enabled=1 actors=16 placements=16 drawn_3d=8 drawn_flat=0 selection=0::0 entries=0 total_pairs=0 culled_fullness=0 hidden_flat=0 missing_impostor=0 basis=placement face_camera=0 event=excitement_okay groups=great:3,ok:13 eye=(-23.945 -36.129 65.599) t=46.000"
+      ],
+      "maximum_sprite_draws": 0,
+      "command": [
+        "C:\\Users\\smmel\\AppData\\Local\\Temp\\ghogx-menu-camera-goal-20260910\\build\\src\\app\\ghogx_app.exe",
+        "--ark-dir",
+        "C:\\Programming\\GitHub\\Guitar Hero II\\gh2_ps2_hybrid_assets\\GEN",
+        "--auto-start",
+        "--diagnostic-character",
+        "funk1",
+        "--diagnostic-venue",
+        "gh1_basement",
+        "--diagnostic-autoplay",
+        "--diagnostic-song-start",
+        "40.0",
+        "--mute-audio",
+        "--fixed-dt",
+        "0.016666666666666666",
+        "--frames",
+        "361",
+        "--screenshot-dir",
+        "C:\\Users\\smmel\\AppData\\Local\\Temp\\ghogx-menu-camera-goal-20260910\\crowd-all-venues\\gh1_basement",
+        "--screenshot-frames",
+        "0,180,360"
+      ]
+    },
+    {
+      "venue": "gh1_small_club",
+      "smoke_pass": true,
+      "motion": {
+        "venue": "gh1_small_club",
+        "exe_sha256": "c474acbf47c8cb124fa27b879af0992ed4b795d3a435be83b1de3754fa1c9fea",
+        "integrity_pass": true,
+        "errors": [],
+        "parsed_samples": 361,
+        "segments": [
+          {
+            "shots": [
+              "flr_near_rt01",
+              "flr_near_rt01"
+            ],
+            "start_sample": 0,
+            "start_local_frames": [
+              0.0,
+              0.0
+            ],
+            "start_presentation_frame": 1200.0,
+            "end_sample": 195,
+            "sample_count": 196
+          },
+          {
+            "shots": [
+              "flr_far_rt01",
+              "flr_far_rt01"
+            ],
+            "start_sample": 196,
+            "start_local_frames": [
+              0.0,
+              0.0
+            ],
+            "start_presentation_frame": 1298.0,
+            "end_sample": 360,
+            "sample_count": 165
+          }
+        ],
+        "cuts": [
+          {
+            "sample": 196,
+            "position_delta": 75.14568080809588,
+            "forward_degrees": 25.010001688759488,
+            "up_degrees": 24.975513453552644,
+            "fov_delta": 0.0
+          }
+        ],
+        "noncut_peak_steps": {
+          "position_delta": {
+            "value": 0.0516096004494503,
+            "sample": 108
+          },
+          "forward_degrees": {
+            "value": 0.051726451881035314,
+            "sample": 80
+          },
+          "up_degrees": {
+            "value": 0.03511637260485515,
+            "sample": 84
+          },
+          "fov_delta": {
+            "value": 0.0,
+            "sample": 1
+          }
+        },
+        "one_update_islands": [],
+        "aba_shot_returns": [],
+        "fixed_dt": 0.016666666666666666,
+        "time_note": "sample * fixed_dt is elapsed capture time; presentation_frame changes clock domain at song start",
+        "scope": "native trace integrity and review locations only; no retail pose or visual acceptance claim"
+      },
+      "camera_samples_match_before_replacement": true,
+      "steady_fps": 59.859,
+      "crowd_samples": [
+        "[world] WorldCrowd draw: enabled=1 actors=16 placements=16 drawn_3d=8 drawn_flat=0 selection=0::0 entries=0 total_pairs=0 culled_fullness=0 hidden_flat=0 missing_impostor=0 basis=placement face_camera=0 event=excitement_okay groups=great:3,ok:13 eye=(73.498 -51.213 125.923) t=40.000",
+        "[world] WorldCrowd draw: enabled=1 actors=16 placements=16 drawn_3d=8 drawn_flat=0 selection=0::0 entries=0 total_pairs=0 culled_fullness=0 hidden_flat=0 missing_impostor=0 basis=placement face_camera=0 event=excitement_okay groups=great:3,ok:13 eye=(73.405 -50.927 126.036) t=40.500",
+        "[world] WorldCrowd draw: enabled=1 actors=16 placements=16 drawn_3d=8 drawn_flat=0 selection=0::0 entries=0 total_pairs=0 culled_fullness=0 hidden_flat=0 missing_impostor=0 basis=placement face_camera=0 event=excitement_okay groups=great:3,ok:13 eye=(73.358 -50.969 126.060) t=41.000",
+        "[world] WorldCrowd draw: enabled=1 actors=16 placements=16 drawn_3d=8 drawn_flat=0 selection=0::0 entries=0 total_pairs=0 culled_fullness=0 hidden_flat=0 missing_impostor=0 basis=placement face_camera=0 event=excitement_okay groups=great:3,ok:13 eye=(73.600 -51.473 125.796) t=41.500",
+        "[world] WorldCrowd draw: enabled=1 actors=16 placements=16 drawn_3d=8 drawn_flat=0 selection=0::0 entries=0 total_pairs=0 culled_fullness=0 hidden_flat=0 missing_impostor=0 basis=placement face_camera=0 event=excitement_okay groups=great:3,ok:13 eye=(74.623 -51.907 125.102) t=42.000",
+        "[world] WorldCrowd draw: enabled=1 actors=16 placements=16 drawn_3d=8 drawn_flat=0 selection=0::0 entries=0 total_pairs=0 culled_fullness=0 hidden_flat=0 missing_impostor=0 basis=placement face_camera=0 event=excitement_okay groups=great:3,ok:13 eye=(74.788 -52.027 125.004) t=42.500",
+        "[world] WorldCrowd draw: enabled=1 actors=16 placements=16 drawn_3d=8 drawn_flat=0 selection=0::0 entries=0 total_pairs=0 culled_fullness=0 hidden_flat=0 missing_impostor=0 basis=placement face_camera=0 event=excitement_okay groups=great:3,ok:13 eye=(74.682 -51.928 125.063) t=43.000",
+        "[world] WorldCrowd draw: enabled=1 actors=16 placements=16 drawn_3d=8 drawn_flat=0 selection=0::0 entries=0 total_pairs=0 culled_fullness=0 hidden_flat=0 missing_impostor=0 basis=placement face_camera=0 event=excitement_okay groups=great:3,ok:13 eye=(77.511 -109.137 76.492) t=43.500",
+        "[world] WorldCrowd draw: enabled=1 actors=16 placements=16 drawn_3d=8 drawn_flat=0 selection=0::0 entries=0 total_pairs=0 culled_fullness=0 hidden_flat=0 missing_impostor=0 basis=placement face_camera=0 event=excitement_okay groups=great:3,ok:13 eye=(77.411 -109.202 76.548) t=44.000",
+        "[world] WorldCrowd draw: enabled=1 actors=16 placements=16 drawn_3d=8 drawn_flat=0 selection=0::0 entries=0 total_pairs=0 culled_fullness=0 hidden_flat=0 missing_impostor=0 basis=placement face_camera=0 event=excitement_okay groups=great:3,ok:13 eye=(77.370 -109.244 76.490) t=44.500",
+        "[world] WorldCrowd draw: enabled=1 actors=16 placements=16 drawn_3d=8 drawn_flat=0 selection=0::0 entries=0 total_pairs=0 culled_fullness=0 hidden_flat=0 missing_impostor=0 basis=placement face_camera=0 event=excitement_okay groups=great:3,ok:13 eye=(77.447 -109.211 76.357) t=45.000",
+        "[world] WorldCrowd draw: enabled=1 actors=16 placements=16 drawn_3d=8 drawn_flat=0 selection=0::0 entries=0 total_pairs=0 culled_fullness=0 hidden_flat=0 missing_impostor=0 basis=placement face_camera=0 event=excitement_okay groups=great:3,ok:13 eye=(77.566 -109.111 76.409) t=45.500",
+        "[world] WorldCrowd draw: enabled=1 actors=16 placements=16 drawn_3d=8 drawn_flat=0 selection=0::0 entries=0 total_pairs=0 culled_fullness=0 hidden_flat=0 missing_impostor=0 basis=placement face_camera=0 event=excitement_okay groups=great:3,ok:13 eye=(77.699 -109.007 76.429) t=46.000"
+      ],
+      "maximum_sprite_draws": 0,
+      "command": [
+        "C:\\Users\\smmel\\AppData\\Local\\Temp\\ghogx-menu-camera-goal-20260910\\build\\src\\app\\ghogx_app.exe",
+        "--ark-dir",
+        "C:\\Programming\\GitHub\\Guitar Hero II\\gh2_ps2_hybrid_assets\\GEN",
+        "--auto-start",
+        "--diagnostic-character",
+        "funk1",
+        "--diagnostic-venue",
+        "gh1_small_club",
+        "--diagnostic-autoplay",
+        "--diagnostic-song-start",
+        "40.0",
+        "--mute-audio",
+        "--fixed-dt",
+        "0.016666666666666666",
+        "--frames",
+        "361",
+        "--screenshot-dir",
+        "C:\\Users\\smmel\\AppData\\Local\\Temp\\ghogx-menu-camera-goal-20260910\\crowd-all-venues\\gh1_small_club",
+        "--screenshot-frames",
+        "0,180,360"
+      ]
+    },
+    {
+      "venue": "gh1_small_club_multi",
+      "smoke_pass": true,
+      "motion": {
+        "venue": "gh1_small_club_multi",
+        "exe_sha256": "c474acbf47c8cb124fa27b879af0992ed4b795d3a435be83b1de3754fa1c9fea",
+        "integrity_pass": true,
+        "errors": [],
+        "parsed_samples": 361,
+        "segments": [
+          {
+            "shots": [
+              "multi01",
+              "multi01"
+            ],
+            "start_sample": 0,
+            "start_local_frames": [
+              0.0,
+              0.0
+            ],
+            "start_presentation_frame": 1200.0,
+            "end_sample": 195,
+            "sample_count": 196
+          },
+          {
+            "shots": [
+              "multi02",
+              "multi02"
+            ],
+            "start_sample": 196,
+            "start_local_frames": [
+              0.0,
+              0.0
+            ],
+            "start_presentation_frame": 1298.0,
+            "end_sample": 360,
+            "sample_count": 165
+          }
+        ],
+        "cuts": [
+          {
+            "sample": 196,
+            "position_delta": 190.59478464666714,
+            "forward_degrees": 72.7253300316119,
+            "up_degrees": 6.422707543907912,
+            "fov_delta": 0.0
+          }
+        ],
+        "noncut_peak_steps": {
+          "position_delta": {
+            "value": 0.0,
+            "sample": 1
+          },
+          "forward_degrees": {
+            "value": 8.537736462515939e-07,
+            "sample": 197
+          },
+          "up_degrees": {
+            "value": 8.537736462515939e-07,
+            "sample": 1
+          },
+          "fov_delta": {
+            "value": 0.0,
+            "sample": 1
+          }
+        },
+        "one_update_islands": [],
+        "aba_shot_returns": [],
+        "fixed_dt": 0.016666666666666666,
+        "time_note": "sample * fixed_dt is elapsed capture time; presentation_frame changes clock domain at song start",
+        "scope": "native trace integrity and review locations only; no retail pose or visual acceptance claim"
+      },
+      "camera_samples_match_before_replacement": true,
+      "steady_fps": 59.908,
+      "crowd_samples": [
+        "[world] WorldCrowd draw: enabled=1 actors=16 placements=16 drawn_3d=2 drawn_flat=0 selection=0::0 entries=0 total_pairs=0 culled_fullness=0 hidden_flat=0 missing_impostor=0 basis=placement face_camera=0 event=excitement_okay groups=great:3,ok:13 eye=(47.902 -120.889 77.159) t=40.000",
+        "[world] WorldCrowd draw: enabled=1 actors=16 placements=16 drawn_3d=2 drawn_flat=0 selection=0::0 entries=0 total_pairs=0 culled_fullness=0 hidden_flat=0 missing_impostor=0 basis=placement face_camera=0 event=excitement_okay groups=great:3,ok:13 eye=(47.902 -120.889 77.159) t=40.500",
+        "[world] WorldCrowd draw: enabled=1 actors=16 placements=16 drawn_3d=2 drawn_flat=0 selection=0::0 entries=0 total_pairs=0 culled_fullness=0 hidden_flat=0 missing_impostor=0 basis=placement face_camera=0 event=excitement_okay groups=great:3,ok:13 eye=(47.902 -120.889 77.159) t=41.000",
+        "[world] WorldCrowd draw: enabled=1 actors=16 placements=16 drawn_3d=2 drawn_flat=0 selection=0::0 entries=0 total_pairs=0 culled_fullness=0 hidden_flat=0 missing_impostor=0 basis=placement face_camera=0 event=excitement_okay groups=great:3,ok:13 eye=(47.902 -120.889 77.159) t=41.500",
+        "[world] WorldCrowd draw: enabled=1 actors=16 placements=16 drawn_3d=2 drawn_flat=0 selection=0::0 entries=0 total_pairs=0 culled_fullness=0 hidden_flat=0 missing_impostor=0 basis=placement face_camera=0 event=excitement_okay groups=great:3,ok:13 eye=(47.902 -120.889 77.159) t=42.000",
+        "[world] WorldCrowd draw: enabled=1 actors=16 placements=16 drawn_3d=2 drawn_flat=0 selection=0::0 entries=0 total_pairs=0 culled_fullness=0 hidden_flat=0 missing_impostor=0 basis=placement face_camera=0 event=excitement_okay groups=great:3,ok:13 eye=(47.902 -120.889 77.159) t=42.500",
+        "[world] WorldCrowd draw: enabled=1 actors=16 placements=16 drawn_3d=2 drawn_flat=0 selection=0::0 entries=0 total_pairs=0 culled_fullness=0 hidden_flat=0 missing_impostor=0 basis=placement face_camera=0 event=excitement_okay groups=great:3,ok:13 eye=(47.902 -120.889 77.159) t=43.000",
+        "[world] WorldCrowd draw: enabled=1 actors=16 placements=16 drawn_3d=2 drawn_flat=0 selection=0::0 entries=0 total_pairs=0 culled_fullness=0 hidden_flat=0 missing_impostor=0 basis=placement face_camera=0 event=excitement_okay groups=great:3,ok:13 eye=(-115.562 -23.164 69.694) t=43.500",
+        "[world] WorldCrowd draw: enabled=1 actors=16 placements=16 drawn_3d=2 drawn_flat=0 selection=0::0 entries=0 total_pairs=0 culled_fullness=0 hidden_flat=0 missing_impostor=0 basis=placement face_camera=0 event=excitement_okay groups=great:3,ok:13 eye=(-115.562 -23.164 69.694) t=44.000",
+        "[world] WorldCrowd draw: enabled=1 actors=16 placements=16 drawn_3d=2 drawn_flat=0 selection=0::0 entries=0 total_pairs=0 culled_fullness=0 hidden_flat=0 missing_impostor=0 basis=placement face_camera=0 event=excitement_okay groups=great:3,ok:13 eye=(-115.562 -23.164 69.694) t=44.500",
+        "[world] WorldCrowd draw: enabled=1 actors=16 placements=16 drawn_3d=2 drawn_flat=0 selection=0::0 entries=0 total_pairs=0 culled_fullness=0 hidden_flat=0 missing_impostor=0 basis=placement face_camera=0 event=excitement_okay groups=great:3,ok:13 eye=(-115.562 -23.164 69.694) t=45.000",
+        "[world] WorldCrowd draw: enabled=1 actors=16 placements=16 drawn_3d=2 drawn_flat=0 selection=0::0 entries=0 total_pairs=0 culled_fullness=0 hidden_flat=0 missing_impostor=0 basis=placement face_camera=0 event=excitement_okay groups=great:3,ok:13 eye=(-115.562 -23.164 69.694) t=45.500",
+        "[world] WorldCrowd draw: enabled=1 actors=16 placements=16 drawn_3d=2 drawn_flat=0 selection=0::0 entries=0 total_pairs=0 culled_fullness=0 hidden_flat=0 missing_impostor=0 basis=placement face_camera=0 event=excitement_okay groups=great:3,ok:13 eye=(-115.562 -23.164 69.694) t=46.000"
+      ],
+      "maximum_sprite_draws": 0,
+      "command": [
+        "C:\\Users\\smmel\\AppData\\Local\\Temp\\ghogx-menu-camera-goal-20260910\\build\\src\\app\\ghogx_app.exe",
+        "--ark-dir",
+        "C:\\Programming\\GitHub\\Guitar Hero II\\gh2_ps2_hybrid_assets\\GEN",
+        "--auto-start",
+        "--diagnostic-character",
+        "funk1",
+        "--diagnostic-venue",
+        "gh1_small_club_multi",
+        "--diagnostic-autoplay",
+        "--diagnostic-song-start",
+        "40.0",
+        "--mute-audio",
+        "--fixed-dt",
+        "0.016666666666666666",
+        "--frames",
+        "361",
+        "--screenshot-dir",
+        "C:\\Users\\smmel\\AppData\\Local\\Temp\\ghogx-menu-camera-goal-20260910\\crowd-all-venues\\gh1_small_club_multi",
+        "--screenshot-frames",
+        "0,180,360"
+      ]
+    },
+    {
+      "venue": "gh1_big_club",
+      "smoke_pass": true,
+      "motion": {
+        "venue": "gh1_big_club",
+        "exe_sha256": "c474acbf47c8cb124fa27b879af0992ed4b795d3a435be83b1de3754fa1c9fea",
+        "integrity_pass": true,
+        "errors": [],
+        "parsed_samples": 361,
+        "segments": [
+          {
+            "shots": [
+              "flr_near_lft03x2w",
+              "flr_near_lft03x2w"
+            ],
+            "start_sample": 0,
+            "start_local_frames": [
+              0.0,
+              0.0
+            ],
+            "start_presentation_frame": 1200.0,
+            "end_sample": 195,
+            "sample_count": 196
+          },
+          {
+            "shots": [
+              "flr_far_lft01",
+              "flr_far_lft01"
+            ],
+            "start_sample": 196,
+            "start_local_frames": [
+              0.0,
+              0.0
+            ],
+            "start_presentation_frame": 1298.0,
+            "end_sample": 360,
+            "sample_count": 165
+          }
+        ],
+        "cuts": [
+          {
+            "sample": 196,
+            "position_delta": 542.2129423517948,
+            "forward_degrees": 17.530455300299423,
+            "up_degrees": 7.1555788950113435,
+            "fov_delta": 0.0
+          }
+        ],
+        "noncut_peak_steps": {
+          "position_delta": {
+            "value": 0.01775952750546855,
+            "sample": 334
+          },
+          "forward_degrees": {
+            "value": 0.006630786622824615,
+            "sample": 139
+          },
+          "up_degrees": {
+            "value": 0.006462359932580042,
+            "sample": 139
+          },
+          "fov_delta": {
+            "value": 0.0,
+            "sample": 1
+          }
+        },
+        "one_update_islands": [],
+        "aba_shot_returns": [],
+        "fixed_dt": 0.016666666666666666,
+        "time_note": "sample * fixed_dt is elapsed capture time; presentation_frame changes clock domain at song start",
+        "scope": "native trace integrity and review locations only; no retail pose or visual acceptance claim"
+      },
+      "camera_samples_match_before_replacement": true,
+      "steady_fps": 59.834,
+      "crowd_samples": [
+        "[world] WorldCrowd draw: enabled=1 actors=11 placements=11 drawn_3d=212 drawn_flat=0 selection=0::0 entries=0 total_pairs=0 culled_fullness=0 hidden_flat=0 missing_impostor=0 basis=placement face_camera=0 event=excitement_okay groups=great:2,ok:9 eye=(35.909 -136.385 19.419) t=40.000",
+        "[world] WorldCrowd draw: enabled=1 actors=11 placements=11 drawn_3d=212 drawn_flat=0 selection=0::0 entries=0 total_pairs=0 culled_fullness=0 hidden_flat=0 missing_impostor=0 basis=placement face_camera=0 event=excitement_okay groups=great:2,ok:9 eye=(35.810 -136.416 19.509) t=40.500",
+        "[world] WorldCrowd draw: enabled=1 actors=11 placements=11 drawn_3d=212 drawn_flat=0 selection=0::0 entries=0 total_pairs=0 culled_fullness=0 hidden_flat=0 missing_impostor=0 basis=placement face_camera=0 event=excitement_okay groups=great:2,ok:9 eye=(35.707 -136.461 19.526) t=41.000",
+        "[world] WorldCrowd draw: enabled=1 actors=11 placements=11 drawn_3d=212 drawn_flat=0 selection=0::0 entries=0 total_pairs=0 culled_fullness=0 hidden_flat=0 missing_impostor=0 basis=placement face_camera=0 event=excitement_okay groups=great:2,ok:9 eye=(35.751 -136.469 19.366) t=41.500",
+        "[world] WorldCrowd draw: enabled=1 actors=11 placements=11 drawn_3d=212 drawn_flat=0 selection=0::0 entries=0 total_pairs=0 culled_fullness=0 hidden_flat=0 missing_impostor=0 basis=placement face_camera=0 event=excitement_okay groups=great:2,ok:9 eye=(35.862 -136.414 19.379) t=42.000",
+        "[world] WorldCrowd draw: enabled=1 actors=11 placements=11 drawn_3d=212 drawn_flat=0 selection=0::0 entries=0 total_pairs=0 culled_fullness=0 hidden_flat=0 missing_impostor=0 basis=placement face_camera=0 event=excitement_okay groups=great:2,ok:9 eye=(35.989 -136.373 19.268) t=42.500",
+        "[world] WorldCrowd draw: enabled=1 actors=11 placements=11 drawn_3d=212 drawn_flat=0 selection=0::0 entries=0 total_pairs=0 culled_fullness=0 hidden_flat=0 missing_impostor=0 basis=placement face_camera=0 event=excitement_okay groups=great:2,ok:9 eye=(36.104 -136.276 19.512) t=43.000",
+        "[world] WorldCrowd draw: enabled=1 actors=11 placements=11 drawn_3d=211 drawn_flat=0 selection=0::0 entries=0 total_pairs=0 culled_fullness=0 hidden_flat=0 missing_impostor=0 basis=placement face_camera=0 event=excitement_okay groups=great:2,ok:9 eye=(-284.774 -573.276 26.183) t=43.500",
+        "[world] WorldCrowd draw: enabled=1 actors=11 placements=11 drawn_3d=211 drawn_flat=0 selection=0::0 entries=0 total_pairs=0 culled_fullness=0 hidden_flat=0 missing_impostor=0 basis=placement face_camera=0 event=excitement_okay groups=great:2,ok:9 eye=(-284.878 -573.276 26.240) t=44.000",
+        "[world] WorldCrowd draw: enabled=1 actors=11 placements=11 drawn_3d=211 drawn_flat=0 selection=0::0 entries=0 total_pairs=0 culled_fullness=0 hidden_flat=0 missing_impostor=0 basis=placement face_camera=0 event=excitement_okay groups=great:2,ok:9 eye=(-284.917 -573.276 26.182) t=44.500",
+        "[world] WorldCrowd draw: enabled=1 actors=11 placements=11 drawn_3d=211 drawn_flat=0 selection=0::0 entries=0 total_pairs=0 culled_fullness=0 hidden_flat=0 missing_impostor=0 basis=placement face_camera=0 event=excitement_okay groups=great:2,ok:9 eye=(-284.833 -573.276 26.049) t=45.000",
+        "[world] WorldCrowd draw: enabled=1 actors=11 placements=11 drawn_3d=211 drawn_flat=0 selection=0::0 entries=0 total_pairs=0 culled_fullness=0 hidden_flat=0 missing_impostor=0 basis=placement face_camera=0 event=excitement_okay groups=great:2,ok:9 eye=(-284.714 -573.276 26.099) t=45.500",
+        "[world] WorldCrowd draw: enabled=1 actors=11 placements=11 drawn_3d=211 drawn_flat=0 selection=0::0 entries=0 total_pairs=0 culled_fullness=0 hidden_flat=0 missing_impostor=0 basis=placement face_camera=0 event=excitement_okay groups=great:2,ok:9 eye=(-284.581 -573.276 26.119) t=46.000"
+      ],
+      "maximum_sprite_draws": 0,
+      "command": [
+        "C:\\Users\\smmel\\AppData\\Local\\Temp\\ghogx-menu-camera-goal-20260910\\build\\src\\app\\ghogx_app.exe",
+        "--ark-dir",
+        "C:\\Programming\\GitHub\\Guitar Hero II\\gh2_ps2_hybrid_assets\\GEN",
+        "--auto-start",
+        "--diagnostic-character",
+        "funk1",
+        "--diagnostic-venue",
+        "gh1_big_club",
+        "--diagnostic-autoplay",
+        "--diagnostic-song-start",
+        "40.0",
+        "--mute-audio",
+        "--fixed-dt",
+        "0.016666666666666666",
+        "--frames",
+        "361",
+        "--screenshot-dir",
+        "C:\\Users\\smmel\\AppData\\Local\\Temp\\ghogx-menu-camera-goal-20260910\\crowd-all-venues\\gh1_big_club",
+        "--screenshot-frames",
+        "0,180,360"
+      ]
+    },
+    {
+      "venue": "gh1_theatre",
+      "smoke_pass": true,
+      "motion": {
+        "venue": "gh1_theatre",
+        "exe_sha256": "c474acbf47c8cb124fa27b879af0992ed4b795d3a435be83b1de3754fa1c9fea",
+        "integrity_pass": true,
+        "errors": [],
+        "parsed_samples": 361,
+        "segments": [
+          {
+            "shots": [
+              "flr_near_rt01x2",
+              "flr_near_rt01x2"
+            ],
+            "start_sample": 0,
+            "start_local_frames": [
+              0.0,
+              0.0
+            ],
+            "start_presentation_frame": 1200.0,
+            "end_sample": 195,
+            "sample_count": 196
+          },
+          {
+            "shots": [
+              "flr_far_lft04",
+              "flr_far_lft04"
+            ],
+            "start_sample": 196,
+            "start_local_frames": [
+              0.0,
+              0.0
+            ],
+            "start_presentation_frame": 1298.0,
+            "end_sample": 360,
+            "sample_count": 165
+          }
+        ],
+        "cuts": [
+          {
+            "sample": 196,
+            "position_delta": 970.8397494293911,
+            "forward_degrees": 113.168479535456,
+            "up_degrees": 4.720052488704585,
+            "fov_delta": 0.0
+          }
+        ],
+        "noncut_peak_steps": {
+          "position_delta": {
+            "value": 0.017532794164264374,
+            "sample": 139
+          },
+          "forward_degrees": {
+            "value": 0.0029473912188704393,
+            "sample": 139
+          },
+          "up_degrees": {
+            "value": 0.0029408266400392396,
+            "sample": 139
+          },
+          "fov_delta": {
+            "value": 0.0,
+            "sample": 1
+          }
+        },
+        "one_update_islands": [],
+        "aba_shot_returns": [],
+        "fixed_dt": 0.016666666666666666,
+        "time_note": "sample * fixed_dt is elapsed capture time; presentation_frame changes clock domain at song start",
+        "scope": "native trace integrity and review locations only; no retail pose or visual acceptance claim"
+      },
+      "camera_samples_match_before_replacement": true,
+      "steady_fps": 59.844,
+      "crowd_samples": [
+        "[world] WorldCrowd draw: enabled=1 actors=11 placements=11 drawn_3d=252 drawn_flat=0 selection=0::0 entries=0 total_pairs=0 culled_fullness=0 hidden_flat=0 missing_impostor=0 basis=placement face_camera=0 event=excitement_okay groups=great:2,ok:9 eye=(353.793 412.307 1.460) t=40.000",
+        "[world] WorldCrowd draw: enabled=1 actors=11 placements=11 drawn_3d=252 drawn_flat=0 selection=0::0 entries=0 total_pairs=0 culled_fullness=0 hidden_flat=0 missing_impostor=0 basis=placement face_camera=0 event=excitement_okay groups=great:2,ok:9 eye=(353.693 412.287 1.543) t=40.500",
+        "[world] WorldCrowd draw: enabled=1 actors=11 placements=11 drawn_3d=252 drawn_flat=0 selection=0::0 entries=0 total_pairs=0 culled_fullness=0 hidden_flat=0 missing_impostor=0 basis=placement face_camera=0 event=excitement_okay groups=great:2,ok:9 eye=(353.592 412.267 1.554) t=41.000",
+        "[world] WorldCrowd draw: enabled=1 actors=11 placements=11 drawn_3d=252 drawn_flat=0 selection=0::0 entries=0 total_pairs=0 culled_fullness=0 hidden_flat=0 missing_impostor=0 basis=placement face_camera=0 event=excitement_okay groups=great:2,ok:9 eye=(353.638 412.274 1.396) t=41.500",
+        "[world] WorldCrowd draw: enabled=1 actors=11 placements=11 drawn_3d=252 drawn_flat=0 selection=0::0 entries=0 total_pairs=0 culled_fullness=0 hidden_flat=0 missing_impostor=0 basis=placement face_camera=0 event=excitement_okay groups=great:2,ok:9 eye=(353.747 412.296 1.416) t=42.000",
+        "[world] WorldCrowd draw: enabled=1 actors=11 placements=11 drawn_3d=252 drawn_flat=0 selection=0::0 entries=0 total_pairs=0 culled_fullness=0 hidden_flat=0 missing_impostor=0 basis=placement face_camera=0 event=excitement_okay groups=great:2,ok:9 eye=(353.874 412.321 1.314) t=42.500",
+        "[world] WorldCrowd draw: enabled=1 actors=11 placements=11 drawn_3d=252 drawn_flat=0 selection=0::0 entries=0 total_pairs=0 culled_fullness=0 hidden_flat=0 missing_impostor=0 basis=placement face_camera=0 event=excitement_okay groups=great:2,ok:9 eye=(353.982 412.347 1.566) t=43.000",
+        "[world] WorldCrowd draw: enabled=1 actors=11 placements=11 drawn_3d=250 drawn_flat=0 selection=0::0 entries=0 total_pairs=0 culled_fullness=0 hidden_flat=0 missing_impostor=0 basis=placement face_camera=0 event=excitement_okay groups=great:2,ok:9 eye=(-439.728 -143.276 63.135) t=43.500",
+        "[world] WorldCrowd draw: enabled=1 actors=11 placements=11 drawn_3d=250 drawn_flat=0 selection=0::0 entries=0 total_pairs=0 culled_fullness=0 hidden_flat=0 missing_impostor=0 basis=placement face_camera=0 event=excitement_okay groups=great:2,ok:9 eye=(-439.728 -143.276 63.135) t=44.000",
+        "[world] WorldCrowd draw: enabled=1 actors=11 placements=11 drawn_3d=250 drawn_flat=0 selection=0::0 entries=0 total_pairs=0 culled_fullness=0 hidden_flat=0 missing_impostor=0 basis=placement face_camera=0 event=excitement_okay groups=great:2,ok:9 eye=(-439.728 -143.276 63.135) t=44.500",
+        "[world] WorldCrowd draw: enabled=1 actors=11 placements=11 drawn_3d=250 drawn_flat=0 selection=0::0 entries=0 total_pairs=0 culled_fullness=0 hidden_flat=0 missing_impostor=0 basis=placement face_camera=0 event=excitement_okay groups=great:2,ok:9 eye=(-439.728 -143.276 63.135) t=45.000",
+        "[world] WorldCrowd draw: enabled=1 actors=11 placements=11 drawn_3d=250 drawn_flat=0 selection=0::0 entries=0 total_pairs=0 culled_fullness=0 hidden_flat=0 missing_impostor=0 basis=placement face_camera=0 event=excitement_okay groups=great:2,ok:9 eye=(-439.728 -143.276 63.135) t=45.500",
+        "[world] WorldCrowd draw: enabled=1 actors=11 placements=11 drawn_3d=250 drawn_flat=0 selection=0::0 entries=0 total_pairs=0 culled_fullness=0 hidden_flat=0 missing_impostor=0 basis=placement face_camera=0 event=excitement_okay groups=great:2,ok:9 eye=(-439.728 -143.276 63.135) t=46.000"
+      ],
+      "maximum_sprite_draws": 0,
+      "command": [
+        "C:\\Users\\smmel\\AppData\\Local\\Temp\\ghogx-menu-camera-goal-20260910\\build\\src\\app\\ghogx_app.exe",
+        "--ark-dir",
+        "C:\\Programming\\GitHub\\Guitar Hero II\\gh2_ps2_hybrid_assets\\GEN",
+        "--auto-start",
+        "--diagnostic-character",
+        "funk1",
+        "--diagnostic-venue",
+        "gh1_theatre",
+        "--diagnostic-autoplay",
+        "--diagnostic-song-start",
+        "40.0",
+        "--mute-audio",
+        "--fixed-dt",
+        "0.016666666666666666",
+        "--frames",
+        "361",
+        "--screenshot-dir",
+        "C:\\Users\\smmel\\AppData\\Local\\Temp\\ghogx-menu-camera-goal-20260910\\crowd-all-venues\\gh1_theatre",
+        "--screenshot-frames",
+        "0,180,360"
+      ]
+    },
+    {
+      "venue": "gh1_fest",
+      "smoke_pass": true,
+      "motion": {
+        "venue": "gh1_fest",
+        "exe_sha256": "c474acbf47c8cb124fa27b879af0992ed4b795d3a435be83b1de3754fa1c9fea",
+        "integrity_pass": true,
+        "errors": [],
+        "parsed_samples": 361,
+        "segments": [
+          {
+            "shots": [
+              "flr_near_lft04",
+              "flr_near_lft04"
+            ],
+            "start_sample": 0,
+            "start_local_frames": [
+              0.0,
+              0.0
+            ],
+            "start_presentation_frame": 1200.0,
+            "end_sample": 195,
+            "sample_count": 196
+          },
+          {
+            "shots": [
+              "flr_far_lft05",
+              "flr_far_lft05"
+            ],
+            "start_sample": 196,
+            "start_local_frames": [
+              0.0,
+              0.0
+            ],
+            "start_presentation_frame": 1298.0,
+            "end_sample": 360,
+            "sample_count": 165
+          }
+        ],
+        "cuts": [
+          {
+            "sample": 196,
+            "position_delta": 885.4717560068406,
+            "forward_degrees": 27.888692995827366,
+            "up_degrees": 1.881505061023924,
+            "fov_delta": 0.0
+          }
+        ],
+        "noncut_peak_steps": {
+          "position_delta": {
+            "value": 0.16511322683482765,
+            "sample": 115
+          },
+          "forward_degrees": {
+            "value": 0.09280720247753459,
+            "sample": 115
+          },
+          "up_degrees": {
+            "value": 0.035757116678941145,
+            "sample": 115
+          },
+          "fov_delta": {
+            "value": 0.0,
+            "sample": 1
+          }
+        },
+        "one_update_islands": [],
+        "aba_shot_returns": [],
+        "fixed_dt": 0.016666666666666666,
+        "time_note": "sample * fixed_dt is elapsed capture time; presentation_frame changes clock domain at song start",
+        "scope": "native trace integrity and review locations only; no retail pose or visual acceptance claim"
+      },
+      "camera_samples_match_before_replacement": true,
+      "steady_fps": 59.633,
+      "crowd_samples": [
+        "[world] WorldCrowd draw: enabled=1 actors=16 placements=16 drawn_3d=5 drawn_flat=0 selection=0::0 entries=0 total_pairs=0 culled_fullness=0 hidden_flat=0 missing_impostor=0 basis=placement face_camera=0 event=excitement_okay groups=great:3,ok:13 eye=(-94.753 -299.362 26.638) t=40.000",
+        "[world] WorldCrowd draw: enabled=1 actors=16 placements=16 drawn_3d=5 drawn_flat=0 selection=0::0 entries=0 total_pairs=0 culled_fullness=0 hidden_flat=0 missing_impostor=0 basis=placement face_camera=0 event=excitement_okay groups=great:3,ok:13 eye=(-94.630 -299.504 26.742) t=40.500",
+        "[world] WorldCrowd draw: enabled=1 actors=16 placements=16 drawn_3d=5 drawn_flat=0 selection=0::0 entries=0 total_pairs=0 culled_fullness=0 hidden_flat=0 missing_impostor=0 basis=placement face_camera=0 event=excitement_okay groups=great:3,ok:13 eye=(-94.602 -299.489 26.749) t=41.000",
+        "[world] WorldCrowd draw: enabled=1 actors=16 placements=16 drawn_3d=5 drawn_flat=0 selection=0::0 entries=0 total_pairs=0 culled_fullness=0 hidden_flat=0 missing_impostor=0 basis=placement face_camera=0 event=excitement_okay groups=great:3,ok:13 eye=(-94.882 -299.224 26.533) t=41.500",
+        "[world] WorldCrowd draw: enabled=1 actors=16 placements=16 drawn_3d=5 drawn_flat=0 selection=0::0 entries=0 total_pairs=0 culled_fullness=0 hidden_flat=0 missing_impostor=0 basis=placement face_camera=0 event=excitement_okay groups=great:3,ok:13 eye=(-95.652 -299.139 26.173) t=42.000",
+        "[world] WorldCrowd draw: enabled=1 actors=16 placements=16 drawn_3d=5 drawn_flat=0 selection=0::0 entries=0 total_pairs=0 culled_fullness=0 hidden_flat=0 missing_impostor=0 basis=placement face_camera=0 event=excitement_okay groups=great:3,ok:13 eye=(-95.831 -299.128 26.094) t=42.500",
+        "[world] WorldCrowd draw: enabled=1 actors=16 placements=16 drawn_3d=5 drawn_flat=0 selection=0::0 entries=0 total_pairs=0 culled_fullness=0 hidden_flat=0 missing_impostor=0 basis=placement face_camera=0 event=excitement_okay groups=great:3,ok:13 eye=(-95.759 -299.140 26.128) t=43.000",
+        "[world] WorldCrowd draw: enabled=1 actors=16 placements=16 drawn_3d=300 drawn_flat=0 selection=0::0 entries=0 total_pairs=0 culled_fullness=0 hidden_flat=0 missing_impostor=0 basis=placement face_camera=0 event=excitement_okay groups=great:3,ok:13 eye=(-94.687 -1182.897 -28.540) t=43.500",
+        "[world] WorldCrowd draw: enabled=1 actors=16 placements=16 drawn_3d=300 drawn_flat=0 selection=0::0 entries=0 total_pairs=0 culled_fullness=0 hidden_flat=0 missing_impostor=0 basis=placement face_camera=0 event=excitement_okay groups=great:3,ok:13 eye=(-94.796 -1182.916 -28.507) t=44.000",
+        "[world] WorldCrowd draw: enabled=1 actors=16 placements=16 drawn_3d=300 drawn_flat=0 selection=0::0 entries=0 total_pairs=0 culled_fullness=0 hidden_flat=0 missing_impostor=0 basis=placement face_camera=0 event=excitement_okay groups=great:3,ok:13 eye=(-94.823 -1182.867 -28.441) t=44.500",
+        "[world] WorldCrowd draw: enabled=1 actors=16 placements=16 drawn_3d=300 drawn_flat=0 selection=0::0 entries=0 total_pairs=0 culled_fullness=0 hidden_flat=0 missing_impostor=0 basis=placement face_camera=0 event=excitement_okay groups=great:3,ok:13 eye=(-94.734 -1182.837 -28.079) t=45.000",
+        "[world] WorldCrowd draw: enabled=1 actors=16 placements=16 drawn_3d=300 drawn_flat=0 selection=0::0 entries=0 total_pairs=0 culled_fullness=0 hidden_flat=0 missing_impostor=0 basis=placement face_camera=0 event=excitement_okay groups=great:3,ok:13 eye=(-94.623 -1182.868 -27.812) t=45.500",
+        "[world] WorldCrowd draw: enabled=1 actors=16 placements=16 drawn_3d=300 drawn_flat=0 selection=0::0 entries=0 total_pairs=0 culled_fullness=0 hidden_flat=0 missing_impostor=0 basis=placement face_camera=0 event=excitement_okay groups=great:3,ok:13 eye=(-94.485 -1182.860 -27.850) t=46.000"
+      ],
+      "maximum_sprite_draws": 0,
+      "command": [
+        "C:\\Users\\smmel\\AppData\\Local\\Temp\\ghogx-menu-camera-goal-20260910\\build\\src\\app\\ghogx_app.exe",
+        "--ark-dir",
+        "C:\\Programming\\GitHub\\Guitar Hero II\\gh2_ps2_hybrid_assets\\GEN",
+        "--auto-start",
+        "--diagnostic-character",
+        "funk1",
+        "--diagnostic-venue",
+        "gh1_fest",
+        "--diagnostic-autoplay",
+        "--diagnostic-song-start",
+        "40.0",
+        "--mute-audio",
+        "--fixed-dt",
+        "0.016666666666666666",
+        "--frames",
+        "361",
+        "--screenshot-dir",
+        "C:\\Users\\smmel\\AppData\\Local\\Temp\\ghogx-menu-camera-goal-20260910\\crowd-all-venues\\gh1_fest",
+        "--screenshot-frames",
+        "0,180,360"
+      ]
+    },
+    {
+      "venue": "gh1_arena",
+      "smoke_pass": true,
+      "motion": {
+        "venue": "gh1_arena",
+        "exe_sha256": "c474acbf47c8cb124fa27b879af0992ed4b795d3a435be83b1de3754fa1c9fea",
+        "integrity_pass": true,
+        "errors": [],
+        "parsed_samples": 361,
+        "segments": [
+          {
+            "shots": [
+              "flr_near_lft03",
+              "flr_near_lft03"
+            ],
+            "start_sample": 0,
+            "start_local_frames": [
+              0.0,
+              0.0
+            ],
+            "start_presentation_frame": 1200.0,
+            "end_sample": 195,
+            "sample_count": 196
+          },
+          {
+            "shots": [
+              "flr_far_rt01",
+              "flr_far_rt01"
+            ],
+            "start_sample": 196,
+            "start_local_frames": [
+              0.0,
+              0.0
+            ],
+            "start_presentation_frame": 1298.0,
+            "end_sample": 360,
+            "sample_count": 165
+          }
+        ],
+        "cuts": [
+          {
+            "sample": 196,
+            "position_delta": 818.3406414801375,
+            "forward_degrees": 39.98742539898966,
+            "up_degrees": 11.616454494518734,
+            "fov_delta": 0.0
+          }
+        ],
+        "noncut_peak_steps": {
+          "position_delta": {
+            "value": 0.18306277364105103,
+            "sample": 108
+          },
+          "forward_degrees": {
+            "value": 0.025715341380919937,
+            "sample": 335
+          },
+          "up_degrees": {
+            "value": 0.013849592967536666,
+            "sample": 337
+          },
+          "fov_delta": {
+            "value": 0.0,
+            "sample": 1
+          }
+        },
+        "one_update_islands": [],
+        "aba_shot_returns": [],
+        "fixed_dt": 0.016666666666666666,
+        "time_note": "sample * fixed_dt is elapsed capture time; presentation_frame changes clock domain at song start",
+        "scope": "native trace integrity and review locations only; no retail pose or visual acceptance claim"
+      },
+      "camera_samples_match_before_replacement": true,
+      "steady_fps": 59.672,
+      "crowd_samples": [
+        "[world] WorldCrowd draw: enabled=1 actors=11 placements=11 drawn_3d=244 drawn_flat=0 selection=0::0 entries=0 total_pairs=0 culled_fullness=0 hidden_flat=0 missing_impostor=0 basis=placement face_camera=0 event=excitement_okay groups=great:2,ok:9 eye=(191.119 -32.202 -259.398) t=40.000",
+        "[world] WorldCrowd draw: enabled=1 actors=11 placements=11 drawn_3d=244 drawn_flat=0 selection=0::0 entries=0 total_pairs=0 culled_fullness=0 hidden_flat=0 missing_impostor=0 basis=placement face_camera=0 event=excitement_okay groups=great:2,ok:9 eye=(190.186 -32.962 -259.304) t=40.500",
+        "[world] WorldCrowd draw: enabled=1 actors=11 placements=11 drawn_3d=244 drawn_flat=0 selection=0::0 entries=0 total_pairs=0 culled_fullness=0 hidden_flat=0 missing_impostor=0 basis=placement face_camera=0 event=excitement_okay groups=great:2,ok:9 eye=(190.341 -33.107 -259.282) t=41.000",
+        "[world] WorldCrowd draw: enabled=1 actors=11 placements=11 drawn_3d=244 drawn_flat=0 selection=0::0 entries=0 total_pairs=0 culled_fullness=0 hidden_flat=0 missing_impostor=0 basis=placement face_camera=0 event=excitement_okay groups=great:2,ok:9 eye=(192.017 -31.368 -259.405) t=41.500",
+        "[world] WorldCrowd draw: enabled=1 actors=11 placements=11 drawn_3d=244 drawn_flat=0 selection=0::0 entries=0 total_pairs=0 culled_fullness=0 hidden_flat=0 missing_impostor=0 basis=placement face_camera=0 event=excitement_okay groups=great:2,ok:9 eye=(192.937 -26.885 -260.491) t=42.000",
+        "[world] WorldCrowd draw: enabled=1 actors=11 placements=11 drawn_3d=244 drawn_flat=0 selection=0::0 entries=0 total_pairs=0 culled_fullness=0 hidden_flat=0 missing_impostor=0 basis=placement face_camera=0 event=excitement_okay groups=great:2,ok:9 eye=(193.153 -26.252 -260.870) t=42.500",
+        "[world] WorldCrowd draw: enabled=1 actors=11 placements=11 drawn_3d=244 drawn_flat=0 selection=0::0 entries=0 total_pairs=0 culled_fullness=0 hidden_flat=0 missing_impostor=0 basis=placement face_camera=0 event=excitement_okay groups=great:2,ok:9 eye=(192.974 -26.637 -260.559) t=43.000",
+        "[world] WorldCrowd draw: enabled=1 actors=11 placements=11 drawn_3d=244 drawn_flat=0 selection=0::0 entries=0 total_pairs=0 culled_fullness=0 hidden_flat=0 missing_impostor=0 basis=placement face_camera=0 event=excitement_okay groups=great:2,ok:9 eye=(174.400 -844.693 -243.201) t=43.500",
+        "[world] WorldCrowd draw: enabled=1 actors=11 placements=11 drawn_3d=244 drawn_flat=0 selection=0::0 entries=0 total_pairs=0 culled_fullness=0 hidden_flat=0 missing_impostor=0 basis=placement face_camera=0 event=excitement_okay groups=great:2,ok:9 eye=(174.367 -844.716 -243.234) t=44.000",
+        "[world] WorldCrowd draw: enabled=1 actors=11 placements=11 drawn_3d=244 drawn_flat=0 selection=0::0 entries=0 total_pairs=0 culled_fullness=0 hidden_flat=0 missing_impostor=0 basis=placement face_camera=0 event=excitement_okay groups=great:2,ok:9 eye=(174.543 -844.675 -243.051) t=44.500",
+        "[world] WorldCrowd draw: enabled=1 actors=11 placements=11 drawn_3d=244 drawn_flat=0 selection=0::0 entries=0 total_pairs=0 culled_fullness=0 hidden_flat=0 missing_impostor=0 basis=placement face_camera=0 event=excitement_okay groups=great:2,ok:9 eye=(175.189 -845.016 -242.409) t=45.000",
+        "[world] WorldCrowd draw: enabled=1 actors=11 placements=11 drawn_3d=244 drawn_flat=0 selection=0::0 entries=0 total_pairs=0 culled_fullness=0 hidden_flat=0 missing_impostor=0 basis=placement face_camera=0 event=excitement_okay groups=great:2,ok:9 eye=(175.531 -845.191 -242.034) t=45.500",
+        "[world] WorldCrowd draw: enabled=1 actors=11 placements=11 drawn_3d=244 drawn_flat=0 selection=0::0 entries=0 total_pairs=0 culled_fullness=0 hidden_flat=0 missing_impostor=0 basis=placement face_camera=0 event=excitement_okay groups=great:2,ok:9 eye=(175.449 -844.609 -242.026) t=46.000"
+      ],
+      "maximum_sprite_draws": 0,
+      "command": [
+        "C:\\Users\\smmel\\AppData\\Local\\Temp\\ghogx-menu-camera-goal-20260910\\build\\src\\app\\ghogx_app.exe",
+        "--ark-dir",
+        "C:\\Programming\\GitHub\\Guitar Hero II\\gh2_ps2_hybrid_assets\\GEN",
+        "--auto-start",
+        "--diagnostic-character",
+        "funk1",
+        "--diagnostic-venue",
+        "gh1_arena",
+        "--diagnostic-autoplay",
+        "--diagnostic-song-start",
+        "40.0",
+        "--mute-audio",
+        "--fixed-dt",
+        "0.016666666666666666",
+        "--frames",
+        "361",
+        "--screenshot-dir",
+        "C:\\Users\\smmel\\AppData\\Local\\Temp\\ghogx-menu-camera-goal-20260910\\crowd-all-venues\\gh1_arena",
+        "--screenshot-frames",
+        "0,180,360"
+      ]
+    }
+  ],
+  "tests": "[1/5] Building CXX object src\\render\\CMakeFiles\\ghogx_gh1_crowd_region_audit.dir\\gh1_crowd_regions.cpp.obj\n[2/5] Building CXX object src\\render\\CMakeFiles\\ghogx_gh1_crowd_region_audit.dir\\gh1_crowd_region_audit.cpp.obj\n[3/5] Linking CXX executable src\\render\\ghogx_gh1_crowd_region_audit.exe\n[4/5] Building CXX object src\\game\\CMakeFiles\\ghogx_gameplay_venue_band_contract_test.dir\\gameplay_venue_band_contract_test.cpp.obj\n[5/5] Linking CXX executable src\\game\\ghogx_gameplay_venue_band_contract_test.exe; Checking ghogx_gameplay_venue_band_contract_test for forbidden runtime DLL imports\nC:\\Users\\smmel\\AppData\\Local\\Temp\\ghogx-menu-camera-goal-20260910\\build\\src\\game\\ghogx_gameplay_venue_band_contract_test.exe imports: KERNEL32.dll\nTest project C:/Users/smmel/AppData/Local/Temp/ghogx-menu-camera-goal-20260910/build\n      Start 17: ghogx_milo_scene_test\n 1/10 Test #17: ghogx_milo_scene_test ........................   Passed    0.06 sec\n      Start 20: ghogx_render_camera_matrix_test\n 2/10 Test #20: ghogx_render_camera_matrix_test ..............   Passed    0.02 sec\n      Start 22: ghogx_gh1_crowd_regions_test\n 3/10 Test #22: ghogx_gh1_crowd_regions_test .................   Passed    0.05 sec\n      Start 25: ghogx_source_anim_task_test\n 4/10 Test #25: ghogx_source_anim_task_test ..................   Passed    0.01 sec\n      Start 26: ghogx_gameplay_venue_band_contract_test\n 5/10 Test #26: ghogx_gameplay_venue_band_contract_test ......   Passed    0.27 sec\n      Start 27: ghogx_gameplay_venue_band_contract_imports\n 6/10 Test #27: ghogx_gameplay_venue_band_contract_imports ...   Passed    3.92 sec\n      Start 29: ghogx_gameplay_session_test\n 7/10 Test #29: ghogx_gameplay_session_test ..................   Passed    0.01 sec\n      Start 30: ghogx_camera_filter_test\n 8/10 Test #30: ghogx_camera_filter_test .....................   Passed    0.01 sec\n      Start 31: ghogx_camera_projection_test\n 9/10 Test #31: ghogx_camera_projection_test .................   Passed    0.01 sec\n      Start 32: ghogx_camera_intro_timing_test\n10/10 Test #32: ghogx_camera_intro_timing_test ...............   Passed    0.01 sec\n\n100% tests passed, 0 tests failed out of 10\n\nTotal Test time (real) =   4.75 sec\n",
+  "frustum_test": "  [ok] camera view matrix matches accepted PS2 output rows\n",
+  "crowd_test": "GH1 crowd regions: membership, boundaries, affine scale, ownership, scoring, population, replacement grounding and lifecycle PASS\n",
+  "installed_executable": "C:\\Programming\\GitHub\\Guitar Hero II\\gh2_ps2_hybrid_assets\\ghogx_app.exe",
+  "installed_practice_proof": "practice-installed.png",
+  "audio_test": "ghogx_ui_test: audio command contract failures=0",
+  "script_test": "ghogx_script_test: interpreter runs real main.dtb script shapes -- all checks passed",
+  "visual_review": "All 45 native stills reviewed in order, grouped by venue. No every-frame video review claimed."
+}

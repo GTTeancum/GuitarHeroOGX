@@ -176,7 +176,7 @@ FoFiXSessionEvent FoFiXGameplaySession::make_event(
   event.source_tick = source_tick;
   event.rock_fill = fofix_rock_fill(rock_);
   event.star_power_fill = fofix_star_power_fill(star_power_);
-  event.failed = fofix_rock_failed(rock_);
+  event.failed = failed();
   event.phrase_state = star_phrase_active_
                            ? static_cast<uint8_t>(star_phrase_missed_ ? 1 : 2)
                            : 0;
@@ -652,7 +652,7 @@ uint32_t FoFiXGameplaySession::tick_diagnostic_autoplay(
     uint32_t hit_mask = required | (1u << 5) | star_power_mask();
     collect_tick(hit_time, hit_mask);
     final_mask = release_to_sustains(hit_time, hit_mask);
-    if (fofix_rock_failed(rock_)) break;
+    if (failed()) break;
   }
 
   final_mask = sustain_mask_at(target_time) | star_power_mask();
@@ -728,7 +728,7 @@ void FoFiXGameplaySession::tick(double song_time, uint32_t fret_mask,
                    song_time, 0, 0, 0,
                    static_cast<size_t>(-1), UINT32_MAX));
   }
-  if (fofix_rock_failed(rock_)) {
+  if (failed()) {
     active_sustains_.clear();
     prev_fret_mask_ = fret_mask;
     return;

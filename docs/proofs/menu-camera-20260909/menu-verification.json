@@ -1,0 +1,62 @@
+{
+  "exe_sha256": "eb73d0164c83f877990ecf92b9f1a8b500d70aa19147e7cd55969a77f34efba0",
+  "checks": {
+    "practice_notes": [
+      "[flow] equipped instrument handoff: mode=<unset> player0=lespaul skin_outfit=lespaull skin_mat=guitar_lespaul_burst.mat player1=<npc> skin_outfit=<default> skin_mat=<default>",
+      "[flow] selected song handoff: provider_index=0 song=badreputation mode=career venue=theatre intro_category=INTRO",
+      "[flow] selected native character handoff: character=rockabill outfit=rockabill1 model=char/rockabill1/og/gen/rockabill1.milo_ps2 surface=resolve_from_character",
+      "[flow] gameplay calibration: audio_offset_ms=0 video_input_offset_ms=0 audio_master=1 presentation=audio-audio_offset judgement=presentation+video_input_offset",
+      "[flow] diagnostic menu-loop song seek: 30.000 sec",
+      "[flow] gameplay ready: badreputation diff=1 autoplay=1"
+    ],
+    "preview_navigation": [
+      "[song-preview] playing song=shoutatthedevil start=65.500 end=85.500 path=songs/shoutatthedevil/shoutatthedevil.vgs",
+      "[menu-proof] frame=30 action=down",
+      "[audio-gameplay] menu_script route=button_toggle sfx=clap2 maps=2 submitted=2 route_gain_db=0.00",
+      "[song-preview] playing song=mother start=61.100 end=81.500 path=songs/mother/mother.vgs",
+      "[menu-proof] frame=60 action=down",
+      "[audio-gameplay] menu_script route=button_toggle sfx=clap3 maps=2 submitted=2 route_gain_db=0.00",
+      "[song-preview] playing song=surrender start=46.000 end=66.000 path=songs/surrender/surrender.vgs",
+      "[menu-proof] frame=90 action=back",
+      "[song-preview] stopped"
+    ],
+    "soundcheck": [
+      "[menu-proof] frame=30 action=down",
+      "[audio-gameplay] menu_script route=button_toggle sfx=clap2 maps=2 submitted=2 route_gain_db=0.00",
+      "[menu-proof] frame=60 action=up",
+      "[audio-gameplay] menu_script route=button_toggle sfx=clap1 maps=2 submitted=2 route_gain_db=0.00"
+    ],
+    "practice_flow": [
+      "[menu-proof] frame=30 action=down",
+      "[menu-proof] frame=60 action=confirm",
+      "[menu-proof] frame=90 action=confirm",
+      "[menu-proof] frame=120 action=confirm",
+      "[menu-proof] frame=150 action=confirm",
+      "[menu-proof] frame=180 action=confirm",
+      "[menu-proof] frame=210 action=confirm",
+      "[flow] equipped instrument handoff: mode=practice player0=lespaul skin_outfit=lespaull skin_mat=guitar_lespaul_burst.mat player1=<npc> skin_outfit=<default> skin_mat=<default>",
+      "[flow] selected song handoff: provider_index=0 song=shoutatthedevil mode=career venue=battle intro_category=INTRO",
+      "[flow] selected native character handoff: character=rockabill outfit=rockabill1 model=char/rockabill1/og/gen/rockabill1.milo_ps2 surface=resolve_from_character",
+      "[flow] gameplay calibration: audio_offset_ms=0 video_input_offset_ms=0 audio_master=1 presentation=audio-audio_offset judgement=presentation+video_input_offset",
+      "[flow] gameplay ready: shoutatthedevil diff=1 autoplay=0",
+      "[flow] gameplay Start -> pract_pause_screen",
+      "[menu-proof] frame=400 action=start",
+      "[menu-proof] frame=450 action=start",
+      "[flow] gameplay Start -> pract_pause_screen",
+      "[menu-proof] frame=500 action=start",
+      "[menu-proof] frame=530 action=down",
+      "[menu-proof] frame=560 action=confirm",
+      "[flow] practice restart -> practice_loading_screen",
+      "[flow] equipped instrument handoff: mode=practice player0=lespaul skin_outfit=lespaull skin_mat=guitar_lespaul_burst.mat player1=<npc> skin_outfit=<default> skin_mat=<default>",
+      "[flow] selected song handoff: provider_index=0 song=shoutatthedevil mode=career venue=battle intro_category=INTRO",
+      "[flow] selected native character handoff: character=rockabill outfit=rockabill1 model=char/rockabill1/og/gen/rockabill1.milo_ps2 surface=resolve_from_character",
+      "[flow] gameplay calibration: audio_offset_ms=0 video_input_offset_ms=0 audio_master=1 presentation=audio-audio_offset judgement=presentation+video_input_offset",
+      "[flow] gameplay ready: shoutatthedevil diff=1 autoplay=0"
+    ],
+    "preview_loop": [
+      "[song-preview] playing song=shoutatthedevil start=65.500 end=85.500 path=songs/shoutatthedevil/shoutatthedevil.vgs",
+      "[song-preview] loop song=shoutatthedevil"
+    ]
+  },
+  "scope": "Native process-local menu navigation and captures; no host input."
+}

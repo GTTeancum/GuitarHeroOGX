@@ -3479,8 +3479,9 @@ void MiloSceneRenderer::set_gh1_crowd_sizes(float promoted_fraction,
 }
 
 std::vector<std::array<float, 16>>
-MiloSceneRenderer::gh1_crowd_promoted_worlds() const {
-  return gh1_crowd_regions_.promoted_worlds();
+MiloSceneRenderer::gh1_crowd_replacement_worlds(bool include_far) const {
+  return include_far ? gh1_crowd_regions_.replacement_worlds()
+                     : gh1_crowd_regions_.promoted_worlds();
 }
 
 void MiloSceneRenderer::exclude_gh1_crowd_already_owned_by(
@@ -5849,7 +5850,9 @@ void MiloSceneRenderer::draw_impl(bool clear_target, bool draw_scene,
     if (!ordered_draw.mesh) continue;
     if (ordered_draw.multi_mesh && nonowning_gh1_crowd_drawables_.count(
             ordered_draw.multi_mesh->name)) continue;
-    if (!gh1_crowd_regions_.allows_flat(ordered_draw.instance_world)) continue;
+    // Standing presentation requirement: every owned crowd card is replaced
+    // by a 3D actor. Retail region membership remains available for auditing.
+    if (gh1_crowd_regions_.owns(ordered_draw.instance_world)) continue;
     const auto& m = *ordered_draw.mesh;
     const bool multi_mesh_instance =
         ordered_draw.multi_mesh && ordered_draw.instance_world;

@@ -1,0 +1,1145 @@
+{
+  "exe_sha256": "eb73d0164c83f877990ecf92b9f1a8b500d70aa19147e7cd55969a77f34efba0",
+  "venues": [
+    {
+      "venue": "battle",
+      "exe_sha256": "eb73d0164c83f877990ecf92b9f1a8b500d70aa19147e7cd55969a77f34efba0",
+      "integrity_pass": true,
+      "errors": [],
+      "parsed_samples": 361,
+      "segments": [
+        {
+          "shots": [
+            "flr_near_lft02",
+            "flr_near_lft02"
+          ],
+          "start_sample": 0,
+          "start_local_frames": [
+            0.0,
+            0.0
+          ],
+          "start_presentation_frame": 1200.0,
+          "end_sample": 195,
+          "sample_count": 196
+        },
+        {
+          "shots": [
+            "flr_far_rt01",
+            "flr_far_rt01"
+          ],
+          "start_sample": 196,
+          "start_local_frames": [
+            0.0,
+            0.0
+          ],
+          "start_presentation_frame": 1298.0,
+          "end_sample": 360,
+          "sample_count": 165
+        }
+      ],
+      "cuts": [
+        {
+          "sample": 196,
+          "position_delta": 364.487238075476,
+          "forward_degrees": 55.64895853833487,
+          "up_degrees": 22.631820793022786,
+          "fov_delta": 0.23470133599999998
+        }
+      ],
+      "noncut_peak_steps": {
+        "position_delta": {
+          "value": 0.023850152547346026,
+          "sample": 279
+        },
+        "forward_degrees": {
+          "value": 0.03394098036460942,
+          "sample": 312
+        },
+        "up_degrees": {
+          "value": 0.007752981220643354,
+          "sample": 312
+        },
+        "fov_delta": {
+          "value": 0.0,
+          "sample": 1
+        }
+      },
+      "one_update_islands": [],
+      "aba_shot_returns": [],
+      "fixed_dt": 0.016666666666666666,
+      "time_note": "sample * fixed_dt is elapsed capture time; presentation_frame changes clock domain at song start",
+      "scope": "native trace integrity and review locations only; no retail pose or visual acceptance claim",
+      "smoke_pass": true,
+      "same_camera_samples_as_previous_candidate": true,
+      "screenshots_sha256": {
+        "frame_00000.png": "84632d150cb13704d69c7fd00caa8a23e24272b2b53fb2dfe3705f1d0532c7fd",
+        "frame_00180.png": "5caa2887b8c388ac4988685b6ab8a04132c7a74e74d4fae4602b8386c47b23db",
+        "frame_00360.png": "607e7c970e683bed89a17ca23d8282f96a8e6d31ecb5e1e51891432d62c1ab86"
+      }
+    },
+    {
+      "venue": "small1",
+      "exe_sha256": "eb73d0164c83f877990ecf92b9f1a8b500d70aa19147e7cd55969a77f34efba0",
+      "integrity_pass": true,
+      "errors": [],
+      "parsed_samples": 361,
+      "segments": [
+        {
+          "shots": [
+            "flr_near_rt01",
+            "flr_near_rt01"
+          ],
+          "start_sample": 0,
+          "start_local_frames": [
+            0.0,
+            0.0
+          ],
+          "start_presentation_frame": 1200.0,
+          "end_sample": 195,
+          "sample_count": 196
+        },
+        {
+          "shots": [
+            "flr_near_lft01",
+            "flr_near_lft01"
+          ],
+          "start_sample": 196,
+          "start_local_frames": [
+            0.0,
+            0.0
+          ],
+          "start_presentation_frame": 1298.0,
+          "end_sample": 360,
+          "sample_count": 165
+        }
+      ],
+      "cuts": [
+        {
+          "sample": 196,
+          "position_delta": 98.25068654184344,
+          "forward_degrees": 75.30158112073745,
+          "up_degrees": 10.68287518291222,
+          "fov_delta": 0.229921877
+        }
+      ],
+      "noncut_peak_steps": {
+        "position_delta": {
+          "value": 0.36259773350652846,
+          "sample": 294
+        },
+        "forward_degrees": {
+          "value": 0.2824009161047481,
+          "sample": 331
+        },
+        "up_degrees": {
+          "value": 0.12248743375483225,
+          "sample": 339
+        },
+        "fov_delta": {
+          "value": 0.0,
+          "sample": 1
+        }
+      },
+      "one_update_islands": [],
+      "aba_shot_returns": [],
+      "fixed_dt": 0.016666666666666666,
+      "time_note": "sample * fixed_dt is elapsed capture time; presentation_frame changes clock domain at song start",
+      "scope": "native trace integrity and review locations only; no retail pose or visual acceptance claim",
+      "smoke_pass": true,
+      "same_camera_samples_as_previous_candidate": true,
+      "screenshots_sha256": {
+        "frame_00000.png": "3b3126db1a5da8812221bcd062b363397a52e94b5694aa818bc54df2906454d0",
+        "frame_00180.png": "e4ccc15f7d595dba423b71349a4af6a0b818561c6e85a49d53540b953be8a5a3",
+        "frame_00360.png": "5488028a63966b5ef6066303e78691d01622e5bcff85a4545e8df064941dc0f9"
+      }
+    },
+    {
+      "venue": "small2",
+      "exe_sha256": "eb73d0164c83f877990ecf92b9f1a8b500d70aa19147e7cd55969a77f34efba0",
+      "integrity_pass": true,
+      "errors": [],
+      "parsed_samples": 361,
+      "segments": [
+        {
+          "shots": [
+            "flr_near_lft02",
+            "flr_near_lft02"
+          ],
+          "start_sample": 0,
+          "start_local_frames": [
+            0.0,
+            0.0
+          ],
+          "start_presentation_frame": 1200.0,
+          "end_sample": 195,
+          "sample_count": 196
+        },
+        {
+          "shots": [
+            "flr_far_rt01",
+            "flr_far_rt01"
+          ],
+          "start_sample": 196,
+          "start_local_frames": [
+            0.0,
+            0.0
+          ],
+          "start_presentation_frame": 1298.0,
+          "end_sample": 360,
+          "sample_count": 165
+        }
+      ],
+      "cuts": [
+        {
+          "sample": 196,
+          "position_delta": 200.24260314150683,
+          "forward_degrees": 94.11080122501681,
+          "up_degrees": 8.711104299526077,
+          "fov_delta": 0.42451894300000004
+        }
+      ],
+      "noncut_peak_steps": {
+        "position_delta": {
+          "value": 0.10241917894730466,
+          "sample": 185
+        },
+        "forward_degrees": {
+          "value": 0.1053938190409823,
+          "sample": 179
+        },
+        "up_degrees": {
+          "value": 0.053932203729135895,
+          "sample": 78
+        },
+        "fov_delta": {
+          "value": 7.999000000014078e-05,
+          "sample": 158
+        }
+      },
+      "one_update_islands": [],
+      "aba_shot_returns": [],
+      "fixed_dt": 0.016666666666666666,
+      "time_note": "sample * fixed_dt is elapsed capture time; presentation_frame changes clock domain at song start",
+      "scope": "native trace integrity and review locations only; no retail pose or visual acceptance claim",
+      "smoke_pass": true,
+      "same_camera_samples_as_previous_candidate": true,
+      "screenshots_sha256": {
+        "frame_00000.png": "0e51288e24c008836dcc53d5d77ee700c18467c2a3afc1ce4db9682b4d468937",
+        "frame_00180.png": "8d681b041e7a2b1108fd3b4a4dd7e22c49a0087e135b4665c73e073cc9df547e",
+        "frame_00360.png": "8dc2754610c6f72501328f2ec827ac8f3913160cc66307d6544c74492df2dc09"
+      }
+    },
+    {
+      "venue": "big",
+      "exe_sha256": "eb73d0164c83f877990ecf92b9f1a8b500d70aa19147e7cd55969a77f34efba0",
+      "integrity_pass": true,
+      "errors": [],
+      "parsed_samples": 361,
+      "segments": [
+        {
+          "shots": [
+            "flr_near_rt01",
+            "flr_near_rt01"
+          ],
+          "start_sample": 0,
+          "start_local_frames": [
+            0.0,
+            0.0
+          ],
+          "start_presentation_frame": 1200.0,
+          "end_sample": 195,
+          "sample_count": 196
+        },
+        {
+          "shots": [
+            "flr_near_lft_04",
+            "flr_near_lft_04"
+          ],
+          "start_sample": 196,
+          "start_local_frames": [
+            0.0,
+            0.0
+          ],
+          "start_presentation_frame": 1298.0,
+          "end_sample": 360,
+          "sample_count": 165
+        }
+      ],
+      "cuts": [
+        {
+          "sample": 196,
+          "position_delta": 129.15312971216983,
+          "forward_degrees": 64.64767245963672,
+          "up_degrees": 7.0788721845438385,
+          "fov_delta": 0.11252832400000001
+        }
+      ],
+      "noncut_peak_steps": {
+        "position_delta": {
+          "value": 0.25976440858526806,
+          "sample": 355
+        },
+        "forward_degrees": {
+          "value": 0.15150661560448309,
+          "sample": 333
+        },
+        "up_degrees": {
+          "value": 0.06265017155545548,
+          "sample": 337
+        },
+        "fov_delta": {
+          "value": 0.0,
+          "sample": 1
+        }
+      },
+      "one_update_islands": [],
+      "aba_shot_returns": [],
+      "fixed_dt": 0.016666666666666666,
+      "time_note": "sample * fixed_dt is elapsed capture time; presentation_frame changes clock domain at song start",
+      "scope": "native trace integrity and review locations only; no retail pose or visual acceptance claim",
+      "smoke_pass": true,
+      "same_camera_samples_as_previous_candidate": true,
+      "screenshots_sha256": {
+        "frame_00000.png": "a9b94d22658cfb36244b3077f1d507a7beaa708e82ee2f431a74d5e17f88d840",
+        "frame_00180.png": "a1f90906227a713031052bfdc674827cbb60787c7a0a813c316ac95076e07dd4",
+        "frame_00360.png": "d564471494f48a7b79e30e5f381481c2993351d41e3f6a789744175c6d099d4c"
+      }
+    },
+    {
+      "venue": "theatre",
+      "exe_sha256": "eb73d0164c83f877990ecf92b9f1a8b500d70aa19147e7cd55969a77f34efba0",
+      "integrity_pass": true,
+      "errors": [],
+      "parsed_samples": 361,
+      "segments": [
+        {
+          "shots": [
+            "flr_near_rt01x2",
+            "flr_near_rt01x2"
+          ],
+          "start_sample": 0,
+          "start_local_frames": [
+            0.0,
+            0.0
+          ],
+          "start_presentation_frame": 1200.0,
+          "end_sample": 195,
+          "sample_count": 196
+        },
+        {
+          "shots": [
+            "flr_near_lft02",
+            "flr_near_lft02"
+          ],
+          "start_sample": 196,
+          "start_local_frames": [
+            0.0,
+            0.0
+          ],
+          "start_presentation_frame": 1298.0,
+          "end_sample": 360,
+          "sample_count": 165
+        }
+      ],
+      "cuts": [
+        {
+          "sample": 196,
+          "position_delta": 32.89331719176599,
+          "forward_degrees": 21.002047183881274,
+          "up_degrees": 16.19450013398081,
+          "fov_delta": 0.08726644500000003
+        }
+      ],
+      "noncut_peak_steps": {
+        "position_delta": {
+          "value": 0.10697909448787932,
+          "sample": 353
+        },
+        "forward_degrees": {
+          "value": 0.11339707664633433,
+          "sample": 259
+        },
+        "up_degrees": {
+          "value": 0.07399234359433284,
+          "sample": 321
+        },
+        "fov_delta": {
+          "value": 0.0,
+          "sample": 1
+        }
+      },
+      "one_update_islands": [],
+      "aba_shot_returns": [],
+      "fixed_dt": 0.016666666666666666,
+      "time_note": "sample * fixed_dt is elapsed capture time; presentation_frame changes clock domain at song start",
+      "scope": "native trace integrity and review locations only; no retail pose or visual acceptance claim",
+      "smoke_pass": true,
+      "same_camera_samples_as_previous_candidate": true,
+      "screenshots_sha256": {
+        "frame_00000.png": "ce5fe44cd29af30be74ec5a1296e35f3139997584c8be324a77cb46cd25f0d7a",
+        "frame_00180.png": "fcc9e0affcb2b2ca71f9e7f43e2e050054e80fd15b43ce908f0761fb72164b4e",
+        "frame_00360.png": "c6eb4eb2f2b2e06035c6c7d7331d92cad9d95a09ccafda43e048df5d1f218dfd"
+      }
+    },
+    {
+      "venue": "fest",
+      "exe_sha256": "eb73d0164c83f877990ecf92b9f1a8b500d70aa19147e7cd55969a77f34efba0",
+      "integrity_pass": true,
+      "errors": [],
+      "parsed_samples": 361,
+      "segments": [
+        {
+          "shots": [
+            "flr_near_lft02x1w",
+            "flr_near_lft02x1w"
+          ],
+          "start_sample": 0,
+          "start_local_frames": [
+            0.0,
+            0.0
+          ],
+          "start_presentation_frame": 1200.0,
+          "end_sample": 195,
+          "sample_count": 196
+        },
+        {
+          "shots": [
+            "flr_far_rt03",
+            "flr_far_rt03"
+          ],
+          "start_sample": 196,
+          "start_local_frames": [
+            0.0,
+            0.0
+          ],
+          "start_presentation_frame": 1298.0,
+          "end_sample": 360,
+          "sample_count": 165
+        }
+      ],
+      "cuts": [
+        {
+          "sample": 196,
+          "position_delta": 242.34161614739762,
+          "forward_degrees": 68.34678787829209,
+          "up_degrees": 18.235036849135433,
+          "fov_delta": 0.210593641
+        }
+      ],
+      "noncut_peak_steps": {
+        "position_delta": {
+          "value": 0.12915960837711743,
+          "sample": 359
+        },
+        "forward_degrees": {
+          "value": 0.06832493932080533,
+          "sample": 116
+        },
+        "up_degrees": {
+          "value": 0.05698381375977763,
+          "sample": 116
+        },
+        "fov_delta": {
+          "value": 0.0006693599999999522,
+          "sample": 195
+        }
+      },
+      "one_update_islands": [],
+      "aba_shot_returns": [],
+      "fixed_dt": 0.016666666666666666,
+      "time_note": "sample * fixed_dt is elapsed capture time; presentation_frame changes clock domain at song start",
+      "scope": "native trace integrity and review locations only; no retail pose or visual acceptance claim",
+      "smoke_pass": true,
+      "same_camera_samples_as_previous_candidate": true,
+      "screenshots_sha256": {
+        "frame_00000.png": "a68afeda155c2c5af1f0a06fbe14ccb19ce5d2d944c4c39b1c37811b79032b5b",
+        "frame_00180.png": "073e70b6d6a8552a0881576d82ac2b8cfc9b5d0de46f3a1d5ed2e708cd65863d",
+        "frame_00360.png": "1e594ae871b69873e4982449b4cf61be5abdbbb79cbba58b60cb8ac4a0248867"
+      }
+    },
+    {
+      "venue": "arena",
+      "exe_sha256": "eb73d0164c83f877990ecf92b9f1a8b500d70aa19147e7cd55969a77f34efba0",
+      "integrity_pass": true,
+      "errors": [],
+      "parsed_samples": 361,
+      "segments": [
+        {
+          "shots": [
+            "flr_near_lft01",
+            "flr_near_lft01"
+          ],
+          "start_sample": 0,
+          "start_local_frames": [
+            0.0,
+            0.0
+          ],
+          "start_presentation_frame": 1200.0,
+          "end_sample": 195,
+          "sample_count": 196
+        },
+        {
+          "shots": [
+            "flr_far_rt02x3",
+            "flr_far_rt02x3"
+          ],
+          "start_sample": 196,
+          "start_local_frames": [
+            0.0,
+            0.0
+          ],
+          "start_presentation_frame": 1298.0,
+          "end_sample": 360,
+          "sample_count": 165
+        }
+      ],
+      "cuts": [
+        {
+          "sample": 196,
+          "position_delta": 808.8465475904203,
+          "forward_degrees": 69.8460669865434,
+          "up_degrees": 25.164609380843697,
+          "fov_delta": 0.44478184
+        }
+      ],
+      "noncut_peak_steps": {
+        "position_delta": {
+          "value": 0.2565684360275268,
+          "sample": 317
+        },
+        "forward_degrees": {
+          "value": 0.012999598499229697,
+          "sample": 339
+        },
+        "up_degrees": {
+          "value": 0.002356593281275042,
+          "sample": 357
+        },
+        "fov_delta": {
+          "value": 0.0,
+          "sample": 1
+        }
+      },
+      "one_update_islands": [],
+      "aba_shot_returns": [],
+      "fixed_dt": 0.016666666666666666,
+      "time_note": "sample * fixed_dt is elapsed capture time; presentation_frame changes clock domain at song start",
+      "scope": "native trace integrity and review locations only; no retail pose or visual acceptance claim",
+      "smoke_pass": true,
+      "same_camera_samples_as_previous_candidate": true,
+      "screenshots_sha256": {
+        "frame_00000.png": "4f55c5416e1369b39a4b328d99149d61894fb19f19faf5c3a4da3daccec7ef12",
+        "frame_00180.png": "43ffd300c421b75324afa0d70861c67bfbb8fc32dfdec7bd9d1a034fe996e61d",
+        "frame_00360.png": "d2dc8463c2c6d645d1841a320c17322725b9e13dd246eb39221d53834f0daf67"
+      }
+    },
+    {
+      "venue": "stone",
+      "exe_sha256": "eb73d0164c83f877990ecf92b9f1a8b500d70aa19147e7cd55969a77f34efba0",
+      "integrity_pass": true,
+      "errors": [],
+      "parsed_samples": 361,
+      "segments": [
+        {
+          "shots": [
+            "flr_near_rt02",
+            "flr_near_rt02"
+          ],
+          "start_sample": 0,
+          "start_local_frames": [
+            0.0,
+            0.0
+          ],
+          "start_presentation_frame": 1200.0,
+          "end_sample": 195,
+          "sample_count": 196
+        },
+        {
+          "shots": [
+            "flr_far_lft01",
+            "flr_far_lft01"
+          ],
+          "start_sample": 196,
+          "start_local_frames": [
+            0.0,
+            0.0
+          ],
+          "start_presentation_frame": 1298.0,
+          "end_sample": 360,
+          "sample_count": 165
+        }
+      ],
+      "cuts": [
+        {
+          "sample": 196,
+          "position_delta": 806.8572382852436,
+          "forward_degrees": 36.5872804191524,
+          "up_degrees": 14.393992435620433,
+          "fov_delta": 0.16288542700000008
+        }
+      ],
+      "noncut_peak_steps": {
+        "position_delta": {
+          "value": 0.891206533539561,
+          "sample": 360
+        },
+        "forward_degrees": {
+          "value": 0.06805923982392927,
+          "sample": 352
+        },
+        "up_degrees": {
+          "value": 0.03767294276454409,
+          "sample": 313
+        },
+        "fov_delta": {
+          "value": 0.0,
+          "sample": 1
+        }
+      },
+      "one_update_islands": [],
+      "aba_shot_returns": [],
+      "fixed_dt": 0.016666666666666666,
+      "time_note": "sample * fixed_dt is elapsed capture time; presentation_frame changes clock domain at song start",
+      "scope": "native trace integrity and review locations only; no retail pose or visual acceptance claim",
+      "smoke_pass": true,
+      "same_camera_samples_as_previous_candidate": true,
+      "screenshots_sha256": {
+        "frame_00000.png": "f7e022a6b5bac5a39c688ff9123f38528bb5f55389fb011bd92d17f0a596b306",
+        "frame_00180.png": "ef29f96f9424a00d605e38e310c43ce992b0f370a16fbda9d8649455f4ef488f",
+        "frame_00360.png": "3305281b08064d17e7b8637125e71172c205ba7ca4a48922acd9c952d8723f0b"
+      }
+    },
+    {
+      "venue": "gh1_basement",
+      "exe_sha256": "eb73d0164c83f877990ecf92b9f1a8b500d70aa19147e7cd55969a77f34efba0",
+      "integrity_pass": true,
+      "errors": [],
+      "parsed_samples": 361,
+      "segments": [
+        {
+          "shots": [
+            "flr_near_lft03",
+            "flr_near_lft03"
+          ],
+          "start_sample": 0,
+          "start_local_frames": [
+            0.0,
+            0.0
+          ],
+          "start_presentation_frame": 1200.0,
+          "end_sample": 195,
+          "sample_count": 196
+        },
+        {
+          "shots": [
+            "flr_far_lft02",
+            "flr_far_lft02"
+          ],
+          "start_sample": 196,
+          "start_local_frames": [
+            0.0,
+            0.0
+          ],
+          "start_presentation_frame": 1298.0,
+          "end_sample": 360,
+          "sample_count": 165
+        }
+      ],
+      "cuts": [
+        {
+          "sample": 196,
+          "position_delta": 82.38318765108689,
+          "forward_degrees": 8.718442991913975,
+          "up_degrees": 0.35506308075262577,
+          "fov_delta": 0.0
+        }
+      ],
+      "noncut_peak_steps": {
+        "position_delta": {
+          "value": 0.10464151663346932,
+          "sample": 121
+        },
+        "forward_degrees": {
+          "value": 0.14988493441527972,
+          "sample": 84
+        },
+        "up_degrees": {
+          "value": 0.12121290335624962,
+          "sample": 121
+        },
+        "fov_delta": {
+          "value": 0.0,
+          "sample": 1
+        }
+      },
+      "one_update_islands": [],
+      "aba_shot_returns": [],
+      "fixed_dt": 0.016666666666666666,
+      "time_note": "sample * fixed_dt is elapsed capture time; presentation_frame changes clock domain at song start",
+      "scope": "native trace integrity and review locations only; no retail pose or visual acceptance claim",
+      "smoke_pass": true,
+      "same_camera_samples_as_previous_candidate": true,
+      "screenshots_sha256": {
+        "frame_00000.png": "086d152839b7b10227106e3217d7186a037fda5c6706b16c89674be0388dfb23",
+        "frame_00180.png": "41fc565f3a335421e727468b641fc61fabcf8dec3953916820169c29e54067d6",
+        "frame_00360.png": "a79253fb6140812f7e0b11b0a745903080554c516ef6ad607977f5df6fc8ab3c"
+      }
+    },
+    {
+      "venue": "gh1_small_club",
+      "exe_sha256": "eb73d0164c83f877990ecf92b9f1a8b500d70aa19147e7cd55969a77f34efba0",
+      "integrity_pass": true,
+      "errors": [],
+      "parsed_samples": 361,
+      "segments": [
+        {
+          "shots": [
+            "flr_near_rt01",
+            "flr_near_rt01"
+          ],
+          "start_sample": 0,
+          "start_local_frames": [
+            0.0,
+            0.0
+          ],
+          "start_presentation_frame": 1200.0,
+          "end_sample": 195,
+          "sample_count": 196
+        },
+        {
+          "shots": [
+            "flr_far_rt01",
+            "flr_far_rt01"
+          ],
+          "start_sample": 196,
+          "start_local_frames": [
+            0.0,
+            0.0
+          ],
+          "start_presentation_frame": 1298.0,
+          "end_sample": 360,
+          "sample_count": 165
+        }
+      ],
+      "cuts": [
+        {
+          "sample": 196,
+          "position_delta": 75.14568080809588,
+          "forward_degrees": 25.010001688759488,
+          "up_degrees": 24.975513453552644,
+          "fov_delta": 0.0
+        }
+      ],
+      "noncut_peak_steps": {
+        "position_delta": {
+          "value": 0.0516096004494503,
+          "sample": 108
+        },
+        "forward_degrees": {
+          "value": 0.051726451881035314,
+          "sample": 80
+        },
+        "up_degrees": {
+          "value": 0.03511637260485515,
+          "sample": 84
+        },
+        "fov_delta": {
+          "value": 0.0,
+          "sample": 1
+        }
+      },
+      "one_update_islands": [],
+      "aba_shot_returns": [],
+      "fixed_dt": 0.016666666666666666,
+      "time_note": "sample * fixed_dt is elapsed capture time; presentation_frame changes clock domain at song start",
+      "scope": "native trace integrity and review locations only; no retail pose or visual acceptance claim",
+      "smoke_pass": true,
+      "same_camera_samples_as_previous_candidate": true,
+      "screenshots_sha256": {
+        "frame_00000.png": "707bb2131790bc1e8d0ca3c22a3f88b78563a60978cb83f059ba9eb3ce353032",
+        "frame_00180.png": "ec365af8e943e7df61380dc77a706245ed9badc1b6132bee87bebf7b6110b511",
+        "frame_00360.png": "bc8e5c727617416885e1ed1a4caaa033e91fd66e5da7199c992173c453f94442"
+      }
+    },
+    {
+      "venue": "gh1_small_club_multi",
+      "exe_sha256": "eb73d0164c83f877990ecf92b9f1a8b500d70aa19147e7cd55969a77f34efba0",
+      "integrity_pass": true,
+      "errors": [],
+      "parsed_samples": 361,
+      "segments": [
+        {
+          "shots": [
+            "multi01",
+            "multi01"
+          ],
+          "start_sample": 0,
+          "start_local_frames": [
+            0.0,
+            0.0
+          ],
+          "start_presentation_frame": 1200.0,
+          "end_sample": 195,
+          "sample_count": 196
+        },
+        {
+          "shots": [
+            "multi02",
+            "multi02"
+          ],
+          "start_sample": 196,
+          "start_local_frames": [
+            0.0,
+            0.0
+          ],
+          "start_presentation_frame": 1298.0,
+          "end_sample": 360,
+          "sample_count": 165
+        }
+      ],
+      "cuts": [
+        {
+          "sample": 196,
+          "position_delta": 190.59478464666714,
+          "forward_degrees": 72.7253300316119,
+          "up_degrees": 6.422707543907912,
+          "fov_delta": 0.0
+        }
+      ],
+      "noncut_peak_steps": {
+        "position_delta": {
+          "value": 0.0,
+          "sample": 1
+        },
+        "forward_degrees": {
+          "value": 8.537736462515939e-07,
+          "sample": 197
+        },
+        "up_degrees": {
+          "value": 8.537736462515939e-07,
+          "sample": 1
+        },
+        "fov_delta": {
+          "value": 0.0,
+          "sample": 1
+        }
+      },
+      "one_update_islands": [],
+      "aba_shot_returns": [],
+      "fixed_dt": 0.016666666666666666,
+      "time_note": "sample * fixed_dt is elapsed capture time; presentation_frame changes clock domain at song start",
+      "scope": "native trace integrity and review locations only; no retail pose or visual acceptance claim",
+      "smoke_pass": true,
+      "same_camera_samples_as_previous_candidate": true,
+      "screenshots_sha256": {
+        "frame_00000.png": "82466c18d25ca78e15c17efdd6e2509222aef269b7d503bf672f21b414f4e65c",
+        "frame_00180.png": "69e636c170879c9e9dd21ef2290fe9b1d4395c7c931c067fa551a7d070d09866",
+        "frame_00360.png": "c75dd53916ec85ec919050005a37ee81594e7f2584024698acb51f877cd2a1b1"
+      }
+    },
+    {
+      "venue": "gh1_big_club",
+      "exe_sha256": "eb73d0164c83f877990ecf92b9f1a8b500d70aa19147e7cd55969a77f34efba0",
+      "integrity_pass": true,
+      "errors": [],
+      "parsed_samples": 361,
+      "segments": [
+        {
+          "shots": [
+            "flr_near_lft03x2w",
+            "flr_near_lft03x2w"
+          ],
+          "start_sample": 0,
+          "start_local_frames": [
+            0.0,
+            0.0
+          ],
+          "start_presentation_frame": 1200.0,
+          "end_sample": 195,
+          "sample_count": 196
+        },
+        {
+          "shots": [
+            "flr_far_lft01",
+            "flr_far_lft01"
+          ],
+          "start_sample": 196,
+          "start_local_frames": [
+            0.0,
+            0.0
+          ],
+          "start_presentation_frame": 1298.0,
+          "end_sample": 360,
+          "sample_count": 165
+        }
+      ],
+      "cuts": [
+        {
+          "sample": 196,
+          "position_delta": 542.2129423517948,
+          "forward_degrees": 17.530455300299423,
+          "up_degrees": 7.1555788950113435,
+          "fov_delta": 0.0
+        }
+      ],
+      "noncut_peak_steps": {
+        "position_delta": {
+          "value": 0.01775952750546855,
+          "sample": 334
+        },
+        "forward_degrees": {
+          "value": 0.006630786622824615,
+          "sample": 139
+        },
+        "up_degrees": {
+          "value": 0.006462359932580042,
+          "sample": 139
+        },
+        "fov_delta": {
+          "value": 0.0,
+          "sample": 1
+        }
+      },
+      "one_update_islands": [],
+      "aba_shot_returns": [],
+      "fixed_dt": 0.016666666666666666,
+      "time_note": "sample * fixed_dt is elapsed capture time; presentation_frame changes clock domain at song start",
+      "scope": "native trace integrity and review locations only; no retail pose or visual acceptance claim",
+      "smoke_pass": true,
+      "same_camera_samples_as_previous_candidate": true,
+      "screenshots_sha256": {
+        "frame_00000.png": "c20289bf6cf260f062edb7a48f236cf43102d79dd758fccd9f3bdda28b82f4de",
+        "frame_00180.png": "9616d4d3df6a0fe80f09eb54f5de4af5630e0d921638d10acba9511a455678d5",
+        "frame_00360.png": "1e9f0b25167d9e49dc71ad6b74472662e8a87b8b688cdabcd45fb80f10ad441b"
+      }
+    },
+    {
+      "venue": "gh1_theatre",
+      "exe_sha256": "eb73d0164c83f877990ecf92b9f1a8b500d70aa19147e7cd55969a77f34efba0",
+      "integrity_pass": true,
+      "errors": [],
+      "parsed_samples": 361,
+      "segments": [
+        {
+          "shots": [
+            "flr_near_rt01x2",
+            "flr_near_rt01x2"
+          ],
+          "start_sample": 0,
+          "start_local_frames": [
+            0.0,
+            0.0
+          ],
+          "start_presentation_frame": 1200.0,
+          "end_sample": 195,
+          "sample_count": 196
+        },
+        {
+          "shots": [
+            "flr_far_lft04",
+            "flr_far_lft04"
+          ],
+          "start_sample": 196,
+          "start_local_frames": [
+            0.0,
+            0.0
+          ],
+          "start_presentation_frame": 1298.0,
+          "end_sample": 360,
+          "sample_count": 165
+        }
+      ],
+      "cuts": [
+        {
+          "sample": 196,
+          "position_delta": 970.8397494293911,
+          "forward_degrees": 113.168479535456,
+          "up_degrees": 4.720052488704585,
+          "fov_delta": 0.0
+        }
+      ],
+      "noncut_peak_steps": {
+        "position_delta": {
+          "value": 0.017532794164264374,
+          "sample": 139
+        },
+        "forward_degrees": {
+          "value": 0.0029473912188704393,
+          "sample": 139
+        },
+        "up_degrees": {
+          "value": 0.0029408266400392396,
+          "sample": 139
+        },
+        "fov_delta": {
+          "value": 0.0,
+          "sample": 1
+        }
+      },
+      "one_update_islands": [],
+      "aba_shot_returns": [],
+      "fixed_dt": 0.016666666666666666,
+      "time_note": "sample * fixed_dt is elapsed capture time; presentation_frame changes clock domain at song start",
+      "scope": "native trace integrity and review locations only; no retail pose or visual acceptance claim",
+      "smoke_pass": true,
+      "same_camera_samples_as_previous_candidate": true,
+      "screenshots_sha256": {
+        "frame_00000.png": "a666a95b74319ef602b1a67a91cf92040b45ab405fed9e7c9c568528741b02eb",
+        "frame_00180.png": "9efff5e7231dca6965b8b233ba7135b546733aefb35f7157c14d595720e1e281",
+        "frame_00360.png": "61b18d7755f1ab701c0d98882648d434e0bf2624831d5f3cf2265d9ed76513d0"
+      }
+    },
+    {
+      "venue": "gh1_fest",
+      "exe_sha256": "eb73d0164c83f877990ecf92b9f1a8b500d70aa19147e7cd55969a77f34efba0",
+      "integrity_pass": true,
+      "errors": [],
+      "parsed_samples": 361,
+      "segments": [
+        {
+          "shots": [
+            "flr_near_lft04",
+            "flr_near_lft04"
+          ],
+          "start_sample": 0,
+          "start_local_frames": [
+            0.0,
+            0.0
+          ],
+          "start_presentation_frame": 1200.0,
+          "end_sample": 195,
+          "sample_count": 196
+        },
+        {
+          "shots": [
+            "flr_far_lft05",
+            "flr_far_lft05"
+          ],
+          "start_sample": 196,
+          "start_local_frames": [
+            0.0,
+            0.0
+          ],
+          "start_presentation_frame": 1298.0,
+          "end_sample": 360,
+          "sample_count": 165
+        }
+      ],
+      "cuts": [
+        {
+          "sample": 196,
+          "position_delta": 885.4717560068406,
+          "forward_degrees": 27.888692995827366,
+          "up_degrees": 1.881505061023924,
+          "fov_delta": 0.0
+        }
+      ],
+      "noncut_peak_steps": {
+        "position_delta": {
+          "value": 0.16511322683482765,
+          "sample": 115
+        },
+        "forward_degrees": {
+          "value": 0.09280720247753459,
+          "sample": 115
+        },
+        "up_degrees": {
+          "value": 0.035757116678941145,
+          "sample": 115
+        },
+        "fov_delta": {
+          "value": 0.0,
+          "sample": 1
+        }
+      },
+      "one_update_islands": [],
+      "aba_shot_returns": [],
+      "fixed_dt": 0.016666666666666666,
+      "time_note": "sample * fixed_dt is elapsed capture time; presentation_frame changes clock domain at song start",
+      "scope": "native trace integrity and review locations only; no retail pose or visual acceptance claim",
+      "smoke_pass": true,
+      "same_camera_samples_as_previous_candidate": true,
+      "screenshots_sha256": {
+        "frame_00000.png": "b97218e2d8ab38cce457e138650c810ebac720239a6f54befee495e41e5761d9",
+        "frame_00180.png": "a166b26af939b78d73bcf8b87e18e32f5b255721869d0e3d5d8374a153d755fa",
+        "frame_00360.png": "3e2d95c458d8a12ea734c6a18e59e138773318340f97a236f3ec931e726e4eb7"
+      }
+    },
+    {
+      "venue": "gh1_arena",
+      "exe_sha256": "eb73d0164c83f877990ecf92b9f1a8b500d70aa19147e7cd55969a77f34efba0",
+      "integrity_pass": true,
+      "errors": [],
+      "parsed_samples": 361,
+      "segments": [
+        {
+          "shots": [
+            "flr_near_lft03",
+            "flr_near_lft03"
+          ],
+          "start_sample": 0,
+          "start_local_frames": [
+            0.0,
+            0.0
+          ],
+          "start_presentation_frame": 1200.0,
+          "end_sample": 195,
+          "sample_count": 196
+        },
+        {
+          "shots": [
+            "flr_far_rt01",
+            "flr_far_rt01"
+          ],
+          "start_sample": 196,
+          "start_local_frames": [
+            0.0,
+            0.0
+          ],
+          "start_presentation_frame": 1298.0,
+          "end_sample": 360,
+          "sample_count": 165
+        }
+      ],
+      "cuts": [
+        {
+          "sample": 196,
+          "position_delta": 818.3406414801375,
+          "forward_degrees": 39.98742539898966,
+          "up_degrees": 11.616454494518734,
+          "fov_delta": 0.0
+        }
+      ],
+      "noncut_peak_steps": {
+        "position_delta": {
+          "value": 0.18306277364105103,
+          "sample": 108
+        },
+        "forward_degrees": {
+          "value": 0.025715341380919937,
+          "sample": 335
+        },
+        "up_degrees": {
+          "value": 0.013849592967536666,
+          "sample": 337
+        },
+        "fov_delta": {
+          "value": 0.0,
+          "sample": 1
+        }
+      },
+      "one_update_islands": [],
+      "aba_shot_returns": [],
+      "fixed_dt": 0.016666666666666666,
+      "time_note": "sample * fixed_dt is elapsed capture time; presentation_frame changes clock domain at song start",
+      "scope": "native trace integrity and review locations only; no retail pose or visual acceptance claim",
+      "smoke_pass": true,
+      "same_camera_samples_as_previous_candidate": true,
+      "screenshots_sha256": {
+        "frame_00000.png": "58330d46aa566be62acc89307775d8ff285b5301177b399d862dfe4cfe8f7fa8",
+        "frame_00180.png": "a5430020941e7c6fc58dfca277a1e6905b75733f462138a03ef0cb8a4d7b2e9b",
+        "frame_00360.png": "f59721781ba6dc49b6bdb878ffd11b3fb310e076b8120ec222ed5228da97156f"
+      }
+    }
+  ]
+}

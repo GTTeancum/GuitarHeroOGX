@@ -959,6 +959,22 @@ int main() {
           "diagnostic seek past a whole star phrase leaves no stale phrase miss");
   }
 
+  {
+    FoFiXGameplaySession practice({
+        make_note(1.0, 1.0, kGreen, false, false),
+        make_note(2.0, 2.0, kRed, false, false),
+    });
+    practice.set_failure_enabled(false);
+    practice.set_rock_fill_for_diagnostic(0.0);
+    practice.tick(1.3, 0);
+    practice.tick(2.0, kRed | kStrum);
+    CHECK(!practice.failed() && practice.misses() == 1 && practice.hits() == 1,
+          "Practice keeps judging misses and later hits with an empty rock meter");
+    practice.set_rock_fill_for_diagnostic(0.0);
+    practice.set_failure_enabled(true);
+    CHECK(practice.failed(), "normal play retains failure at an empty rock meter");
+  }
+
   if (failures == 0) {
     std::fprintf(stderr, "gameplay_session_test: PASS\n");
   }

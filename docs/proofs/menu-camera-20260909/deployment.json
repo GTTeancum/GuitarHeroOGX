@@ -1,0 +1,75 @@
+{
+  "installed_executable": "C:\\Programming\\GitHub\\Guitar Hero II\\gh2_ps2_hybrid_assets\\ghogx_app.exe",
+  "sha256": "3e8c9008af459fc67b87aa5453d389e6ede7b556779fdcd4669c0bcd7c096be4",
+  "bytes": 6868992,
+  "committed": false,
+  "goal_status": "Paused by user to conserve usage; camera certification not closed.",
+  "focused_audio": [
+    "ghogx_ui_test: audio command contract failures=0"
+  ],
+  "script": [
+    "ghogx_script_test: interpreter runs real main.dtb script shapes -- all checks passed"
+  ],
+  "camera_and_session_tests": [
+    " 1/10 Test #17: ghogx_milo_scene_test ........................   Passed    0.09 sec",
+    " 2/10 Test #20: ghogx_render_camera_matrix_test ..............   Passed    0.02 sec",
+    " 3/10 Test #22: ghogx_gh1_crowd_regions_test .................   Passed    0.02 sec",
+    " 4/10 Test #25: ghogx_source_anim_task_test ..................   Passed    0.02 sec",
+    " 5/10 Test #26: ghogx_gameplay_venue_band_contract_test ......***Failed    0.37 sec",
+    " 6/10 Test #27: ghogx_gameplay_venue_band_contract_imports ...   Passed    8.96 sec",
+    " 7/10 Test #29: ghogx_gameplay_session_test ..................   Passed    0.03 sec",
+    " 8/10 Test #30: ghogx_camera_filter_test .....................   Passed    0.02 sec",
+    " 9/10 Test #31: ghogx_camera_projection_test .................   Passed    0.03 sec",
+    "10/10 Test #32: ghogx_camera_intro_timing_test ...............   Passed    0.03 sec",
+    "90% tests passed, 1 tests failed out of 10"
+  ],
+  "baseline_structural_failures": [
+    "Missing venue/band contract: failed gameplay stops the VGS stream before holding the overlay",
+    "Missing venue/band contract: failed gameplay stays visible before returning to title",
+    "Missing venue/band contract: finished gameplay stops the VGS stream before holding the overlay",
+    "Missing venue/band contract: finished gameplay stays visible before returning to title",
+    "Missing venue/band contract: highway decodes native track.milo_ps2 mesh objects",
+    "Broken venue/band contract order: the prewarmed highway is marked ready before its first frame is presented",
+    "Missing venue/band contract: the player guitarist loads the authored star_power CharClipGroup from its main animation MILO",
+    "Missing venue/band contract: venue load begins from decoded source WorldDir/RndDir assembly refs",
+    "Missing venue/band contract: lighting overlay textures fall back to paired venue geometry MILO",
+    "Broken venue/band contract order: lighting Mat fallback happens before texture requests",
+    "Missing venue/band contract: GH2 v28 Mesh PostLoad preserves shared floats as weights for skinned geometry",
+    "Missing venue/band contract: GH2 v28 Mesh PostLoad packs Color32 only for unskinned geometry",
+    "Missing venue/band contract: venue assembly follows the recursive ObjectDir subdir tree from geometry",
+    "Missing venue/band contract: venue assembly follows the recursive ObjectDir subdir tree from lighting",
+    "Missing venue/band contract: venue load merges visual geometry subdirs before renderer setup"
+  ],
+  "current_structural_failures": [
+    "Missing venue/band contract: failed gameplay stops the VGS stream before holding the overlay",
+    "Missing venue/band contract: failed gameplay stays visible before returning to title",
+    "Missing venue/band contract: finished gameplay stops the VGS stream before holding the overlay",
+    "Missing venue/band contract: finished gameplay stays visible before returning to title",
+    "Missing venue/band contract: highway decodes native track.milo_ps2 mesh objects",
+    "Broken venue/band contract order: the prewarmed highway is marked ready before its first frame is presented",
+    "Missing venue/band contract: the player guitarist loads the authored star_power CharClipGroup from its main animation MILO",
+    "Missing venue/band contract: venue load begins from decoded source WorldDir/RndDir assembly refs",
+    "Missing venue/band contract: lighting overlay textures fall back to paired venue geometry MILO",
+    "Broken venue/band contract order: lighting Mat fallback happens before texture requests",
+    "Missing venue/band contract: GH2 v28 Mesh PostLoad preserves shared floats as weights for skinned geometry",
+    "Missing venue/band contract: GH2 v28 Mesh PostLoad packs Color32 only for unskinned geometry",
+    "Missing venue/band contract: venue assembly follows the recursive ObjectDir subdir tree from geometry",
+    "Missing venue/band contract: venue assembly follows the recursive ObjectDir subdir tree from lighting",
+    "Missing venue/band contract: venue load merges visual geometry subdirs before renderer setup"
+  ],
+  "final_practice_end": [
+    "[flow] equipped instrument handoff: mode=<unset> player0=lespaul skin_outfit=lespaull skin_mat=guitar_lespaul_burst.mat player1=<npc> skin_outfit=<default> skin_mat=<default>",
+    "[flow] selected song handoff: provider_index=0 song=badreputation mode=career venue=theatre intro_category=INTRO",
+    "[flow] selected native character handoff: character=rockabill outfit=rockabill1 model=char/rockabill1/og/gen/rockabill1.milo_ps2 surface=resolve_from_character",
+    "[flow] gameplay calibration: audio_offset_ms=0 video_input_offset_ms=0 audio_master=1 presentation=audio-audio_offset judgement=presentation+video_input_offset",
+    "[flow] diagnostic menu-loop song seek: 185.000 sec",
+    "[flow] gameplay ready: badreputation diff=1 autoplay=1",
+    "[gameplay] t=193.0 score=447 streak=8 mult=1",
+    "[flow] practice complete -> practice_end_screen"
+  ],
+  "crowd_verifier": [
+    "Ran 9 tests in 0.001s",
+    "OK"
+  ],
+  "remaining": "Finish camera certification reconciliation; user visual acceptance pending. All sprite crowds must be replaced with 3D: separate explicit TODO requirement."
+}

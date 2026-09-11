@@ -1,4 +1,6 @@
 #include "render/scene_d3d9.h"
+#include "render/instance_frustum.h"
+#include <limits>
 
 #include <cmath>
 #include <cstdio>
@@ -20,6 +22,21 @@ namespace {
 }  // namespace
 
 int main() {
+  {
+    std::array<float, 16> clip{1,0,0,0, 0,1,0,0, 0,0,1,0, 0,0,0,1};
+    const float lo[]{-.5f,-.5f,.1f}, hi[]{.5f,.5f,.9f};
+    CHECK_NEAR(ghogx::render::instance_bounds_visible(lo,hi,clip),1,0);
+    clip[12]=2;
+    CHECK_NEAR(ghogx::render::instance_bounds_visible(lo,hi,clip),0,0);
+    clip[12]=1; // AABB crosses the right plane: must not disappear.
+    CHECK_NEAR(ghogx::render::instance_bounds_visible(lo,hi,clip),1,0);
+    clip[12]=0; clip[14]=-2;
+    CHECK_NEAR(ghogx::render::instance_bounds_visible(lo,hi,clip),0,0);
+    clip[14]=2;
+    CHECK_NEAR(ghogx::render::instance_bounds_visible(lo,hi,clip),0,0);
+    clip[14]=std::numeric_limits<float>::quiet_NaN();
+    CHECK_NEAR(ghogx::render::instance_bounds_visible(lo,hi,clip),1,0);
+  }
   // Accepted PS2 row block: gdx_cam_output_00ceaa20 from
   // gh2dxu_arena_camera_relocated_rows_20260623.json. Rows are:
   // forward, position, right, up, then the derived D3D-style view matrix.

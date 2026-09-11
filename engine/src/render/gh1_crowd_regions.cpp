@@ -77,6 +77,7 @@ void Gh1CrowdRegions::rebuild(const milo_scene::Scene& scene) {
   instances_.clear();
   instance_runs_.clear();
   active_flat_.clear();
+  card_ground_z_.clear();
   selected_ = -1;
   // Converter records the recovered Arena::Crowd ownership. Never apply this
   // policy to arbitrary native GH2 MultiMeshes or WorldCrowd instances.
@@ -117,6 +118,25 @@ void Gh1CrowdRegions::rebuild(const milo_scene::Scene& scene) {
     for (const auto& instance : multi.instances) {
       instances_.insert(&instance);
       run.push_back(&instance);
+      const auto mesh = std::find_if(scene.meshes.begin(), scene.meshes.end(),
+          [&](const auto& m) { return m.name == multi.mesh; });
+      if (mesh != scene.meshes.end()) {
+        const auto* geometry = &*mesh;
+        if (!mesh->geometry_owner.empty() && mesh->geometry_owner != mesh->name) {
+          const auto shared = std::find_if(scene.meshes.begin(), scene.meshes.end(),
+              [&](const auto& m) { return m.name == mesh->geometry_owner; });
+          if (shared != scene.meshes.end()) geometry = &*shared;
+        }
+        bool first_vertex = true;
+        float bottom = instance.pos[2];
+        for (const auto& v : geometry->verts) {
+          const float z = instance.pos[2] + v.px * instance.rot[0][2] +
+                          v.py * instance.rot[1][2] + v.pz * instance.rot[2][2];
+          bottom = first_vertex ? z : std::min(bottom, z);
+          first_vertex = false;
+        }
+        card_ground_z_[&instance] = bottom;
+      }
     }
   }
   // 0x171F58..0x1720AC: consecutive names from 00, stop at first missing mesh.
@@ -228,6 +248,27 @@ std::vector<std::array<float, 16>> Gh1CrowdRegions::promoted_worlds() const {
         xfm.rot[1][0], xfm.rot[1][1], xfm.rot[1][2], 0.0f,
         xfm.rot[2][0], xfm.rot[2][1], xfm.rot[2][2], 0.0f,
         xfm.pos[0], xfm.pos[1], region.plane_z, 1.0f});
+  }
+  return worlds;
+}
+
+std::vector<std::array<float, 16>> Gh1CrowdRegions::replacement_worlds() const {
+  auto worlds = promoted_worlds();
+  for (const auto& run : instance_runs_) {
+    for (const auto* instance : run) {
+      if (!active_flat_.count(instance)) continue;
+      float ground = instance->pos[2];
+      const auto bottom = card_ground_z_.find(instance);
+      if (bottom != card_ground_z_.end()) ground = bottom->second;
+      for (const auto& region : regions_) {
+        if (region.members.count(instance)) { ground = region.plane_z; break; }
+      }
+      const auto& x = *instance;
+      worlds.push_back({x.rot[0][0], x.rot[0][1], x.rot[0][2], 0,
+                        x.rot[1][0], x.rot[1][1], x.rot[1][2], 0,
+                        x.rot[2][0], x.rot[2][1], x.rot[2][2], 0,
+                        x.pos[0], x.pos[1], ground, 1});
+    }
   }
   return worlds;
 }

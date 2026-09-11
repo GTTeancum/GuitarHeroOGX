@@ -224,7 +224,7 @@ class MiloSceneRenderer {
   // frame. Native GH2 renderers have no GH1 ownership group and are unaffected.
   void select_gh1_crowd_region(int index);
   void set_gh1_crowd_sizes(float promoted_fraction, float flat_fraction);
-  std::vector<std::array<float, 16>> gh1_crowd_promoted_worlds() const;
+  std::vector<std::array<float, 16>> gh1_crowd_replacement_worlds(bool include_far) const;
   void exclude_gh1_crowd_already_owned_by(const MiloSceneRenderer& owner);
   void set_post_text_meshes(std::unordered_set<std::string> mesh_names);
   void set_post_text_mesh_world_offsets(

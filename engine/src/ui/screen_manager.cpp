@@ -947,6 +947,16 @@ bool ScreenManager::symbol_exists(Symbol name) {
 
 bool ScreenManager::handle_command(Symbol name, const DataArray& args,
                                    DataNode& out) {
+  if (name == Symbol("song_preview")) {
+    const Symbol song = args.size() ? node_name_symbol(args.at(0)) : Symbol();
+    set_global(Symbol("song_preview_start_ms"),
+               args.size() > 1 ? args.at(1) : DataNode::Int(-1));
+    set_global(Symbol("song_preview_end_ms"),
+               args.size() > 2 ? args.at(2) : DataNode::Int(-1));
+    emit_audio_event(Symbol("song_preview"), song, song.valid());
+    out = DataNode();
+    return true;
+  }
   if (name == Symbol("set_loader_period")) {
     const float period =
         args.size() ? args.at(0).as_float().value_or(0.0f) : 0.0f;

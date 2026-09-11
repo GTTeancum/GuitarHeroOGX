@@ -1,12 +1,34 @@
 # Shared camera-driver audit
 
-Status: **shared PS2 gameplay driver recovered; current 15-venue native acceptance passed** (2026-09-05).
+Status: **shared PS2 gameplay driver recovered; current 15-venue verification and full 3D crowd replacement passed** (2026-09-11).
+
+## Current completion — 2026-09-11
+
+The current installed executable is
+`c474acbf47c8cb124fa27b879af0992ed4b795d3a435be83b1de3754fa1c9fea`.
+All 15 venues pass; all 5,415 camera samples match the previous matrix exactly.
+The ten focused camera/session CTests pass, and the fresh saved retail crowd
+oracle still matches. All 45 final native stills were reviewed. See the
+[current requirement/evidence record](proofs/crowds-3d-20260911/README.md).
+
+The user's standing requirement overrides retail sprite presentation: every
+visible GH1/GH2 crowd placement now draws a 3D character. Source selection,
+visibility and density are preserved. Shared pose batching and conservative
+posed-mesh clipping keep all venues at 58.561–59.926 steady desktop fps.
+GH1 Big Club's sprite obstruction is removed without any camera adjustment.
+Authored views can still include foreground 3D people, including Stone.
+
+Earlier notes below are historical, including statements that release GH1
+camera payloads, 3D promotion, or the shared-driver tests remain unfinished.
+The live/release object comparison and current evidence record supersede those
+statuses. Certification covers the recovered normal PS2 contracts and tested
+inputs, not every possible physical-PS2 arithmetic edge case.
 
 All eight GH2 venues and seven converted GH1 venues are compatibility inputs.
 There are no venue-specific camera adjustments in this audit. Retained PS2
 camera captures are comparison evidence, not a substitute runtime driver.
 
-## Current acceptance — shared driver and all-venue native proof
+## Previous acceptance — shared driver and all-venue native proof
 
 Current executable:
 `df24602e52429b145f311b3931fbd9045f5f8e2e34809416cab5fc736aa3ca3e`.

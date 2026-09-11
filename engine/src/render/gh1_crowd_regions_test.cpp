@@ -90,11 +90,16 @@ int main() {
   const auto promoted = regions.promoted_worlds();
   CHECK(promoted.size() == 1); CHECK(promoted[0][12] == 1.0f);
   CHECK(promoted[0][13] == 1.0f); CHECK(promoted[0][14] == 0.0f);
+  const auto replacements = regions.replacement_worlds();
+  CHECK(replacements.size() == 2); // promoted + retained far card, once each
+  CHECK(replacements[0] == promoted[0]);
+  CHECK(replacements[1][12] == 14.0f && replacements[1][14] == -7.0f);
+  CHECK(regions.owns(a) && regions.owns(b) && !regions.owns(nullptr));
   CHECK(!regions.allows_flat(a)); CHECK(!regions.allows_flat(b));
   CHECK(regions.allows_flat(&scene.multi_meshes[0].instances[3]));
   // Release crowd-quality contract: reducing the promoted/fullness fraction
   // must never restore a camera-selected near/mid member as a flat card.
-  // Legacy cards are legal only outside the selected region (far crowd).
+  // This audits the retail population; presentation replaces its cards in 3D.
   regions.set_sizes(0.0f, 1.0f);
   CHECK(regions.promoted_count() == 0);
   for (const auto* selected_member : regions.regions()[0].ordered_members)
@@ -189,5 +194,17 @@ int main() {
   secondary = primary;
   primary.groups.clear();
   CHECK(Gh1CrowdRegions::duplicate_drawables(primary, secondary).empty());
-  std::puts("GH1 crowd regions: membership, boundaries, affine scale, ownership, scoring, population and lifecycle PASS");
+  ms::Scene far_scene;
+  auto far_card = triangle("card.mesh");
+  for (auto& v : far_card.verts) v.pz = -20;
+  far_scene.meshes.push_back(far_card);
+  ms::MultiMeshObj far_crowd;
+  far_crowd.name = "Crowd01.mm"; far_crowd.mesh = far_card.name;
+  far_crowd.instances.resize(1); far_crowd.instances[0].pos[2] = 60;
+  far_scene.multi_meshes.push_back(far_crowd);
+  owner.children = {far_crowd.name}; far_scene.groups.push_back(owner);
+  Gh1CrowdRegions far_regions; far_regions.rebuild(far_scene);
+  CHECK(far_regions.replacement_worlds().size() == 1);
+  CHECK(far_regions.replacement_worlds()[0][14] == 40);
+  std::puts("GH1 crowd regions: membership, boundaries, affine scale, ownership, scoring, population, replacement grounding and lifecycle PASS");
 }

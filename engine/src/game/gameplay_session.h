@@ -95,7 +95,8 @@ class FoFiXGameplaySession {
   const FoFiXRockState& rock_state() const { return rock_; }
   const FoFiXStarPowerState& star_power_state() const { return star_power_; }
   bool star_power_active() const { return star_power_.active; }
-  bool failed() const { return fofix_rock_failed(rock_); }
+  void set_failure_enabled(bool enabled) { failure_enabled_ = enabled; }
+  bool failed() const { return failure_enabled_ && fofix_rock_failed(rock_); }
   int hits() const { return hits_; }
   int misses() const { return misses_; }
   int overstrums() const { return overstrums_; }
@@ -104,6 +105,7 @@ class FoFiXGameplaySession {
   }
 
  private:
+  bool failure_enabled_ = true;
   struct ActiveSustain {
     uint32_t mask = 0;
     int gem_count = 0;

@@ -60,6 +60,8 @@ def main():
     parser.add_argument("--transform-mesh", help="Retain only this mesh's target rows, avoiding duplicate ancestor evidence")
     parser.add_argument("--camera-transform-audit", action="store_true",
                         help="Retain every submitted camera transform with its live CamShot attribution")
+    parser.add_argument("--crowd-audit", action="store_true",
+                        help="Retain 3D/sprite crowd draw counts for presentation verification")
     parser.add_argument("--performer-start-audit", action="store_true",
                         help="Retain decoded start waypoints and the applied performer start transform")
     parser.add_argument("--camera-mesh-audit", action="store_true",
@@ -108,6 +110,8 @@ def main():
             del env[key]
     env.update(GHOGX_HIDE_WINDOW="1", GHOGX_DEBUG_CAMERA="1", GHOGX_DEBUG_CAMERA_MOTION="1",
                GHOGX_ADDONS_DIR=str(args.addons_dir.resolve()))
+    if args.crowd_audit:
+        env["GHOGX_DEBUG_WORLDCROWD"] = "1"
     if args.compact_trace:
         del env["GHOGX_DEBUG_CAMERA"]
         env["GHOGX_LOG_CAMERA_SUBMITTED_EVERY_FRAME"] = "1"
@@ -181,6 +185,7 @@ def main():
             current_shot = "unknown"
             solver_samples = []
             crowd_regions = []
+            crowd_draw_samples = []
             helper_samples = []
             venue_source_samples = []
             presentation_samples = []
@@ -336,6 +341,8 @@ def main():
                         frustum_samples.append(line.strip())
                     elif line.startswith("[crowd_region]"):
                         crowd_regions.append(line.strip())
+                    if args.crowd_audit and "WorldCrowd draw:" in line:
+                        crowd_draw_samples.append(line.strip())
                     elif line.startswith("[world] regular camera sweep:"):
                         sweeps.append(line.strip())
                     elif line.startswith("[camera-solver]") and " refs " in line and len(solver_samples) < 4:
@@ -383,6 +390,7 @@ def main():
                            wall_seconds=round(time.monotonic() - start, 2),
                            shots=sorted(shots), samples=samples, sweeps=sweeps,
                            solver_samples=solver_samples, crowd_regions=crowd_regions, helper_samples=helper_samples,
+                           crowd_draw_samples=crowd_draw_samples,
                            venue_source_samples=venue_source_samples,
                            presentation_samples=presentation_samples, highway_visible=args.show_highway,
                            lifecycle_samples=lifecycle_samples,

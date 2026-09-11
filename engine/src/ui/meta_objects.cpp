@@ -1897,7 +1897,7 @@ bool GameConfig::handle_meta(Symbol msg, const DataArray& args, DataNode& out) {
     return true;
   }
   if (std::strcmp(m, "get_song_caption") == 0) {
-    out = db_ ? db_->song_field(si, Symbol("name")) : DataNode();
+    out = DataNode::Sym(Symbol("mtv_made_famous"));
     return true;
   }
   if (std::strcmp(m, "get_num_players") == 0 || std::strcmp(m, "num_players") == 0) {

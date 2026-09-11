@@ -4,6 +4,7 @@
 #include "render/milo_scene_renderer.h"  // OrbitCamera
 #include "render/window_d3d9.h"
 #include "render/scene_d3d9.h"           // Mat4
+#include "render/instance_frustum.h"
 #include "asset/milo_image.h"
 
 #define WIN32_LEAN_AND_MEAN
@@ -1443,6 +1444,7 @@ struct CharRenderer::Impl {
   std::vector<std::array<float, 3>> scratch_pos;
   std::vector<std::array<float, 3>> scratch_nrm;
   std::vector<std::array<float, 16>> scratch_skin;
+  const std::vector<std::array<float, 16>>* instance_worlds = nullptr;
 };
 
 CharRenderer::CharRenderer(Window& win) : impl_(new Impl) {
@@ -2695,10 +2697,33 @@ void CharRenderer::draw_impl(bool clear_target, uint32_t clear_color) {
       append_skinned_pose_vertices(
           m, spos, snrm, mesh_color, use_vertex_color, vb);
     }
-    const HRESULT draw_result = dev->DrawIndexedPrimitiveUP(
+    const auto submit = [&]() { return dev->DrawIndexedPrimitiveUP(
         D3DPT_TRIANGLELIST, 0, static_cast<UINT>(m.verts.size()),
         static_cast<UINT>(m.indices.size() / 3), m.indices.data(),
-        D3DFMT_INDEX16, vb.data(), sizeof(SVtx));
+        D3DFMT_INDEX16, vb.data(), sizeof(SVtx)); };
+    HRESULT draw_result = S_OK;
+    if (impl.instance_worlds) {
+      Bounds3 posed_bounds;
+      for (const auto& vertex : vb)
+        add_bounds(posed_bounds, {vertex.x, vertex.y, vertex.z});
+      std::array<float, 16> view_rows, projection_rows;
+      std::memcpy(view_rows.data(), &view, 64);
+      std::memcpy(projection_rows.data(), &proj, 64);
+      const auto view_projection = mul16(view_rows, projection_rows);
+      for (const auto& placement : *impl.instance_worlds) {
+        const auto instance_world = mul16(mw, placement);
+        if (posed_bounds.valid && !ghogx::render::instance_bounds_visible(
+                posed_bounds.mn, posed_bounds.mx,
+                mul16(instance_world, view_projection))) continue;
+        D3DMATRIX instance_matrix{};
+        std::memcpy(&instance_matrix, instance_world.data(), 64);
+        dev->SetTransform(D3DTS_WORLD, &instance_matrix);
+        const HRESULT result = submit();
+        if (FAILED(result)) draw_result = result;
+      }
+    } else {
+      draw_result = submit();
+    }
     if (debug_mesh_mode && FAILED(draw_result)) {
       std::fprintf(stderr,
                    "[mesh-draw-failed] mesh=%s hr=0x%08lx verts=%zu "
@@ -3088,6 +3113,24 @@ void CharRenderer::draw() {
 void CharRenderer::draw_over_scene(const OrbitCamera& cam) {
   impl_->cam = cam;
   draw_impl(false, 0u);
+}
+
+void CharRenderer::draw_instances_over_scene(const OrbitCamera& cam,
+    const std::vector<std::array<float, 16>>& worlds) {
+  if (worlds.empty()) return;
+  const auto saved_world = impl_->world_transform;
+  if (impl_->has_prop) {
+    for (const auto& world : worlds) {
+      set_world_transform(world);
+      draw_over_scene(cam);
+    }
+  } else {
+    impl_->world_transform = {1,0,0,0, 0,1,0,0, 0,0,1,0, 0,0,0,1};
+    impl_->instance_worlds = &worlds;
+    draw_over_scene(cam);
+    impl_->instance_worlds = nullptr;
+  }
+  impl_->world_transform = saved_world;
 }
 
 bool CharRenderer::refresh_worldcrowd_impostor(

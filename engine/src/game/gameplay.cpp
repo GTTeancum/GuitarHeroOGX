@@ -30954,6 +30954,7 @@ bool Gameplay::load_song(const std::string& hdr_path, const std::string& ark_pat
     }
     gameplay_session_mirror_ =
         FoFiXGameplaySession::FromChart(chart_, difficulty_);
+    gameplay_session_mirror_->set_failure_enabled(!practice_mode_);
     if (diagnostic_rock_fill_) {
         gameplay_session_mirror_->set_rock_fill_for_diagnostic(
             *diagnostic_rock_fill_);
@@ -39658,6 +39659,7 @@ void Gameplay::rebuild_worldcrowd_actor_runtime(ghogx::render::Window& win) {
             if (!runtime || !runtime->renderer) continue;
             runtime->gh1_promoted = true;
             runtime->gh1_promoted_ordinal = ordinal;
+            runtime->gh1_replacement_stride = recipes.size();
             ++loaded;
             ++worldcrowd_actor_runtime_placements_;
         }
@@ -40063,18 +40065,27 @@ void Gameplay::draw_worldcrowd_actor_runtime(
     size_t hidden_flat = 0;
     size_t missing_impostor = 0;
     const auto gh1_promoted_worlds =
-        world_ ? world_->gh1_crowd_promoted_worlds()
+        world_ ? world_->gh1_crowd_replacement_worlds(!venue_camera_hide_crowd_)
                : std::vector<std::array<float, 16>>{};
     if (world_) world_->apply_environment_lighting_state("crowd.env");
     for (auto& [actor_path, runtime] : worldcrowd_actor_runtime_) {
         (void)actor_path;
         if (!runtime.renderer) continue;
         runtime.renderer->set_min_lod(active_force_char_lod_);
+        std::vector<std::array<float, 16>> crowd_3d_worlds;
+        const bool batch_crowd_pose = !runtime.type_script ||
+            std::none_of(runtime.world_fxes.begin(), runtime.world_fxes.end(),
+                [&](const auto& fx) {
+                    return fx.renderer &&
+                        runtime.type_script->named_object_active(fx.source.name);
+                });
         if (runtime.gh1_promoted) {
             if (runtime.gh1_promoted_ordinal >= gh1_promoted_worlds.size())
                 continue;
-            const auto& character_world =
-                gh1_promoted_worlds[runtime.gh1_promoted_ordinal];
+            for (size_t ordinal = runtime.gh1_promoted_ordinal;
+                 ordinal < gh1_promoted_worlds.size();
+                 ordinal += runtime.gh1_replacement_stride) {
+            const auto& character_world = gh1_promoted_worlds[ordinal];
             if (debug_worldcrowd && !runtime.gh1_transform_logged) {
                 runtime.gh1_transform_logged = true;
                 auto row_length = [&](int row) {
@@ -40096,11 +40107,17 @@ void Gameplay::draw_worldcrowd_actor_runtime(
                     character_world[14], row_length(0), row_length(1),
                     row_length(2));
             }
-            runtime.renderer->set_world_transform(character_world);
-            draw_world_fx(runtime, character_world, cam, false);
-            runtime.renderer->draw_over_scene(cam);
-            draw_world_fx(runtime, character_world, cam, true);
+            if (batch_crowd_pose) {
+                crowd_3d_worlds.push_back(character_world);
+            } else {
+                runtime.renderer->set_world_transform(character_world);
+                draw_world_fx(runtime, character_world, cam, false);
+                runtime.renderer->draw_over_scene(cam);
+                draw_world_fx(runtime, character_world, cam, true);
+            }
             ++drawn_3d;
+            }
+            runtime.renderer->draw_instances_over_scene(cam, crowd_3d_worlds);
             continue;
         }
         std::vector<uint8_t> selected_3d(runtime.placement_worlds.size(), 0);
@@ -40157,7 +40174,9 @@ void Gameplay::draw_worldcrowd_actor_runtime(
                 ++placement_index;
                 continue;
             }
-            if (draw_as_3d) {
+            // Preserve source fullness/hide decisions, then replace every
+            // remaining visible impostor with its existing 3D actor.
+            if (draw_as_3d || !venue_camera_hide_crowd_) {
                 // The second loop in GH2 retail WorldCrowd::DrawShowing
                 // (SLUS_214.47, 0x0026ba3c) walks m3DChars and subtracts
                 // CharDef::mHeight / 2 from the copied instance translation
@@ -40171,10 +40190,14 @@ void Gameplay::draw_worldcrowd_actor_runtime(
                         ? worldcrowd_face_camera_source_world(character_world,
                                                               camera_ref)
                         : character_world;
-                runtime.renderer->set_world_transform(draw_world);
-                draw_world_fx(runtime, draw_world, cam, false);
-                runtime.renderer->draw_over_scene(cam);
-                draw_world_fx(runtime, draw_world, cam, true);
+                if (batch_crowd_pose) {
+                    crowd_3d_worlds.push_back(draw_world);
+                } else {
+                    runtime.renderer->set_world_transform(draw_world);
+                    draw_world_fx(runtime, draw_world, cam, false);
+                    runtime.renderer->draw_over_scene(cam);
+                    draw_world_fx(runtime, draw_world, cam, true);
+                }
                 ++drawn_3d;
             } else if (venue_camera_hide_crowd_) {
                 // Source m3DOnly/show_3d_only keeps the CamShot-selected 3-D
@@ -40194,6 +40217,7 @@ void Gameplay::draw_worldcrowd_actor_runtime(
             }
             ++placement_index;
         }
+        runtime.renderer->draw_instances_over_scene(cam, crowd_3d_worlds);
         size_t pending_flat = 0;
         for (const auto& [key, worlds] : flat_worlds_by_set) {
             (void)key;
@@ -42386,6 +42410,27 @@ bool Gameplay::prepare_world(ghogx::render::Window& win) {
 
 void Gameplay::draw(ghogx::render::Window& win) {
     draw_internal(win, false);
+}
+
+void Gameplay::draw_highway_over_scene(ghogx::render::Window& win) {
+    if (!chart_loaded_) return;
+    if (!highway_) highway_ = std::make_unique<HighwayRenderer>(win);
+    if (!highway_->textures_loaded_for_surface(highway_surface_ref_)) {
+        highway_->load_textures(
+            !highway_asset_hdr_path_.empty() ? highway_asset_hdr_path_ : hdr_path_,
+            !highway_asset_ark_path_.empty() ? highway_asset_ark_path_ : ark_path_,
+            highway_surface_ref_);
+    }
+    song_presentation_ready_ = true;
+    const bool whammy = (prev_fret_mask_ & (1u << 7)) != 0;
+    highway_->draw_over_scene(
+        highway_song_time(), chart_, difficulty_, prev_fret_mask_ & 0x1F,
+        lane_flash_, 1.5f, &note_consumed_[std::clamp(difficulty_, 0, 3)],
+        &active_session_sustains_, star_power_.active, whammy,
+        whammy ? prev_whammy_axis_ : 0.0f, star_collect_flash_, miss_flash_,
+        star_miss_flash_, hit_phrase_state_, multiplier_, bad_highway_flash_,
+        fofix_rock_fill(rock_), star_power_highway_flash_,
+        multiplier_surface_flash_, track_intro_active_, track_intro_elapsed());
 }
 
 void Gameplay::draw_internal(ghogx::render::Window& win,

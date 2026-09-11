@@ -1,6 +1,6 @@
 # TO-DO
 
-This file contains open work only. Completed work belongs in Git history,
+This file tracks open work and standing requirements. Completed work belongs in Git history,
 proof manifests, and technical documentation—not in this queue.
 
 ## Open work at a glance
@@ -9,13 +9,18 @@ proof manifests, and technical documentation—not in this queue.
 2. Add original-Xbox support for Xbox 360 guitar hardware.
 3. Decide whether to add a later-game-style HOPO glow.
 4. Prove the complete mixed-content gameplay matrix.
-5. Convert selected Rock Band 2 characters to release-quality GH2 assets.
-6. Add a data-driven venue selection screen.
-7. Restore source-accurate Practice mode presentation.
-8. Restore setlist song-preview playback.
-9. Correct the Soundcheck up/down navigation sound.
-10. Complete shared camera-driver retail parity certification.
-11. Add data-driven setlist buckets and preference-aware launch controls.
+5. Convert selected Rock Band 2 and Neversoft Guitar Hero characters to release-quality GH2 assets.
+6. Add data-driven setlist buckets and preference-aware launch controls.
+
+## Standing requirements
+
+Crowds must use actual 3D characters throughout the game, including converted
+GH1 venues and future conversions. Replace the entire visible sprite/billboard
+population, not just camera-selected retail promotions. Source sprite retention
+is not an acceptable fallback. Preserve appropriate visibility, density and
+animation, and verify native visuals and performance.
+
+Implementation and all-venue evidence: [3D crowd verification](docs/proofs/crowds-3d-20260911/README.md).
 
 ## Details
 
@@ -72,8 +77,15 @@ proof manifests, and technical documentation—not in this queue.
     preferred-guitar, and loose-DLC packaging path. Its source-authored RB2
     height/weight deformation is baked across all vertices, fourteen textures
     are reduced to three atlas pages, transparent lenses are preserved, and
-    the native proof holds 60 FPS. Apply this pipeline to a deliberately
-    selected roster rather than adding per-character fixes.
+    the native proof holds 60 FPS. His forearms still show visible deformation
+    problems in the Manage Band preview and therefore have not passed visual
+    acceptance. Before selecting a release roster, evaluate baking useful RB2
+    bump/specular detail into the diffuse atlas alongside AO so the PS2 target
+    retains more of the source material definition. Apply pipeline-level fixes
+    to a deliberately selected roster rather than adding per-character
+    exceptions.
+
+   Midori from Guitar Hero 3 has been certified by the player. Additional Neversoft characters and outfits will be requested by the user.
 
     Ship every converted character as additive DLC with a unique character ID,
     portrait, outfit data, preferred guitar, and source-derived metadata. The
@@ -92,57 +104,17 @@ proof manifests, and technical documentation—not in this queue.
     idle/strum/fret/movement/camera/lighting/performance acceptance matrix for
     every selected character.
 
-6. **Venue selection screen**
+    Current proposed conversions from user:
+    1. The Duke of Gravity (Wii RB2)
+    2. Penelope McQueen (Wii RB2)
+    3. Moosejaw Bordreau (Wii RB2)
+    4. Mothership Q (Wii RB2)
+    5. Elroy Budvis (PS2 GH3)
+    6. Casey Lynch outfits (PS2 GH3)
+    7. Xavier Stone outfits (PS2 GH3)
+    8. Clive Winston outfits (PS2 GHWT and GH Metallica) - user to supply disc images
 
-    Add an in-theme, data-driven venue selection screen based on the supplied
-    HTML design mockup in the repository-root
-    `Guitar Hero Venue Selector.zip`. It must expose native and DLC venues
-    without hard-coded roster entries, preserve GH2 as the primary UI language,
-    and integrate with Quickplay venue choice and Manage Band venue preferences.
-    The archive is recorded for later review and has not yet been
-    inspected.
-    The complete 14-image venue preview set was approved on 2026-09-07. On the
-    selector, show the chosen preview in the left pane, center-framed
-    vertically, with a tentative -3 degree rotation that remains tunable during
-    the final layout pass. Use the canonical copies in
-    `proofs/manage-band-20260906/venue-preview-approved/`.
-    The Manage Band Favorite Venue submenu now implements that preview
-    treatment and switches the cached image from the highlighted stable venue
-    ID. The remaining item is the standalone Quickplay venue-selection screen
-    and its final interaction/layout acceptance.
-
-7. **Practice mode presentation**
-
-    Restore the missing GH2 gameplay highway and correct the backwards
-    song/title/artist text ordering. Preserve the original messy Practice Room
-    backdrop and trace the final presentation against the retail source.
-
-8. **Setlist song previews**
-
-    Restore source-accurate song-preview playback when the highlighted setlist
-    entry changes.
-
-9. **Soundcheck navigation sound**
-
-    Replace the current Soundcheck up/down sound with the source-correct menu
-    navigation cue.
-
-10. **Shared camera-driver parity — in progress**
-
-    Finish the executable/memory-trace audit of camera targets, rotation blends,
-    path evaluation, shake, lifecycle and selection. Validate all 15 GH2/GH1
-    venues as inputs, without venue-specific fixes. Native smoke coverage alone
-    is not retail parity. See `docs/CAMERA_DRIVER_AUDIT.md` for evidence and gates.
-
-    Regenerate the release GH1 payload with source-correct horizontal-to-vertical
-    FOV curves (compiler and legacy loading paths corrected; proof copies only).
-    Restore GH1 shared camera-path parent/target policy in the release payload,
-    and finish `crowd_region` integration: source-selected instances leave the
-    flat list and enter a 3D character pool (not yet wired). Verify automatic
-    selection startup timing and fix the still-obstructed close-ups using
-    source evidence. Verify complete shake/helper-transform composition.
-
-11. **Setlist buckets and Quickplay launch controls**
+6. **Setlist buckets and Quickplay launch controls**
 
     Add switchable, ordered Quickplay setlist buckets sourced from the merged
     catalog. GH2, GH1, and GH80s remain distinct setlists. DLC manifests may

@@ -999,6 +999,9 @@ class Gameplay {
 
   // Draw the highway for this frame.
   void draw(ghogx::render::Window& win);
+  // Practice supplies its own authored room backdrop but uses the live game
+  // chart, judgment state, frets, sustains and GH2 highway renderer.
+  void draw_highway_over_scene(ghogx::render::Window& win);
   void stop_audio();
   void set_paused(bool paused);
 
@@ -1014,7 +1017,8 @@ class Gameplay {
   // The venue/song-card/highway opening has its own clock. Song audio, notes,
   // scoring, and gameplay MIDI remain at zero until this presentation ends.
   double intro_presentation_time() const {
-    return intro_presentation_time_;
+    return track_intro_active_ ? intro_presentation_time_ :
+        intro_camera_seconds_ + std::max(0.0, audio_master_time_);
   }
   void set_calibration_offsets_ms(int audio_offset_ms,
                                   int video_input_offset_ms) {
@@ -1093,6 +1097,7 @@ class Gameplay {
   // Diagnostic capture helper: jump the deterministic song clock to a known
   // authored window without replaying all earlier note/cue events.
   void seek_for_diagnostic_capture(double seconds);
+  void set_practice_mode(bool enabled) { practice_mode_ = enabled; }
   std::vector<DiagnosticInputEvent> build_diagnostic_guitar_script_from_chart(
       double start_sec,
       double end_sec,
@@ -1936,6 +1941,7 @@ class Gameplay {
     size_t animation_ordinal = 0;
     bool gh1_promoted = false;
     size_t gh1_promoted_ordinal = 0;
+    size_t gh1_replacement_stride = 1;
     bool gh1_transform_logged = false;
     float source_character_height = 0.0f;
     float fullness_fraction = 1.0f;
@@ -2054,6 +2060,7 @@ class Gameplay {
   double gameplay_session_mirror_last_log_time_ = -1.0;
   std::string gameplay_session_sustain_log_signature_;
   bool     failed_         = false;
+  bool     practice_mode_  = false;
   bool     star_phrase_active_ = false;
   bool     star_phrase_missed_ = false;
 

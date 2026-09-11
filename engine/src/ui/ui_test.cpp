@@ -269,6 +269,22 @@ static void check_menu_audio_surface_smoke() {
       });
 
   Object* synth = mgr.resolve_object(Symbol("synth"));
+  // Retail uses a global command, including the zero-argument stop form.
+  DataNode preview_result;
+  DataArray preview_args;
+  preview_args.push(DataNode::Sym(Symbol("badreputation")));
+  CHECK(mgr.handle_command(Symbol("song_preview"), preview_args, preview_result));
+  CHECK(events.back().action == Symbol("song_preview"));
+  CHECK(events.back().cue == Symbol("badreputation"));
+  CHECK(events.back().value);
+  CHECK(mgr.get_global(Symbol("song_preview_start_ms")).as_int().value_or(0) == -1);
+  preview_args.push(DataNode::Int(12000));
+  preview_args.push(DataNode::Int(19000));
+  CHECK(mgr.handle_command(Symbol("song_preview"), preview_args, preview_result));
+  CHECK(mgr.get_global(Symbol("song_preview_start_ms")).as_int().value_or(0) == 12000);
+  CHECK(mgr.get_global(Symbol("song_preview_end_ms")).as_int().value_or(0) == 19000);
+  CHECK(mgr.handle_command(Symbol("song_preview"), DataArray(), preview_result));
+  CHECK(!events.back().value && !events.back().cue.valid());
   Object* world = mgr.resolve_object(Symbol("world"));
   Object* sync_click = mgr.resolve_object(Symbol("sync_click.cue"));
   CHECK(synth != nullptr);
@@ -790,6 +806,10 @@ int main(int argc, char** argv) {
   check_transition_lifecycle_smoke();
   check_backwards_anim_routes_goto_as_back_smoke();
   check_menu_audio_surface_smoke();
+  if (argc > 1 && std::string(argv[1]) == "--audio-contract-only") {
+    std::printf("ghogx_ui_test: audio command contract failures=%d\n", g_failures);
+    return g_failures == 0 ? 0 : 1;
+  }
   check_focus_panel_surface_smoke();
   check_bad_select_surface_smoke();
   check_shared_menu_sfx_surface_smoke();

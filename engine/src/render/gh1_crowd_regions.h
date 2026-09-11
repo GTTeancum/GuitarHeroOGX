@@ -31,6 +31,10 @@ class Gh1CrowdRegions {
   size_t active_flat_count() const { return active_flat_.size(); }
   size_t promoted_count() const;
   std::vector<std::array<float, 16>> promoted_worlds() const;
+  // Presentation override: source-promoted population plus every visible card,
+  // using authored ground planes/card geometry for the replacement foot pivot.
+  std::vector<std::array<float, 16>> replacement_worlds() const;
+  bool owns(const milo_scene::Xfm* instance) const { return instances_.count(instance) != 0; }
   float promoted_fraction() const { return promoted_fraction_; }
   float flat_fraction() const { return flat_fraction_; }
 
@@ -51,6 +55,7 @@ class Gh1CrowdRegions {
   std::unordered_set<const milo_scene::Xfm*> instances_;
   std::vector<std::vector<const milo_scene::Xfm*>> instance_runs_;
   std::unordered_set<const milo_scene::Xfm*> active_flat_;
+  std::unordered_map<const milo_scene::Xfm*, float> card_ground_z_;
   float promoted_fraction_ = 1.0f;
   float flat_fraction_ = 1.0f;
   int selected_ = -1;

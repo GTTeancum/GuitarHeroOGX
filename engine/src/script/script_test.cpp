@@ -459,6 +459,9 @@ static void test_sprintf() {
         "guitar01.env");
   CHECK(to_str(ip.eval(*mkcmd({mksym("sprintf"), mkstr("CASH: $%/D"), mkint(12345)}), env)) ==
         "CASH: $12,345");
+  CHECK(to_str(ip.eval(*mkcmd({mksym("sprintf"), mkstr("%d%% (%d/%d)"),
+                               mkint(100), mkint(8), mkint(8)}), env)) ==
+        "100% (8/8)");
 }
 
 static void test_stock_collection_helpers() {

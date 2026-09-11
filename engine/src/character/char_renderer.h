@@ -83,6 +83,10 @@ class CharRenderer {
   // target and depth buffer. Used to composite the animated character into a
   // venue scene after the venue renderer has drawn its pass.
   void draw_over_scene(const ghogx::render::OrbitCamera& cam);
+  // Reuse one animated pose/material setup across crowd placements. Geometry
+  // remains fully 3D; no render-to-texture impostor is involved.
+  void draw_instances_over_scene(const ghogx::render::OrbitCamera& cam,
+      const std::vector<std::array<float, 16>>& worlds);
 
   // WorldCrowd's source renderer keeps only CamShot-selected members as full
   // 3-D characters. The remaining members are drawn through a camera-facing
